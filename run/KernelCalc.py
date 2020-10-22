@@ -4,15 +4,18 @@ import sys
 import argparse
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
+from chemml.kernels.GraphKernel import *
 from run.GPR import *
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Prediction')
+    parser = argparse.ArgumentParser(
+        description='Calculate Kernel Matrix and Gradients.',
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument(
-        '--gpr', type=str, default="graphdot",
-        help='The GaussianProcessRegressor.\n'
-             'options: graphdot or sklearn.'
+        '--result_dir', type=str, default='default',
+        help='The output directory.',
     )
     parser.add_argument(
         '--normalized', action='store_true',
@@ -37,35 +40,30 @@ def main():
         '--json_hyper', type=str, default=None,
         help='Reading hyperparameter file.\n'
     )
-    parser.add_argument(
-        '--f_model', type=str,
-        help='model.pkl',
-    )
     args = parser.parse_args()
-
-    # set Gaussian process regressor
-    GPR = set_gpr(args.gpr)
 
     single_graph, multi_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
-
     # set kernel_config
     kernel_config = set_kernel_config(
-        '', 'graph', args.normalized,
+        args.result_dir, 'graph', args.normalized,
         single_graph, multi_graph,
         add_f, add_p,
         json.loads(open(args.json_hyper, 'r').readline())
     )
-    model = GPR.load_cls(args.f_model, kernel_config.kernel)
-    # read input
-    df = get_df(args.input, None, kernel_config.single_graph, kernel_config.multi_graph)
-    X, _, _ = get_XYid_from_df(df, kernel_config)
-    y, y_std = model.predict(X, return_std=True)
-    df = pd.read_csv(args.input, sep='\s+')
-    df['predict'] = y
-    df['uncertainty'] = y_std
-    df.to_csv('predict.csv', sep=' ', index=False)
+    params = {
+        'train_size': None,
+        'train_ratio': 1.0,
+        'seed': 0,
+    }
+    df, df_train, df_test, train_X, train_Y, train_id, test_X, test_Y, \
+    test_id = read_input(
+        args.result_dir, args.input, kernel_config, properties, params
+    )
+    print('**\tCalculating kernel matrix\t**')
+    kernel_config.kernel.PreCalculate(train_X, result_dir=args.result_dir)
+    print('**\tEnd Calculating kernel matrix\t**')
 
 
 if __name__ == '__main__':

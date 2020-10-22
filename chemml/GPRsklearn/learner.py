@@ -10,7 +10,6 @@ class Learner(BaseLearner):
                                                        normalize_y=True,
                                                        alpha=self.alpha)
 
-    def train(self, verbose=True):
+    def train(self):
         self.model.fit_robust(self.train_X, self.train_Y)
-        if verbose:
-            print('hyperparameter: ', self.model.kernel_.hyperparameters)
+        print('hyperparameter: ', self.model.kernel_.hyperparameters)

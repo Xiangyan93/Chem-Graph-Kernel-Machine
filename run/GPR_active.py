@@ -1,157 +1,147 @@
 #!/usr/bin/env python3
 import os
 import sys
-import pickle
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from chemml.learner import ActiveLearner
-from run.GPR import (
-    read_input,
-    get_kernel_config
-)
+from run.GPR import *
+
+
+def set_active_config(active_config):
+    learning_mode, add_mode, init_size, add_size, max_size, search_size, \
+    pool_size, stride = active_config.split(':')
+    init_size = int(init_size) if init_size else 0
+    add_size = int(add_size) if add_size else 0
+    max_size = int(max_size) if max_size else 0
+    search_size = int(search_size) if search_size else 0
+    pool_size = int(pool_size) if pool_size else 0
+    stride = int(stride) if stride else 0
+    return learning_mode, add_mode, init_size, add_size, max_size, \
+           search_size, pool_size, stride
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description='Gaussian process regression using graph kernel',
+        description='Gaussian process regression using graph kernel, active '
+                    'learning',
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
-        '--gpr', type=str, default="graphdot",
-        help='The GaussianProcessRegressor.\n'
-             'options: graphdot or sklearn.'
-    )
-    parser.add_argument(
-        '--optimizer', type=str, default="L-BFGS-B",
-        help='Optimizer used in GPR. options:\n' 
-             'L-BFGS-B: graphdot GPR that minimize LOOCV error.\n'
-             'fmin_l_bfgs_b: sklearn GPR that maximize marginalized log '
-             'likelihood.'
-    )
-    parser.add_argument(
-        '--kernel',  type=str, default="graph",
-        help='Kernel type.\n'
-             'options: graph, vector.\n'
-    )
-    parser.add_argument('-i', '--input', type=str, help='Input data in csv '
-                                                        'format.')
-    parser.add_argument('--property', type=str, help='Target property.')
-    parser.add_argument('--seed', type=int, help='random seed', default=0)
-    parser.add_argument(
         '--result_dir', type=str, default='default',
-        help='The path where all the output saved.',
+        help='The output directory.',
     )
     parser.add_argument(
-        '--alpha', type=float, default=0.5,
-        help='Initial alpha value.'
+        '--gpr', type=str, default="graphdot",
+        help='The GaussianProcessRegressor, optimizer.\n'
+             'format: regressor:optimizer\n'
+             'examples:\n'
+             'graphdot:L-BFGS-B\n'
+             'sklearn:fmin_l_bfgs_b\n'
+             'graphdot:None'
+    )
+    parser.add_argument(
+        '--kernel', type=str,
+        help='format: kernel:Normalized?:alpha.\n'
+             'examples:\n'
+             'graph:True:0.01\n'
+             'graph:False:10.0\n'
+             'preCalc::0.01\n'
+             'For preCalc kernel, run KernelCalc.py first.'
+    )
+    parser.add_argument(
+        '-i', '--input', type=str, help='Input data in csv format.'
+    )
+    parser.add_argument(
+        '--input_config', type=str, help='Columns in input data.\n'
+        'format: single_graph:multi_graph:targets\n'
+        'examples: inchi::tt\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
-        help='Additional features. examples:\n'
-             'rel_T\n'
-             'T,P'
+        help='Additional vector features with RBF kernel.\n' 
+             'examples:\n'
+             'red_T:0.1\n'
+             'T,P:100,500'
     )
     parser.add_argument(
-        '--add_hyperparameters', type=str, default=None,
-        help='The hyperparameters of additional features. examples:\n'
-             '100\n'
-             '100,100'
+        '--train_test_config', type=str, help=
+        'format: mode:train_size:train_ratio:seed\n'
+        'examples:\n'
+        'train_test:1000::0\n'
+        'train_test::0.8:0\n'
     )
     parser.add_argument(
-        '--normalized', action='store_true',
-        help='use normalized kernel.',
+        '--active_config', type=str, help=
+        'format: learning_mode:add_mode:init_size:add_size:max_size:search_size'
+        ':pool_size:stride\n'
+        'examples:\n'
+        'supervised:nlargest:5:1:200:0:200:100\n'
+        'unsupervised:cluster:5:5:200:0:200:100\n'
+        'random:nlargest:100:100:200:0:200:100\n'
     )
     parser.add_argument(
-        '--train_size', type=int, default=None,
-        help='size of training set',
+        '--json_hyper', type=str, default=None,
+        help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '--train_ratio', type=float, default=0.8,
-        help='size for training set.\n'
-             'This option is effective only when train_size is None',
+        '--load_K', action='store_true',
+        help='read existed K.pkl',
     )
-    parser.add_argument(
-        '--vectorFPparams', type=str, default='morgan,2,64,0',
-        help='parameters for vector fingerprints. examples:\n'
-             'morgan,2,128,0\n'
-             'morgan,2,0,200\n'
-    )
-    parser.add_argument(
-        '--learning_mode', type=str, default='unsupervised',
-        help='options: supervised/unsupervised/random.'
-    )
-    parser.add_argument(
-        '--add_mode', type=str, default='cluster',
-        help='options: random/cluster/nlargest.'
-    )
-    parser.add_argument(
-        '--init_size', type=int, default=100,
-        help='Initial size for active learning',
-    )
-    parser.add_argument(
-        '--add_size', type=int, default=10,
-        help='Add size for active learning'
-    )
-    parser.add_argument(
-        '--max_size', type=int, default=800,
-        help='Max size for active learning',
-    )
-    parser.add_argument(
-        '--search_size', type=int, default=0,
-        help='Search size for active learning, 0 for pooling from all remaining'
-             ' samples'
-    )
-    parser.add_argument(
-        '--pool_size', type=int, default=200,
-        help='Pool size for active learning, 0 for pooling from all searched '
-             'samples'
-    )
-    parser.add_argument('--stride', type=int, help='output stride', default=100)
     parser.add_argument(
         '--continued', action='store_true',
         help='whether continue training'
     )
     args = parser.parse_args()
-    # set result directory
-    result_dir = os.path.join(CWD, args.result_dir)
+
+    # set args
+    kernel, normalized, alpha = set_kernel_normalized_alpha(args.kernel)
+    single_graph, multi_graph, properties = \
+        set_graph_property(args.input_config)
+    add_f, add_p = set_add_feature_hyperparameters(args.add_features)
+    learning_mode, add_mode, init_size, add_size, max_size, search_size, \
+    pool_size, stride = set_active_config(args.active_config)
     # set kernel_config
-    kernel_config, get_graph, get_XY_from_df = get_kernel_config(
-        args.kernel, args.add_features, args.add_hyperparameters, args.normalized,
-        args.vectorFPparams, result_dir
+    kernel_config = set_kernel_config(
+        args.result_dir, kernel, normalized,
+        single_graph, multi_graph,
+        add_f, add_p,
+        json.loads(open(args.json_hyper, 'r').readline())
     )
 
     if args.continued:
         print('***\tLoading checkpoint\t***\n')
-        f_checkpoint = os.path.join(result_dir, 'checkpoint.pkl')
+        f_checkpoint = os.path.join(args.result_dir, 'checkpoint.pkl')
         activelearner = ActiveLearner.load_checkpoint(f_checkpoint,
                                                       kernel_config)
-        activelearner.max_size = args.max_size
+        activelearner.max_size = max_size
         print("model continued from checkpoint")
     else:
-        # set Gaussian process regressor
-        if args.gpr == 'graphdot':
-            from chemml.GPRgraphdot.learner import Learner
-        elif args.gpr == 'sklearn':
-            from chemml.GPRsklearn.learner import Learner
-        else:
-            raise Exception('Unknown GaussianProcessRegressor: %s' % args.gpr)
         # set optimizer
-        optimizer = None if args.optimizer == 'None' else args.optimizer
+        gpr, optimizer = set_gpr_optimizer(args.gpr)
+        # set Gaussian process regressor
+        Learner = set_learner(gpr)
+        # set train_test
+        mode, train_size, train_ratio, seed = \
+            set_mode_train_size_ratio_seed(args.train_test_config)
         # read input
-        df, df_train, df_test, train_X, train_Y, train_smiles, test_X, test_Y, \
-        test_smiles = read_input(
-            result_dir, args.input, args.property, 'train_test', args.seed,
-            None, 'uniform', args.train_size, args.train_ratio,
-            kernel_config, get_graph, get_XY_from_df
+        params = {
+            'train_size': train_size,
+            'train_ratio': train_ratio,
+            'seed': seed,
+        }
+        df, df_train, df_test, train_X, train_Y, train_id, test_X, test_Y, \
+        test_id = read_input(
+            args.result_dir, args.input, kernel_config, properties, params
         )
+        if optimizer is None:
+            pre_calculate(kernel_config, df, args.result_dir, args.load_K)
         activelearner = ActiveLearner(
-            train_X, train_Y, train_smiles, args.alpha, kernel_config,
-            args.learning_mode, args.add_mode, args.init_size, args.add_size,
-            args.max_size, args.search_size, args.pool_size, result_dir,
-            Learner,
-            test_X=test_X, test_Y=test_Y, test_smiles=test_smiles,
-            optimizer=optimizer, seed=args.seed, stride=args.stride
+            train_X, train_Y, train_id, alpha, kernel_config, learning_mode,
+            add_mode, init_size, add_size, max_size, search_size, pool_size,
+            args.result_dir, Learner,
+            test_X=test_X, test_Y=test_Y, test_id=test_id,
+            optimizer=optimizer, seed=seed, stride=stride
         )
 
     while True:

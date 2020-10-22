@@ -11,38 +11,48 @@ pip install scikit-learn==0.23.0
 pip install graphdot==0.7
 ```
 ## Usages
-1. Edit config.py to set up the nodes and edges features in graph.
+1. Use hyperparameters/generator.py to set up the nodes and edges features in graph.
   
 2. Single-valued proeprty: triple point temperature.  
     - regression with fixed hyper-parameters.
         ```
-        python3 run/GPR.py --gpr graphdot --optimizer None --kernel graph -i run/examples/tt.txt --property tt --result_dir tt-regression --alpha 0.01 --mode loocv --normalized
+        python3 run/GPR.py --result_dir run/tt-regression --gpr graphdot:none --kernel graph:True:0.01 -i run/examples/tt.txt --input_config inchi::tt --train_test_config loocv:::0 --json_hyper hyperparameters/tensorproduct.json
         ```
     - Optimize hyper-parameters, and regression.
         ```
-        python3 run/GPR.py --gpr graphdot --optimizer L-BFGS-B --kernel graph -i run/examples/tt.txt --property tt --result_dir tt-regression --alpha 0.01 --mode loocv --normalized
+        python3 run/GPR.py --result_dir run/tt-regression --gpr graphdot:L-BFGS-B --kernel graph:True:0.01 -i run/examples/tt.txt --input_config inchi::tt --train_test_config loocv:::0 --json_hyper hyperparameters/tensorproduct.json
         ```
     - Active learning
         ```
-        python3 run/GPR_active.py --gpr graphdot --optimizer None --kernel graph -i run/examples/tt.txt --property tt --result_dir tt-active --alpha 0.01 --normalized --train_size 900 --learning_mode supervised --add_mode nlargest --init_size 5 --add_size 1 --max_size 200 --stride 100
+        python3 run/GPR_active.py --result_dir run/tt-active --gpr sklearn:none --kernel graph:true:0.01 -i run/examples/tt.txt --input_config inchi::tt --train_test_config ::0.9: --active_config supervised:nlargest:5:1:200:0:200:100 --json_hyper hyperparameters/tensorproduct.json
         ```
         you can also extend the active learning
         ```
-        python3 run/GPR_active.py --gpr graphdot --optimizer None --kernel graph -i run/examples/tt.txt --property tt --result_dir tt-active --alpha 0.01 --normalized --train_size 900 --max_size 500 --continued
+        python3 run/GPR_active.py --result_dir run/tt-active --gpr sklearn:none --kernel graph:true:0.01 -i run/examples/tt.txt --input_config inchi::tt --train_test_config ::0.9: --active_config supervised:nlargest:5:1:500:0:200:100 --json_hyper hyperparameters/tensorproduct.json --continued
         ```
     - Prediction of unknown molecule using existed model
        ```
-       python3 run/predict.py --gpr graphdot --smiles CCCCCCCCCC --f_model run/tt-regression/model.pkl --normalized
+       python3 run/predict.py --gpr graphdot --normalized -i run/examples/tt_predict.txt --input_config SMILES:: --json_hyper run/tt-regression/hyperparameters.json --f_model run/tt-regression/model.pkl
        ```
-    - Use Morgan fingerprints GPR-MF.
-       ```
-       python3 run/GPR.py --gpr graphdot --optimizer L-BFGS-B --kernel vector -i run/examples/tt.txt --property tt --result_dir tt-mf128b --alpha 0.01 --mode loocv --vectorFPparams morgan,2,128,0
-       ```
-       GPR-MF is inaccurate and computational expensive for hyperparameter 
-       optimization.
+       Put the molecules to be predicted in a file as run/examples/tt_predict.txt, 
+       "predict.csv" will be generated for the prediction results.
    
 3. Temperature, pressure-dependent properties.
     - Active learning
        ```
-       python3 run/GPR_active.py --gpr graphdot --optimizer None --kernel graph -i run/examples/density.txt --add_features T,P --add_hyperparameters 100,500 --property density --result_dir density-active --alpha 0.01 --normalized --train_ratio 1.0 --learning_mode supervised --add_mode nlargest --init_size 5 --add_size 1 --max_size 200 --stride 100
+       python3 run/GPR_active.py --result_dir run/density-active --gpr sklearn:none --kernel graph:true:0.01 -i run/examples/density.txt --input_config SMILES::density --add_features T,P:100,500 --train_test_config ::1.0: --active_config supervised:nlargest:5:1:200:0:200:50 --json_hyper hyperparameters/tensorproduct.json
        ```
+      
+4. Separate CPU and GPU calculation with fixed hyper-parameters.  
+    - GPR
+        ```
+        CPU: python3 run/txt2pkl.py --result_dir run/tt-regression -i run/examples/tt.txt --input_config inchi::tt
+        GPU: python3 run/KernelCalc.py --result_dir run/tt-regression -i run/examples/tt.txt --input_config inchi::tt --normalized --json_hyper hyperparameters/tensorproduct.json
+        CPU: python3 run/GPR.py --result_dir run/tt-regression --gpr sklearn:none --kernel preCalc::0.01 -i run/examples/tt.txt --train_test_config loocv:::0 --json_hyper hyperparameters/tensorproduct.json
+        GPU: python3 run/preCalc2graph.py --result_dir run/tt-regression --gpr sklearn --normalized --input_config inchi::tt --json_hyper hyperparameters/tensorproduct.json
+        ```
+    
+    - Active Learning
+        ```
+        
+        ```
