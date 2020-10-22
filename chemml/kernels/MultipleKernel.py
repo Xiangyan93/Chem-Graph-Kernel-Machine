@@ -2,6 +2,10 @@ import copy
 import numpy as np
 
 
+def _get_uniX(X):
+    return np.sort(np.unique(X))
+
+
 class MultipleKernel:
     def __init__(self, kernel_list, composition, combined_rule='product'):
         self.kernel_list = kernel_list
@@ -33,11 +37,11 @@ class MultipleKernel:
                     covariance_matrix *= output[0]
                     for j in range(self.nkernel):
                         if j == i:
-                            gradient_matrix_list[j] = gradient_matrix_list[j] * \
-                                                      output[1]
+                            gradient_matrix_list[j] = \
+                                gradient_matrix_list[j] * output[1]
                         else:
                             shape = output[0].shape + (1,)
-                            gradient_matrix_list[j] = gradient_matrix_list[j] * \
+                            gradient_matrix_list[j] = gradient_matrix_list[j] *\
                                                       output[0].reshape(shape)
             gradient_matrix = gradient_matrix_list[0]
             for i, gm in enumerate(gradient_matrix_list):
@@ -73,7 +77,7 @@ class MultipleKernel:
 
     @property
     def n_dims_list(self):
-        return [kernel.n_dims for kernel in self.kernel_list]
+        return [len(kernel.theta) for kernel in self.kernel_list]
 
     @property
     def n_dims(self):
@@ -94,7 +98,7 @@ class MultipleKernel:
 
     @theta.setter
     def theta(self, value):
-        if len(value) != self.n_dims:
+        if len(value) != len(self.theta):
             raise Exception('The length of n_dims and theta must the same')
         s = 0
         e = 0
@@ -123,3 +127,25 @@ class MultipleKernel:
             composition=self.composition,
             combined_rule=self.combined_rule,
         )
+
+    def PreCalculate(self, X, result_dir):
+        # save in several files with id tag.
+        X_list = self.get_X_list(X)
+        for i, kernel in enumerate(self.kernel_list):
+            Xi = X_list[i]
+            if hasattr(kernel, 'PreCalculate'):
+                kernel.PreCalculate(Xi, result_dir=result_dir, id=i)
+
+    def get_uniX(self, X):
+        graphs = []
+        X_list = self.get_X_list(X)
+        for i, kernel in enumerate(self.kernel_list):
+            Xi = X_list[i]
+            if hasattr(kernel, 'get_uniX'):
+                graphs += kernel.get_uniX(Xi)
+        return _get_uniX(graphs)
+
+    def load(self, result_dir):
+        for i, kernel in enumerate(self.kernel_list):
+            if hasattr(kernel, 'PreCalculate'):
+                kernel.load(result_dir)

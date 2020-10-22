@@ -5,105 +5,81 @@ import pandas as pd
 from collections import defaultdict
 from sklearn.cluster import KMeans
 from sklearn.manifold import SpectralEmbedding
-from sklearn.metrics import explained_variance_score
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import r2_score
+from sklearn.metrics import (
+    explained_variance_score,
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score,
+)
 
 
 class BaseLearner:
-    def __init__(self, train_X, train_Y, train_smiles, test_X, test_Y,
-                 test_smiles, kernel_config, optimizer=None, alpha=0.01):
+    def __init__(self, train_X, train_Y, train_id, test_X, test_Y,
+                 test_id, kernel_config, optimizer=None, alpha=0.01):
         self.train_X = train_X
         self.train_Y = train_Y
-        self.train_smiles = train_smiles
+        self.train_id = train_id
         self.test_X = test_X
         self.test_Y = test_Y
-        self.test_smiles = test_smiles
+        self.test_id = test_id
         self.kernel_config = kernel_config
         self.kernel = kernel_config.kernel
         self.optimizer = optimizer
         self.alpha = alpha
 
-    def get_out(self, x, smiles):
-        out = pd.DataFrame({'smiles': smiles})
-        if self.kernel_config.features is not None:
-            for i, feature in enumerate(self.kernel_config.features):
-                column_id = -len(self.kernel_config.features)+i
-                out.loc[:, feature] = x[:, column_id]
-        return out
-
-    def evaluate_df(self, x, y, smiles, y_pred, y_std, kernel=None,
+    def evaluate_df(self, x, y, id, y_pred, y_std, kernel=None,
                     debug=False, alpha=None):
-        r2 = r2_score(y, y_pred)
-        ex_var = explained_variance_score(y, y_pred)
-        mse = mean_squared_error(y, y_pred)
-        if len(y.shape) == 1:
-            out = pd.DataFrame({'#target': y,
-                                'predict': y_pred,
-                                'uncertainty': y_std,
-                                'abs_dev': abs(y - y_pred),
-                                'rel_dev': abs((y - y_pred) / y)})
-        else:
-            out = pd.DataFrame({})
-            for i in range(y.shape[1]):
-                out['c%i' % i] = y[:, i]
-                out['c%i_pred' % i] = y_pred[:, i]
-            out['uncertainty'] = y_std
-            out['abs_dev'] = abs(y - y_pred).mean(axis=1)
-            out['rel_dev'] = abs((y - y_pred) / y).mean(axis=1)
+        r2 = r2_score(y, y_pred, multioutput='raw_values')
+        ex_var = explained_variance_score(y, y_pred, multioutput='raw_values')
+        mse = mean_squared_error(y, y_pred, multioutput='raw_values')
+        mae = mean_absolute_error(y, y_pred, multioutput='raw_values')
+        out = pd.DataFrame({
+            '#target': y,
+            'predict': y_pred,
+            'uncertainty': y_std,
+            'abs_dev': abs(y - y_pred),
+            'rel_dev': abs((y - y_pred) / y)}
+        )
         if alpha is not None:
             out.loc[:, 'alpha'] = alpha
-        out = pd.concat([out, self.get_out(x, smiles)], axis=1)
-        if debug:
-            K = kernel(x, self.train_X)
-            xout = self.get_out(self.train_X, self.train_smiles)
-            info_list = []
-            kindex = np.argsort(-K)[:, :min(5, len(self.train_X))]
-            for i, smiles in enumerate(self.train_smiles):
-                s = [smiles]
-                if self.kernel_config.features is not None:
-                    for feature in self.kernel_config.features:
-                        s.append(xout[feature][i])
-                s = list(map(str, s))
-                info_list.append(','.join(s))
-            info_list = np.array(info_list)
-            similar_data = []
-            for i, index in enumerate(kindex):
-                info = info_list[index]
+        out.loc[:, 'id'] = id
 
+        if debug:
+            n = 5
+            similar_info = []
+            K = kernel(x, self.train_X)
+            kindex = np.argsort(-K)[:, :min(n, len(self.train_X))]
+            for i, index in enumerate(kindex):
                 def round5(x):
                     return ',%.5f' % x
-
                 k = list(map(round5, K[i][index]))
-                info = ';'.join(list(map(str.__add__, info, k)))
-                similar_data.append(info)
-            out.loc[:, 'similar_mols'] = similar_data
-        return r2, ex_var, mse, out.sort_values(by='abs_dev', ascending=False)
+                id = list(map(str, self.train_id[index].tolist()))
+                info = ';'.join(list(map(str.__add__, id, k)))
+                similar_info.append(info)
+            out.loc[:, 'similar_mols'] = similar_info
+        return r2, ex_var, mse, mae, out.sort_values(by='abs_dev', ascending=False)
 
     def evaluate_test(self, debug=True, alpha=None):
         x = self.test_X
         y = self.test_Y
-        smiles = self.test_smiles
         y_pred, y_std = self.model.predict(x, return_std=True)
-        return self.evaluate_df(x, y, smiles, y_pred, y_std,
+        return self.evaluate_df(x, y, self.test_id, y_pred, y_std,
                                 kernel=self.model.kernel, debug=debug,
                                 alpha=alpha)
 
     def evaluate_train(self, debug=False, alpha=None):
         x = self.train_X
         y = self.train_Y
-        smiles = self.train_smiles
         y_pred, y_std = self.model.predict(x, return_std=True)
-        return self.evaluate_df(x, y, smiles, y_pred, y_std,
+        return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
                                 kernel=self.model.kernel, debug=debug,
                                 alpha=alpha)
 
     def evaluate_loocv(self, debug=True, alpha=None):
         x = self.train_X
         y = self.train_Y
-        smiles = self.train_smiles
         y_pred, y_std = self.model.predict_loocv(x, y, return_std=True)
-        return self.evaluate_df(x, y, smiles, y_pred, y_std,
+        return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
                                 kernel=self.model.kernel, debug=debug,
                                 alpha=alpha)
 
@@ -111,10 +87,10 @@ class BaseLearner:
 class ActiveLearner:
     ''' for active learning, basically do selection for users '''
 
-    def __init__(self, train_X, train_Y, train_smiles, alpha, kernel_config,
+    def __init__(self, train_X, train_Y, train_id, alpha, kernel_config,
                  learning_mode, add_mode, initial_size, add_size, max_size,
                  search_size, pool_size, result_dir, Learner, test_X=None,
-                 test_Y=None, test_smiles=None, optimizer=None, stride=100,
+                 test_Y=None, test_id=None, optimizer=None, stride=100,
                  seed=0):
         '''
         search_size: Random chose samples from untrained samples. And are
@@ -129,12 +105,15 @@ class ActiveLearner:
         '''
         self.train_X = train_X
         self.train_Y = train_Y
-        self.train_smiles = train_smiles
+        self.train_id = train_id
         self.test_X = test_X
         self.test_Y = test_Y
-        self.test_smiles = test_smiles
+        self.test_id = test_id
         self.kernel_config = kernel_config
-        self.alpha = alpha
+        if np.iterable(alpha):
+            self.init_alpha = alpha
+        else:
+            self.init_alpha = np.ones(len(train_X)) * alpha
         self.learning_mode = learning_mode
         self.add_mode = add_mode
         if initial_size <= 1:
@@ -147,6 +126,8 @@ class ActiveLearner:
         self.optimizer = optimizer
         self.seed = seed
         self.result_dir = result_dir
+        if not os.path.exists(self.result_dir):
+            os.mkdir(self.result_dir)
         self.Learner = Learner
         self.train_IDX = np.linspace(
             0,
@@ -162,7 +143,8 @@ class ActiveLearner:
         )
         self.stride = stride
         self.learning_log = pd.DataFrame({
-            '#size': [], 'r2': [], 'mse': [], 'ex-var': [], 'search_size': []
+            '#size': [], 'r2': [], 'mse': [], 'mae': [], 'ex-var': [],
+            'search_size': []
         })
 
     def stop_sign(self):
@@ -175,8 +157,9 @@ class ActiveLearner:
     def __get_train_X_y(self):
         train_x = self.train_X[self.train_idx]
         train_y = self.train_Y[self.train_idx]
-        smiles = self.train_smiles[self.train_idx]
-        return train_x, train_y, smiles
+        id = self.train_id[self.train_idx]
+        alpha = self.init_alpha[self.train_idx]
+        return train_x, train_y, id, alpha
 
     def __get_untrain_X_y(self):
         untrain_idx = np.delete(self.train_IDX, self.train_idx)
@@ -193,19 +176,19 @@ class ActiveLearner:
     def train(self):
         np.random.seed(self.seed)
         # print('%s' % (time.asctime(time.localtime(time.time()))))
-        train_x, train_y, smiles = self.__get_train_X_y()
+        train_x, train_y, id, alpha = self.__get_train_X_y()
         self.learner = self.Learner(
             train_x,
             train_y,
-            smiles,
+            id,
             self.test_X,
             self.test_Y,
-            self.test_smiles,
+            self.test_id,
             self.kernel_config,
             optimizer=self.optimizer,
-            alpha=self.alpha,
+            alpha=alpha,
         )
-        self.learner.train(verbose=False)
+        self.learner.train()
         return True
 
     @staticmethod
@@ -315,11 +298,11 @@ class ActiveLearner:
 
     def evaluate(self, train_output=True, debug=True):
         # print('%s' % (time.asctime(time.localtime(time.time()))))
-        r2, ex_var, mse, out = self.learner.evaluate_test(debug=debug)
-        print("R-square:%.3f\nMSE:%.3g\nexplained_variance:%.3f\n" %
+        r2, ex_var, mse, mae, out = self.learner.evaluate_test(debug=debug)
+        print("R-square:%.3f\nMSE:%.5g\nexplained_variance:%.3f\n" %
               (r2, mse, ex_var))
         self.learning_log.loc[self.current_size] = (
-            self.current_size, r2, mse,
+            self.current_size, r2, mse, mae,
             ex_var,
             self.search_size
         )
@@ -331,7 +314,7 @@ class ActiveLearner:
         )
 
         if train_output:
-            r2, ex_var, mse, out = self.learner.evaluate_train(debug=debug)
+            r2, ex_var, mse, mae, out = self.learner.evaluate_train(debug=debug)
             out.to_csv(
                 '%s/%i-train.log' % (self.result_dir, self.current_size),
                 sep='\t',
@@ -359,17 +342,18 @@ class ActiveLearner:
         store_dict.pop('kernel_config', None)
         # store model
         self.learner.model.save(self.result_dir)
+        self.learner.kernel_config.save(self.result_dir, self.learner.model)
         pickle.dump(store_dict, open(f_checkpoint, 'wb'), protocol=4)
 
     @classmethod
     def load_checkpoint(cls, f_checkpoint, kernel_config):
         d = pickle.load(open(f_checkpoint, 'rb'))
         activelearner = cls(
-            d['train_X'], d['train_Y'], d['train_smiles'], d['alpha'],
+            d['train_X'], d['train_Y'], d['train_id'], d['init_alpha'],
             kernel_config, d['learning_mode'], d['add_mode'], 10,
             d['add_size'], d['max_size'], d['search_size'], d['pool_size'],
             d['result_dir'], d['Learner'], d['test_X'], d['test_Y'],
-            d['test_smiles'], d['optimizer'], d['stride'], d['seed'])
+            d['test_id'], d['optimizer'], d['stride'], d['seed'])
         # restore params
         for key in d.keys():
             setattr(activelearner, key, d[key])

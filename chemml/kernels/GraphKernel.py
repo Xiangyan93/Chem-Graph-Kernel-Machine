@@ -1,11 +1,24 @@
+import os
+import json
 import pickle
-import numpy as np
-import sklearn.gaussian_process as gp
 from graphdot.kernel.marginalized import MarginalizedGraphKernel
-from graphdot.kernel.marginalized._kernel import Uniform
-from chemml.kernels.MultipleKernel import MultipleKernel
-from chemml.smiles import inchi2smiles
-from config import *
+from graphdot.kernel.marginalized.starting_probability import Uniform
+from graphdot.microkernel import (
+    Additive,
+    Constant as kC,
+    TensorProduct,
+    SquareExponential as sExp,
+    KroneckerDelta as kDelta,
+    Convolution as kConv,
+    Normalize
+)
+from chemml.kernels.PreCalcKernel import (
+    ConvolutionPreCalcKernel as CPCK,
+    _Kc,
+)
+from chemml.kernels.MultipleKernel import _get_uniX
+from chemml.kernels.KernelConfig import KernelConfig
+from chemml.kernels.MultipleKernel import *
 
 
 class MGK(MarginalizedGraphKernel):
@@ -73,53 +86,63 @@ class MGK(MarginalizedGraphKernel):
 
 
 class NormalizedGraphKernel(MGK):
+    def __diag2K(self, K, dx, dy, l, K_gradient=None):
+        a = np.repeat(dx ** -2, len(dy)).reshape(len(dx), len(dy))
+        b = np.repeat(dy ** -2, len(dx)).reshape(len(dy), len(dx))
+        c = np.exp(-((a - b.T) / l) ** 2)
+        K = np.einsum("i,ij,j,ij->ij", dx, K, dy, c)
+        if K_gradient is None:
+            return K
+        else:
+            return K, np.einsum("ijk,i,j,ij->ijk", K_gradient, dx, dy, c)
+
     def __normalize(self, X, Y, R, length=50000):
         if Y is None:
             # square matrix
             if type(R) is tuple:
                 d = np.diag(R[0]) ** -0.5
-                a = np.repeat(d ** -2, len(d)).reshape(len(d), len(d))
-                a = np.exp(-((a - a.T) / length) ** 2)
-                K = np.einsum("i,ij,j,ij->ij", d, R[0], d, a)
-                # K = np.diag(d).dot(R[0]).dot(np.diag(d))
-                K_gradient = np.einsum("ijk,i,j,ij->ijk", R[1], d, d, a)
+                return self.__diag2K(R[0], d, d, length, K_gradient=R[1])
+            else:
+                d = np.diag(R) ** -0.5
+                return self.__diag2K(R, d, d, length)
+        else:
+            # rectangular matrix, must have X and Y
+            # diag_X = (super().diag(X) ** -0.5).flatten()
+            # diag_Y = (super().diag(Y) ** -0.5).flatten()
+            dx = super().diag(X) ** -0.5
+            dy = super().diag(Y) ** -0.5
+            if type(R) is tuple:
+                return self.__diag2K(R[0], dx, dy, length, K_gradient=R[1])
+            else:
+                return self.__diag2K(R, dx, dy, length)
+
+    '''
+    def __normalize_old(self, X, Y, R):
+        if Y is None:
+            # square matrix
+            if type(R) is tuple:
+                d = np.diag(R[0]) ** -0.5
+                K = np.diag(d).dot(R[0]).dot(np.diag(d))
+                K_gradient = np.einsum("ijk,i,j->ijk", R[1], d, d)
                 return K, K_gradient
             else:
                 d = np.diag(R) ** -0.5
-                a = np.repeat(d ** -2, len(d)).reshape(len(d), len(d))
-                a = np.exp(-((a - a.T) / length) ** 2)
-                K = np.einsum("i,ij,j,ij->ij", d, R, d, a)
-                # K = np.diag(d).dot(R).dot(np.diag(d))
+                K = np.diag(d).dot(R).dot(np.diag(d))
                 return K
         else:
             # rectangular matrix, must have X and Y
             if type(R) is tuple:
-                diag_X = (super().diag(X) ** -0.5).flatten()
-                diag_Y = (super().diag(Y) ** -0.5).flatten()
-                a = np.repeat(diag_X ** -2, len(diag_Y)).reshape(
-                    len(diag_X), len(diag_Y)
-                )
-                b = np.repeat(diag_Y ** -2, len(diag_X)).reshape(
-                    len(diag_Y), len(diag_X)
-                )
-                c = np.exp(-((a - b.T) / length) ** 2)
-                K = np.einsum("i,ij,j,ij->ij", diag_X, R[0], diag_Y, c)
-                # K = np.diag(diag_X).dot(R[0]).dot(np.diag(diag_Y))
-                K_gradient = np.einsum("ijk,i,j,ij->ijk", R[1], diag_X,
-                                       diag_Y, c)
+                diag_X = super().diag(X) ** -0.5
+                diag_Y = super().diag(Y) ** -0.5
+                K = np.diag(diag_X).dot(R[0]).dot(np.diag(diag_Y))
+                K_gradient = np.einsum("ijk,i,j->ijk", R[1], diag_X, diag_Y)
                 return K, K_gradient
             else:
-                diag_X = (super().diag(X) ** -0.5).flatten()
-                diag_Y = (super().diag(Y) ** -0.5).flatten()
-                a = np.repeat(diag_X ** -2, len(diag_Y)).reshape(
-                    len(diag_X), len(diag_Y)
-                )
-                b = np.repeat(diag_Y ** -2, len(diag_X)).reshape(
-                    len(diag_Y), len(diag_X)
-                )
-                c = np.exp(-((a - b.T) / length) ** 2)
-                K = np.einsum("i,ij,j,ij->ij", diag_X, R, diag_Y, c)
+                diag_X = super().diag(X) ** -0.5
+                diag_Y = super().diag(Y) ** -0.5
+                K = np.einsum("ij,i,j->ij", R, diag_X, diag_Y)
                 return K
+    '''
 
     def __call__(self, X, Y=None, *args, **kwargs):
         R = super().__call__(X, Y, *args, **kwargs)
@@ -129,175 +152,240 @@ class NormalizedGraphKernel(MGK):
         return np.ones(len(X))
 
 
+def _PreCalculate(self, X, result_dir, id=None):
+    self.graphs = X
+    self.K, self.K_gradient = self(self.graphs, eval_gradient=True)
+    self.save(result_dir, id=id)
+
+
+def _save(self, result_dir, id=None):
+    if id is None:
+        f_kernel = os.path.join(result_dir, 'kernel.pkl')
+    else:
+        f_kernel = os.path.join(result_dir, 'kernel_%i.pkl' % id)
+    store_dict = self.__dict__.copy()
+    for key in ['node_kernel', 'edge_kernel', 'p', 'q', 'q_bounds',
+                'element_dtype', 'backend']:
+        store_dict.pop(key, None)
+    store_dict['theta'] = self.theta
+    pickle.dump(store_dict, open(f_kernel, 'wb'), protocol=4)
+
+
+def _load(self, result_dir):
+    f_kernel = os.path.join(result_dir, 'kernel.pkl')
+    store_dict = pickle.load(open(f_kernel, 'rb'))
+    self.__dict__.update(**store_dict)
+
+
+def _get_params(self, super, deep=False):
+    params = super.get_params(deep=deep)
+    params.update(dict(
+        graphs=self.graphs,
+        K=self.K,
+        K_gradient=self.K_gradient,
+    ))
+    return params
+
+
+def _call(self, super, X, Y=None, eval_gradient=False, *args, **kwargs):
+    if self.K is None or self.K_gradient is None:
+        return super.__call__(X, Y=Y, eval_gradient=eval_gradient, *args,
+                              **kwargs)
+    else:
+        X_idx = np.searchsorted(self.graphs, X).ravel()
+        Y_idx = np.searchsorted(self.graphs, Y).ravel() if Y is not None \
+            else X_idx
+    if eval_gradient:
+        return self.K[X_idx][:, Y_idx], self.K_gradient[X_idx][:, Y_idx][:]
+    else:
+        return self.K[X_idx][:, Y_idx]
+
+
 class PreCalcMarginalizedGraphKernel(MGK):
-    def __init__(self, inchi=None, K=None, K_gradient=None, graphs=None,
-                 sort_by_inchi=False, *args, **kwargs):
+    def __init__(self, graphs=None, K=None, K_gradient=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.inchi = inchi
+        self.graphs = graphs
         self.K = K
         self.K_gradient = K_gradient
-        self.graphs = graphs
-        self.sort_by_inchi = sort_by_inchi
 
-    def PreCalculate(self, X, inchi=None, sort_by_inchi=False):
-        if sort_by_inchi:
-            idx = np.argsort(inchi)
-            self.inchi = inchi[idx]
-        else:
-            idx = np.argsort(X)
-        self.graphs = X[idx]
-        self.K, self.K_gradient = self(self.graphs, eval_gradient=True)
-        self.sort_by_inchi = sort_by_inchi
+    def get_uniX(self, X):
+        return _get_uniX(X)
+
+    def PreCalculate(self, X, result_dir, id=None):
+        _PreCalculate(self, self.get_uniX(X), result_dir, id=id)
+
+    def save(self, result_dir, id=None):
+        _save(self, result_dir, id=id)
+
+    def load(self, result_dir):
+        _load(self, result_dir)
 
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        if self.K is None or self.K_gradient is None:
-            return super().__call__(X, Y=Y, eval_gradient=eval_gradient,
-                                    *args, **kwargs)
-        else:
-            if self.sort_by_inchi:
-                raise Exception(
-                    '__call__ not allowed with sort_by_inchi = True')
-            X_idx = np.searchsorted(self.graphs, X).ravel()
-            if Y is not None:
-                Y_idx = np.searchsorted(self.graphs, Y).ravel()
-            else:
-                Y_idx = X_idx
-            if eval_gradient:
-                return self.K[X_idx][:, Y_idx], \
-                       self.K_gradient[X_idx][:, Y_idx][:]
-            else:
-                return self.K[X_idx][:, Y_idx]
+        return _call(self, super(), X, Y=Y, eval_gradient=eval_gradient,
+                     *args, **kwargs)
 
     def get_params(self, deep=False):
-        params = super().get_params(deep=deep)
-        params.update(dict(
-            inchi=self.inchi,
-            K=self.K,
-            K_gradient=self.K_gradient,
-            graphs=self.graphs,
-            sort_by_inchi=self.sort_by_inchi,
-        ))
-        return params
+        return _get_params(self, deep)
 
 
 class PreCalcNormalizedGraphKernel(NormalizedGraphKernel):
-    def __init__(self, inchi=None, K=None, K_gradient=None, graphs=None,
-                 sort_by_inchi=False, *args, **kwargs):
+    def __init__(self, graphs=None, K=None, K_gradient=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.inchi = inchi
+        self.graphs = graphs
         self.K = K
         self.K_gradient = K_gradient
-        self.graphs = graphs
-        self.sort_by_inchi = sort_by_inchi
 
-    def PreCalculate(self, X, inchi=None, sort_by_inchi=False):
-        if sort_by_inchi:
-            idx = np.argsort(inchi)
-            self.inchi = inchi[idx]
-        else:
-            idx = np.argsort(X)
-        self.graphs = X[idx]
-        self.K, self.K_gradient = self(self.graphs, eval_gradient=True)
-        self.sort_by_inchi = sort_by_inchi
+    def get_uniX(self, X):
+        return _get_uniX(X)
+
+    def PreCalculate(self, X, result_dir, id=None):
+        _PreCalculate(self, self.get_uniX(X), result_dir, id=id)
+
+    def save(self, result_dir, id=None):
+        _save(self, result_dir, id=id)
+
+    def load(self, result_dir):
+        _load(self, result_dir)
 
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        if self.K is None or self.K_gradient is None:
-            return super().__call__(X, Y=Y, eval_gradient=eval_gradient,
-                                    *args, **kwargs)
-        else:
-            if self.sort_by_inchi:
-                raise Exception(
-                    '__call__ not allowed with sort_by_inchi = True')
-            X_idx = np.searchsorted(self.graphs, X).ravel()
-            if Y is not None:
-                Y_idx = np.searchsorted(self.graphs, Y).ravel()
-            else:
-                Y_idx = X_idx
-            if eval_gradient:
-                return self.K[X_idx][:, Y_idx], \
-                       self.K_gradient[X_idx][:, Y_idx][:]
-            else:
-                return self.K[X_idx][:, Y_idx]
+        return _call(self, super(), X, Y=Y, eval_gradient=eval_gradient,
+                     *args, **kwargs)
 
     def get_params(self, deep=False):
-        params = super().get_params(deep=deep)
-        params.update(dict(
-            inchi=self.inchi,
-            K=self.K,
-            K_gradient=self.K_gradient,
-            graphs=self.graphs,
-            sort_by_inchi=self.sort_by_inchi,
-        ))
-        return params
+        return _get_params(self, super(), deep)
 
 
-class ConvolutionGraphKernel:
-    def __init__(self, kernel, composition):
-        self.kernel = kernel
-        self.composition = composition
-    # to be finished
+class ConvolutionNormalizedGraphKernel(PreCalcNormalizedGraphKernel):
+    def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
+        from chemml.kernels.PreCalcKernel import _call
+        return _call(self, X, Y=None, eval_gradient=eval_gradient,
+                     *args, **kwargs)
+
+    def Kc(self, x, y, eval_gradient=False):
+        return _Kc(CPCK, super(), x, y, eval_gradient=eval_gradient)
+
+    def get_uniX(self, X):
+        graphs = []
+        for x in X:
+            graphs += CPCK.x2graph(x)
+        return _get_uniX(graphs)
+
+    def PreCalculate(self, X, result_dir, id=None):
+        X = self.get_uniX(X)
+        self.graphs = np.sort(X)
+        self.K, self.K_gradient = super().__call__(self.graphs,
+                                                   eval_gradient=True)
+        self.save(result_dir, id=id)
 
 
-class GraphKernelConfig:
-    def __init__(self, NORMALIZED=True, add_features=None,
-                 add_hyperparameters=None, theta=None):
-        self.features = add_features
-        # define node and edge kernelets
-        knode = Config.Hyperpara.knode
-        kedge = Config.Hyperpara.kedge
-        stop_prob = Config.Hyperpara.q
-        stop_prob_bound = Config.Hyperpara.q_bound
-
-        if NORMALIZED:
-            graph_kernel = PreCalcNormalizedGraphKernel(
-                node_kernel=knode,
-                edge_kernel=kedge,
-                q=stop_prob,
-                q_bounds=stop_prob_bound,
-                p=Uniform(1.0, p_bounds='fixed'),
-                unique=add_features is not None
-            )
+class GraphKernelConfig(KernelConfig):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        ns = len(self.single_graph)
+        nm = len(self.multi_graph)
+        if ns == 1 and nm == 0 and self.add_features is None:
+            self.kernel = self.get_single_graph_kernel()
+        elif ns == 0 and nm == 1 and self.add_features is None:
+            self.kernel = self.get_conv_graph_kernel()
         else:
-            graph_kernel = PreCalcMarginalizedGraphKernel(
-                node_kernel=knode,
-                edge_kernel=kedge,
-                q=stop_prob,
-                q_bounds=stop_prob_bound,
-                p=Uniform(1.0, p_bounds='fixed'),
-                unique=add_features is not None
-            )
-        if add_features is not None and add_hyperparameters is not None:
-            if len(add_features) != len(add_hyperparameters):
-                raise Exception('features and hyperparameters must be the same '
-                                'length')
-            add_kernel = gp.kernels.ConstantKernel(1.0, (1e-3, 1e3)) * \
-                         gp.kernels.RBF(length_scale=add_hyperparameters)
-            composition = [
-                (0,),
-                tuple(np.arange(1, len(add_features) + 1))
-            ]
+            kernels = []
+            for i in range(ns):
+                kernels += [self.get_single_graph_kernel()]
+            for i in range(ns, ns+nm):
+                kernels += [self.get_conv_graph_kernel()]
+            kernels += self.get_rbf_kernel()
+            composition = [(i,) for i in range(ns+nm)] + \
+                [tuple(np.arange(ns+nm, len(self.add_features) + ns+nm))]
             self.kernel = MultipleKernel(
-                [graph_kernel, add_kernel], composition, 'product'
+                kernel_list=kernels,
+                composition=composition,
+                combined_rule='product',
             )
+        if self.hyperdict is not None:
+            theta = self.hyperdict.get('theta')
+            if theta is not None:
+                print('Reading Existed kernel parameter %s' % theta)
+                self.kernel = self.kernel.clone_with_theta(theta)
+
+    def get_single_graph_kernel(self):  # dont delete kernel_pkl
+        params = self.params
+        self.type = 'graph'
+        if params['NORMALIZED']:
+            KernelObject = PreCalcNormalizedGraphKernel
         else:
-            self.kernel = graph_kernel
+            KernelObject = PreCalcMarginalizedGraphKernel
+        knode, kedge, p = self.get_knode_kedge_p()
+        return KernelObject(
+            node_kernel=knode,
+            edge_kernel=kedge,
+            q=self.hyperdict['q'][0],
+            q_bounds=self.hyperdict['q'][1],
+            p=p,
+            unique=self.add_features is not None
+        )
 
-        if theta is not None:
-            print('Reading Existed kernel parameter %s' % theta)
-            with open(theta, 'rb') as file:
-                theta = pickle.load(file)
-            self.kernel = self.kernel.clone_with_theta(theta)
+    def get_conv_graph_kernel(self):  # dont delete kernel_pkl
+        params = self.params
+        self.type = 'graph'
+        if params['NORMALIZED']:
+            KernelObject = ConvolutionNormalizedGraphKernel
+        else:
+            raise Exception('not supported option')
+        knode, kedge, p = self.get_knode_kedge_p()
+        return KernelObject(
+            node_kernel=knode,
+            edge_kernel=kedge,
+            q=self.hyperdict['q'][0],
+            q_bounds=self.hyperdict['q'][1],
+            p=p,
+            unique=self.add_features is not None
+        )
 
+    def get_knode_kedge_p(self):
+        def get_microk(microk):
+            if microk[2] != 'fixed':
+                microk[2] = tuple(microk[2])
+            if microk[0] == 'kDelta':
+                return kDelta(microk[1], microk[2])
+            elif microk[0] == 'sExp':
+                # if microk[2] == 'fixed':
+                    # microk[2] = (microk[1], microk[1])
+                return sExp(microk[1], length_scale_bounds=microk[2])
+            elif microk[0] == 'kConv':
+                return kConv(kDelta(microk[1], microk[2]))
+            elif microk[0] == 'kC':
+                return kC(microk[1], microk[2])
+            else:
+                raise Exception('unknown microkernel type')
 
-def get_XY_from_df(df, kernel_config, properties=None):
-    if df.size == 0:
-        return None, None, None
-    x = ['graph']
-    if kernel_config.features is not None:
-        x += kernel_config.features
-    X = df[x].to_numpy()
-    smiles = df.inchi.apply(inchi2smiles).to_numpy()
-    Y = df[properties].to_numpy()
-    if len(properties) == 1:
-        Y = Y.ravel()
-    return [X, Y, smiles]
+        knode_dict = {}
+        kedge_dict = {}
+        for key, microk_list in self.hyperdict.items():
+            if key.startswith('atom_'):
+                microk = [get_microk(mk) for mk in microk_list]
+                knode_dict.update({key[5:]: np.product(microk)})
+            elif key.startswith('bond_'):
+                microk = [get_microk(mk) for mk in microk_list]
+                kedge_dict.update({key[5:]: np.product(microk)})
+
+        def fun(type, dict):
+            if type == 'Tensorproduct':
+                return TensorProduct(**dict)
+            elif type == 'Additive':
+                return Normalize(Additive(**dict))
+
+        return fun(self.hyperdict['a_type'], knode_dict), \
+               fun(self.hyperdict['b_type'], kedge_dict), \
+               Uniform(1.0, "fixed")
+
+    def save(self, result_dir, model):
+        if hasattr(model, 'kernel_'):
+            theta = model.kernel_.theta
+        else:
+            theta = model.kernel.theta
+        self.hyperdict.update({
+            'theta': theta.tolist()
+        })
+        open(os.path.join(result_dir, 'hyperparameters.json'), 'w').write(
+            json.dumps(self.hyperdict)
+        )

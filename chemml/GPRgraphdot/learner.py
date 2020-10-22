@@ -11,7 +11,6 @@ class Learner(BaseLearner):
                          normalize_y=True,
                          alpha=self.alpha)
 
-    def train(self, verbose=True):
-        self.model.fit_loocv(self.train_X, self.train_Y, verbose=verbose)
-        if verbose:
-            print('hyperparameter: ', self.model.kernel.hyperparameters)
+    def train(self):
+        self.model.fit_loocv(self.train_X, self.train_Y, verbose=True, repeat=1)
+        print('hyperparameter: ', self.model.kernel.hyperparameters)
