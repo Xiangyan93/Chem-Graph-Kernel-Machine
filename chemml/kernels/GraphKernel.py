@@ -294,65 +294,70 @@ class GraphKernelConfig(KernelConfig):
         super().__init__(*args, **kwargs)
         ns = len(self.single_graph)
         nm = len(self.multi_graph)
+        assert (len(self.hyperdict) == ns + nm)
         if ns == 1 and nm == 0 and self.add_features is None:
-            self.kernel = self.get_single_graph_kernel()
+            self.kernel = self.get_single_graph_kernel(self.hyperdict[0])
         elif ns == 0 and nm == 1 and self.add_features is None:
-            self.kernel = self.get_conv_graph_kernel()
+            self.kernel = self.get_conv_graph_kernel(self.hyperdict[0])
         else:
+            na = 0 if self.add_features is None else len(self.add_features)
             kernels = []
             for i in range(ns):
-                kernels += [self.get_single_graph_kernel()]
+                kernels += [self.get_single_graph_kernel(self.hyperdict[i])]
             for i in range(ns, ns+nm):
-                kernels += [self.get_conv_graph_kernel()]
+                kernels += [self.get_conv_graph_kernel(self.hyperdict[i])]
             kernels += self.get_rbf_kernel()
             composition = [(i,) for i in range(ns+nm)] + \
-                [tuple(np.arange(ns+nm, len(self.add_features) + ns+nm))]
+                [tuple(np.arange(ns+nm, na+ns+nm))]
             self.kernel = MultipleKernel(
                 kernel_list=kernels,
                 composition=composition,
                 combined_rule='product',
             )
-        if self.hyperdict is not None:
-            theta = self.hyperdict.get('theta')
+        if self.hyperdict[0].get('theta') is not None:
+            theta = []
+            for hyperdict in self.hyperdict:
+                theta += hyperdict['theta']
             if theta is not None:
                 print('Reading Existed kernel parameter %s' % theta)
                 self.kernel = self.kernel.clone_with_theta(theta)
 
-    def get_single_graph_kernel(self):  # dont delete kernel_pkl
+    def get_single_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
         params = self.params
         self.type = 'graph'
         if params['NORMALIZED']:
             KernelObject = PreCalcNormalizedGraphKernel
         else:
             KernelObject = PreCalcMarginalizedGraphKernel
-        knode, kedge, p = self.get_knode_kedge_p()
+        knode, kedge, p = self.get_knode_kedge_p(hyperdict)
         return KernelObject(
             node_kernel=knode,
             edge_kernel=kedge,
-            q=self.hyperdict['q'][0],
-            q_bounds=self.hyperdict['q'][1],
+            q=hyperdict['q'][0],
+            q_bounds=hyperdict['q'][1],
             p=p,
             unique=self.add_features is not None
         )
 
-    def get_conv_graph_kernel(self):  # dont delete kernel_pkl
+    def get_conv_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
         params = self.params
         self.type = 'graph'
         if params['NORMALIZED']:
             KernelObject = ConvolutionNormalizedGraphKernel
         else:
             raise Exception('not supported option')
-        knode, kedge, p = self.get_knode_kedge_p()
+        knode, kedge, p = self.get_knode_kedge_p(hyperdict)
         return KernelObject(
             node_kernel=knode,
             edge_kernel=kedge,
-            q=self.hyperdict['q'][0],
-            q_bounds=self.hyperdict['q'][1],
+            q=hyperdict['q'][0],
+            q_bounds=hyperdict['q'][1],
             p=p,
             unique=self.add_features is not None
         )
 
-    def get_knode_kedge_p(self):
+    @staticmethod
+    def get_knode_kedge_p(hyperdict):
         def get_microk(microk):
             if microk[2] != 'fixed':
                 microk[2] = tuple(microk[2])
@@ -372,11 +377,10 @@ class GraphKernelConfig(KernelConfig):
                 return Constant(microk[1], microk[2])
             else:
                 raise Exception('unknown microkernel type')
-
         knode_dict = {}
         kedge_dict = {}
         p_dict = {}
-        for key, microk_list in self.hyperdict.items():
+        for key, microk_list in hyperdict.items():
             if key.startswith('atom_'):
                 microk = [get_microk(mk) for mk in microk_list]
                 knode_dict.update({key[5:]: np.product(microk)})
@@ -395,18 +399,21 @@ class GraphKernelConfig(KernelConfig):
             elif type == 'Additive_p':
                 return Additive_p(**dict)
 
-        return fun(self.hyperdict['a_type'], knode_dict), \
-               fun(self.hyperdict['b_type'], kedge_dict), \
-               fun(self.hyperdict['p_type'], p_dict)
+        return fun(hyperdict['a_type'], knode_dict), \
+               fun(hyperdict['b_type'], kedge_dict), \
+               fun(hyperdict['p_type'], p_dict)
 
-    def save(self, result_dir, model):
-        if hasattr(model, 'kernel_'):
-            theta = model.kernel_.theta
+    def save(self, path, model):
+        kernel = model.kernel_ if hasattr(model, 'kernel_') \
+            else model.kernel
+        if hasattr(kernel, 'kernel_list'):
+            for i, hyperdict in enumerate(self.hyperdict):
+                theta = kernel.kernel_list[i].theta
+                hyperdict.update({'theta': theta.tolist()})
+                open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w')\
+                    .write(json.dumps(self.hyperdict))
         else:
-            theta = model.kernel.theta
-        self.hyperdict.update({
-            'theta': theta.tolist()
-        })
-        open(os.path.join(result_dir, 'hyperparameters.json'), 'w').write(
-            json.dumps(self.hyperdict)
-        )
+            theta = kernel.theta
+            self.hyperdict[0].update({'theta': theta.tolist()})
+            open(os.path.join(path, 'hyperparameters.json'), 'w') \
+                .write(json.dumps(self.hyperdict))

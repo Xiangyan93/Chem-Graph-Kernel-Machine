@@ -74,8 +74,11 @@ def set_gpr(gpr):
 
 def set_kernel_config(result_dir, kernel, normalized,
                       single_graph, multi_graph,
-                      add_features, add_hyperparameters, hyperdict):
+                      add_features, add_hyperparameters, hyperjson):
     if kernel == 'graph':
+        hyperdict = [
+            json.loads(open(f, 'r').readline()) for f in hyperjson.split(',')
+        ]
         params = {
             'NORMALIZED': normalized,
             'hyperdict': hyperdict
@@ -312,7 +315,7 @@ def main():
         args.result_dir, kernel, normalized,
         single_graph, multi_graph,
         add_f, add_p,
-        json.loads(open(args.json_hyper, 'r').readline())
+        args.json_hyper
     )
 
     # read input

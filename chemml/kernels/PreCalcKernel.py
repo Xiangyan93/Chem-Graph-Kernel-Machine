@@ -69,36 +69,53 @@ class PreCalcKernel:
 def _Kc(self, super, x, y, eval_gradient=False):
     x, x_weight = self.x2graph(x), self.x2weight(x)
     y, y_weight = self.x2graph(y), self.x2weight(y)
-    Kxy, dKxy = super.__call__(x, Y=y, eval_gradient=True)
-    Kxx, dKxx = super.__call__(x, eval_gradient=True)
-    Kyy, dKyy = super.__call__(y, eval_gradient=True)
-    Fxy = np.einsum("i,j,ij", x_weight, y_weight, Kxy)
-    dFxy = np.einsum("i,j,ijk->k", x_weight, y_weight, dKxy)
-    Fxx = np.einsum("i,j,ij", x_weight, x_weight, Kxx)
-    dFxx = np.einsum("i,j,ijk->k", x_weight, x_weight, dKxx)
-    Fyy = np.einsum("i,j,ij", y_weight, y_weight, Kyy)
-    dFyy = np.einsum("i,j,ijk->k", y_weight, y_weight, dKyy)
-
-    def get_reaction_smarts(g, g_weight):
-        reactants = []
-        products = []
-        for i, weight in enumerate(g_weight):
-            if weight > 0:
-                reactants.append(g.smiles)
-            elif weight < 0:
-                products.append(g.smiles)
-        return '.'.join(reactants) + '>>' '.'.join(products)
-
-    if Fxx <= 0.:
-        raise Exception('trivial reaction: ', get_reaction_smarts(x, x_weight))
-    if Fyy == 0.:
-        raise Exception('trivial reaction: ', get_reaction_smarts(y, y_weight))
-    sqrtFxxFyy = np.sqrt(Fxx * Fyy)
     if eval_gradient:
-        return Fxy / sqrtFxxFyy, \
-               (dFxy - 0.5 * dFxx / Fxx - 0.5 * dFyy / Fyy) / sqrtFxxFyy
+        if not x and not y:
+            return 1.0, np.zeros(len(super.theta))
+        elif not x or not y:
+            return 0., np.zeros(len(super.theta))
+        else:
+            Kxy, dKxy = super.__call__(x, Y=y, eval_gradient=True)
+            Kxx, dKxx = super.__call__(x, eval_gradient=True)
+            Kyy, dKyy = super.__call__(y, eval_gradient=True)
+            Fxy = np.einsum("i,j,ij", x_weight, y_weight, Kxy)
+            dFxy = np.einsum("i,j,ijk->k", x_weight, y_weight, dKxy)
+            Fxx = np.einsum("i,j,ij", x_weight, x_weight, Kxx)
+            dFxx = np.einsum("i,j,ijk->k", x_weight, x_weight, dKxx)
+            Fyy = np.einsum("i,j,ij", y_weight, y_weight, Kyy)
+            dFyy = np.einsum("i,j,ijk->k", y_weight, y_weight, dKyy)
+
+            def get_reaction_smarts(g, g_weight):
+                reactants = []
+                products = []
+                for i, weight in enumerate(g_weight):
+                    if weight > 0:
+                        reactants.append(g.smiles)
+                    elif weight < 0:
+                        products.append(g.smiles)
+                return '.'.join(reactants) + '>>' '.'.join(products)
+
+            if Fxx <= 0.:
+                raise Exception('trivial reaction: ', get_reaction_smarts(x, x_weight))
+            if Fyy == 0.:
+                raise Exception('trivial reaction: ', get_reaction_smarts(y, y_weight))
+            sqrtFxxFyy = np.sqrt(Fxx * Fyy)
+            return Fxy / sqrtFxxFyy, \
+                   (dFxy - 0.5 * dFxx / Fxx - 0.5 * dFyy / Fyy) / sqrtFxxFyy
     else:
-        return Fxy / sqrtFxxFyy
+        if not x and not y:
+            return 1.0
+        elif not x or not y:
+            return 0.
+        else:
+            Kxy = super.__call__(x, Y=y)
+            Kxx = super.__call__(x)
+            Kyy = super.__call__(y)
+            Fxy = np.einsum("i,j,ij", x_weight, y_weight, Kxy)
+            Fxx = np.einsum("i,j,ij", x_weight, x_weight, Kxx)
+            Fyy = np.einsum("i,j,ij", y_weight, y_weight, Kyy)
+            sqrtFxxFyy = np.sqrt(Fxx * Fyy)
+            return Fxy / sqrtFxxFyy
 
 
 def _call(self, X, Y=None, eval_gradient=False, *args, **kwargs):

@@ -53,7 +53,7 @@ class HyperJsonGenerator:
         if reaction:
             tp.pop('probability_atomic_number')
             tp.update({
-                'probability_group_reaction': [['Uniform_p', 1.0, [1e-2, 1e2]]]
+                'probability_group_reaction': [['Uniform_p', 1.0, "fixed"]]
             })
         return tp
 
@@ -105,7 +105,7 @@ class HyperJsonGenerator:
         if reaction:
             ad.pop('probability_atomic_number')
             ad.update({
-                'probability_group_reaction': [['Uniform_p', 1.0, [1e-2, 1e2]]]
+                'probability_group_reaction': [['Uniform_p', 1.0, "fixed"]]
             })
         return ad
 
