@@ -4,9 +4,10 @@ import sys
 import argparse
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 from rdkit import Chem
 from rdkit.Chem import rdChemReactions
-
+tqdm.pandas()
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from chemml.graph.hashgraph import HashGraph
@@ -99,13 +100,20 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
             df['id'] = df['id'].astype(int)
             df['group_id'] = df['group_id'].astype(int)
         for sg in single_graph:
-            # df[sg].apply(HashGraph.from_inchi_or_smiles)
-            df[sg] = single2graph(df[sg])
+            print('Processing single graph.')
+            if len(_get_uniX(df[sg])) > 0.5 * len(df[sg]):
+                df[sg] = df[sg].progress_apply(HashGraph.from_inchi_or_smiles,
+                                               args=[rdkit_config()])
+            else:
+                df[sg] = single2graph(df[sg])
         for mg in multi_graph:
-            df[mg] = df[mg].apply(multi_graph_transform)
+            print('Processing multi graph.')
+            df[mg] = df[mg].progress_apply(multi_graph_transform)
         for rg in reaction_graph:
-            df[rg + '_agents'] = df[rg].apply(reaction2agent)
-            df[rg] = df[rg].apply(reaction2rp)
+            print('Processing reagents graph.')
+            df[rg + '_agents'] = df[rg].progress_apply(reaction2agent)
+            print('Processing reactions graph.')
+            df[rg] = df[rg].progress_apply(reaction2rp)
         if pkl is not None:
             df.to_pickle(pkl)
     return df

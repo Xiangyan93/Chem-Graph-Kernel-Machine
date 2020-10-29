@@ -1,4 +1,3 @@
-import numpy as np
 from .gpr import GPR
 from chemml.learner import BaseLearner
 
