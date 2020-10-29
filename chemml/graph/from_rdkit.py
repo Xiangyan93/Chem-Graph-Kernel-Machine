@@ -8,110 +8,9 @@ import re
 import networkx as nx
 import pandas as pd
 import numpy as np
-from treelib import Tree
 from rdkit.Chem import AllChem as Chem
 from graphdot.graph._from_networkx import _from_networkx
-
-
-class FunctionalGroup:
-    """Functional Group.
-
-    atom0 -> atom1 define a directed bond in the molecule. Then the bond is
-    removed and the functional group is defined as a multitree. atom1 is the
-    root node of the tree.
-
-    Parameters
-    ----------
-    mol : molecule object in RDKit
-
-    atom0, atom1 : atom object in RDKit
-
-    depth: the depth of the multitree.
-
-    Attributes
-    ----------
-    tree : multitree represent the functional group
-        each node has 3 important attributes: tag: [atomic number, bond order
-        with its parent], identifier: atom index defined in RDKit molecule
-        object, data: RDKit atom object.
-
-    """
-
-    def __init__(self, mol, atom0, atom1, depth=5):
-        self.mol = mol
-        tree = Tree()
-        bond_order = mol.GetBondBetweenAtoms(
-            atom0.GetIdx(),
-            atom1.GetIdx()
-        ).GetBondTypeAsDouble()
-        tree.create_node(
-            tag=[atom0.GetAtomicNum(), bond_order],
-            identifier=atom0.GetIdx(), data=atom0
-        )
-        tree.create_node(
-            tag=[atom1.GetAtomicNum(), bond_order],
-            identifier=atom1.GetIdx(),
-            data=atom1,
-            parent=atom0.GetIdx()
-        )
-        for _ in range(depth):
-            for node in tree.all_nodes():
-                if node.is_leaf():
-                    for atom in node.data.GetNeighbors():
-                        tree_id = tree._identifier
-                        if atom.GetIdx() != node.predecessor(tree_id=tree_id):
-                            order = mol.GetBondBetweenAtoms(
-                                atom.GetIdx(),
-                                node.data.GetIdx()
-                            ).GetBondTypeAsDouble()
-                            identifier = atom.GetIdx()
-                            while tree.get_node(identifier) is not None:
-                                identifier += len(mol.GetAtoms())
-                            tree.create_node(
-                                tag=[atom.GetAtomicNum(), order],
-                                identifier=identifier,
-                                data=atom,
-                                parent=node.identifier
-                            )
-        self.tree = tree
-
-    def __eq__(self, other):
-        if self.get_rank_list() == other.get_rank_list():
-            return True
-        else:
-            return False
-
-    def __lt__(self, other):
-        if self.get_rank_list() < other.get_rank_list():
-            return True
-        else:
-            return False
-
-    def __gt__(self, other):
-        if self.get_rank_list() > other.get_rank_list():
-            return True
-        else:
-            return False
-
-    def get_rank_list(self):
-        rank_list = []
-        expand_tree = self.tree.expand_tree(mode=Tree.WIDTH, reverse=True)
-        for identifier in expand_tree:
-            rank_list += self.tree.get_node(identifier).tag
-        return rank_list
-
-    def get_bonds_list(self):
-        bonds_list = []
-        expand_tree = self.tree.expand_tree(mode=Tree.WIDTH, reverse=True)
-        for identifier in expand_tree:
-            i = identifier
-            j = self.tree.get_node(identifier).predecessor(
-                tree_id=self.tree._identifier)
-            if j is None:
-                continue
-            ij = (min(i, j), max(i, j))
-            bonds_list.append(ij)
-        return bonds_list
+from .substructure import FunctionalGroup
 
 
 def get_bond_orientation_dict(mol):
@@ -234,14 +133,6 @@ def get_atom_ring_stereo(mol, atom, ring_idx, depth=5,
         return 0
 
 
-def get_ringlist(mol):
-    ringlist = [[] for _ in range(mol.GetNumAtoms())]
-    for ring in mol.GetRingInfo().AtomRings():
-        for i in ring:
-            ringlist[i].append(len(ring))
-    return [sorted(rings) if len(rings) else [0] for rings in ringlist]
-
-
 def IsSymmetric(mol, ij, depth=2):
     atom0 = mol.GetAtomWithIdx(ij[0])
     atom1 = mol.GetAtomWithIdx(ij[1])
@@ -296,25 +187,36 @@ def get_group_id(atom, rule):
         return [0]
 
 
-def _from_rdkit(cls, mol, bond_type='order',
-    set_morgan_identifier=False, morgan_radius=3,
-    set_elemental_mode=False,
-    set_ring_membership=False,
-    set_ring_stereo=False, depth=5,
-    set_hydrogen=False,
-    set_group=False, set_group_rule='element', reaction_center=None
-):
-    g = nx.Graph()
+class rdkit_config:
+    def __init__(self, bond_type='order',
+                 set_morgan_identifier=True, morgan_radius=3,
+                 set_elemental_mode=True,
+                 set_ring_membership=True,
+                 set_ring_stereo=True, depth=5,
+                 set_hydrogen=False,
+                 set_group=False, set_group_rule='element',
+                 reaction_center=None):
+        self.bond_type = bond_type
+        self.set_morgan_identifier = set_morgan_identifier
+        self.morgan_radius = morgan_radius
+        self.set_elemental_mode = set_elemental_mode
+        self.set_ring_membership = set_ring_membership
+        self.set_ring_stereo = set_ring_stereo
+        self.depth = depth
+        self.set_hydrogen = set_hydrogen
+        self.set_group = set_group
+        self.set_group_rule = set_group_rule
+        self.reaction_center = reaction_center
 
-    if set_hydrogen:
-        mol = Chem.AddHs(mol)
+    def preprocess(self, mol):
+        if self.set_hydrogen:
+            mol = Chem.AddHs(mol)
 
-    if set_morgan_identifier:
-        # calculate morgan substrcutre hasing value
-        def get_morgan_identifier(mol, morgan_radius):
+        if self.set_morgan_identifier:
+            # calculate morgan substrcutre hasing value
             morgan_info = dict()
             atomidx_hash_dict = dict()
-            radius = morgan_radius
+            radius = self.morgan_radius
             Chem.GetMorganFingerprint(mol, radius, bitInfo=morgan_info,
                                       useChirality=False)
             while len(atomidx_hash_dict) != mol.GetNumAtoms():
@@ -325,24 +227,43 @@ def _from_rdkit(cls, mol, bond_type='order',
                         if a[0] not in atomidx_hash_dict:
                             atomidx_hash_dict[a[0]] = key
                 radius -= 1
-            return atomidx_hash_dict
+            self.atomidx_hash_dict = atomidx_hash_dict
 
-        atomidx_hash_dict = get_morgan_identifier(mol, morgan_radius)
+        if self.set_elemental_mode:
+            # read elemental modes.
+            self.emode = pd.read_csv(os.path.join(CWD, 'emodes.dat'), sep='\s+')
 
-    if set_elemental_mode:
-        # read elemental modes.
-        emode = pd.read_csv(os.path.join(CWD, 'emodes.dat'), sep='\s+')
+        if self.set_group:
+            self.group_dict = {
+                1: 'group_an1', 5: 'group_an5', 6: 'group_an6', 7: 'group_an7',
+                8: 'group_an8', 9: 'group_an9', 14: 'group_an14',
+                15: 'group_an15',
+                16: 'group_an16', 17: 'group_an17', 35: 'group_an35',
+                53: 'group_an53'
+            }
 
-    if set_group:
-        group_dict = {
-            1: 'an1', 5: 'an5', 6: 'an6', 7: 'an7', 8: 'an8', 9: 'an9',
-            14: 'an14', 15: 'an15', 16: 'an16', 17: 'an17', 35: 'an35',
-            53: 'an53'
-        }  # group_id -> group name
+        if self.set_ring_membership:
+            self.ringlist = self.get_ringlist(mol)
+
+    @staticmethod
+    def get_ringlist(mol):
+        ringlist = [[] for _ in range(mol.GetNumAtoms())]
+        for ring in mol.GetRingInfo().AtomRings():
+            for i in ring:
+                ringlist[i].append(len(ring))
+        return [sorted(rings) if len(rings) else [0] for rings in ringlist]
+
+
+def _from_rdkit(cls, mol, rdkit_config):
+    g = nx.Graph()
 
     # set atomic attributes
-    for i, atom in enumerate(mol.GetAtoms()):
-        assert (i == atom.GetIdx())
+    if mol.GetNumAtoms() == 1:
+        atom_list = [0, 0]
+    else:
+        atom_list = np.arange(0, mol.GetNumAtoms()).tolist()
+    for i, idx in enumerate(atom_list):
+        atom = mol.GetAtomWithIdx(idx)
         g.add_node(i)
         an = atom.GetAtomicNum()
         g.nodes[i]['atomic_number'] = an
@@ -351,88 +272,107 @@ def _from_rdkit(cls, mol, bond_type='order',
         g.nodes[i]['hybridization'] = atom.GetHybridization()
         g.nodes[i]['aromatic'] = atom.GetIsAromatic()
         g.nodes[i]['chiral'] = get_chiral_tag(mol, atom)
+        g.nodes[i]['single_atom'] = True if mol.GetNumAtoms() == 1 else False
         if g.nodes[i]['chiral'] == 0:
             g.nodes[i]['an_chiral'] = False
         else:
             g.nodes[i]['an_chiral'] = True
-        if set_elemental_mode:
+
+        if rdkit_config.set_elemental_mode:
+            emode = rdkit_config.emode
             g.nodes[i]['elemental_mode1'] = emode[emode.an == an].em1.ravel()[0]
             g.nodes[i]['elemental_mode2'] = emode[emode.an == an].em2.ravel()[0]
             #  g.nodes[i]['elemental_mode3'] = emode[emode.an == an].em3.ravel()[0]
             #  g.nodes[i]['elemental_mode4'] = emode[emode.an == an].em4.ravel()[0]
-        if set_morgan_identifier:
-            g.nodes[i]['morgan_hash'] = atomidx_hash_dict[atom.GetIdx()]
 
-        if set_group:
-            g.nodes[i]['group_id'] = get_group_id(atom, set_group_rule)
-            for key, value in group_dict.items():
+        if rdkit_config.set_morgan_identifier:
+            g.nodes[i]['morgan_hash'] = rdkit_config.atomidx_hash_dict[
+                atom.GetIdx()]
+
+        if rdkit_config.set_group:
+            g.nodes[i]['group_id'] = get_group_id(atom,
+                                                  rdkit_config.set_group_rule)
+            for key, value in rdkit_config.group_dict.items():
                 g.nodes[i][value] = True if key in g.nodes[i]['group_id'] \
                     else False
 
-        if reaction_center is not None:
-            g.nodes[i]['an_reaction'] = True if i in reaction_center \
-                else False
+        if rdkit_config.reaction_center is not None:
+            g.nodes[i]['group_reaction'] = True if atom.GetPropsAsDict().get(
+                'molAtomMapNumber') in rdkit_config.reaction_center else False
 
-    # set ring information
-    if set_ring_membership:
-        for i, rings in enumerate(get_ringlist(mol)):
-            g.nodes[i]['ring_membership'] = rings
-            if rings == [0]:
+        # set ring information
+        if rdkit_config.set_ring_membership:
+            g.nodes[i]['ring_membership'] = rdkit_config.ringlist[idx]
+            if rdkit_config.ringlist[idx] == [0]:
                 g.nodes[i]['ring_number'] = 0
             else:
-                g.nodes[i]['ring_number'] = len(rings)
+                g.nodes[i]['ring_number'] = len(rdkit_config.ringlist[idx])
 
     # set bond attributes
-    for bond in mol.GetBonds():
-        ij = (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+    if mol.GetNumAtoms() == 1:
+        ij = (0, 1)
         g.add_edge(*ij)
-        if bond_type == 'order':
-            g.edges[ij]['order'] = bond.GetBondTypeAsDouble()
+        if rdkit_config.bond_type == 'order':
+            g.edges[ij]['order'] = 0.
         else:
-            g.edges[ij]['type'] = bond.GetBondType()
-        g.edges[ij]['aromatic'] = bond.GetIsAromatic()
-        g.edges[ij]['conjugated'] = bond.GetIsConjugated()
-        g.edges[ij]['stereo'] = bond.GetStereo()
-        g.edges[ij]['symmetry'] = IsSymmetric(mol, ij)
-        if set_ring_stereo is True:
+            g.edges[ij]['type'] = 0
+        g.edges[ij]['aromatic'] = False
+        g.edges[ij]['conjugated'] = False
+        g.edges[ij]['stereo'] = 0
+        # g.edges[ij]['symmetry'] = False
+        if rdkit_config.set_ring_stereo:
             g.edges[ij]['ring_stereo'] = 0.
+    else:
+        for bond in mol.GetBonds():
+            ij = (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+            g.add_edge(*ij)
+            if rdkit_config.bond_type == 'order':
+                g.edges[ij]['order'] = bond.GetBondTypeAsDouble()
+            else:
+                g.edges[ij]['type'] = bond.GetBondType()
+            g.edges[ij]['aromatic'] = bond.GetIsAromatic()
+            g.edges[ij]['conjugated'] = bond.GetIsConjugated()
+            g.edges[ij]['stereo'] = bond.GetStereo()
+            # g.edges[ij]['symmetry'] = IsSymmetric(mol, ij)
+            if rdkit_config.set_ring_stereo:
+                g.edges[ij]['ring_stereo'] = 0.
 
-    # set ring stereo
-    if set_ring_stereo:
-        bond_orientation_dict = get_bond_orientation_dict(mol)
-        for ring_idx in mol.GetRingInfo().AtomRings():
-            atom_updown = []
-            for idx in ring_idx:
-                if g.nodes[idx]['ring_number'] != 1:
-                    atom_updown.append(0)
-                else:
-                    atom = mol.GetAtomWithIdx(idx)
-                    atom_updown.append(
-                        get_atom_ring_stereo(
-                            mol,
-                            atom,
-                            ring_idx,
-                            depth=depth,
-                            bond_orientation_dict=bond_orientation_dict
+        # set ring stereo
+        if rdkit_config.set_ring_stereo:
+            bond_orientation_dict = get_bond_orientation_dict(mol)
+            for ring_idx in mol.GetRingInfo().AtomRings():
+                atom_updown = []
+                for idx in ring_idx:
+                    if g.nodes[idx]['ring_number'] != 1:
+                        atom_updown.append(0)
+                    else:
+                        atom = mol.GetAtomWithIdx(idx)
+                        atom_updown.append(
+                            get_atom_ring_stereo(
+                                mol,
+                                atom,
+                                ring_idx,
+                                depth=rdkit_config.depth,
+                                bond_orientation_dict=bond_orientation_dict
+                            )
                         )
-                    )
-            atom_updown = np.array(atom_updown)
-            for j in range(len(ring_idx)):
-                b = j
-                e = j + 1 if j != len(ring_idx) - 1 else 0
-                StereoOfRingBond = float(atom_updown[b] * atom_updown[e] *
-                                         len(ring_idx))
-                if ring_idx[b] < ring_idx[e]:
-                    ij = (ring_idx[b], ring_idx[e])
-                else:
-                    ij = (ring_idx[e], ring_idx[b])
-                if g.edges[ij]['ring_stereo'] != 0.:
-                    raise Exception(ij, g.edges[ij]['ring_stereo'],
-                                    StereoOfRingBond)
-                else:
-                    g.edges[ij]['ring_stereo'] = StereoOfRingBond
-                    if StereoOfRingBond != 0.:
-                        g.nodes[ij[0]]['an_chiral'] = True
-                        g.nodes[ij[1]]['an_chiral'] = True
+                atom_updown = np.array(atom_updown)
+                for j in range(len(ring_idx)):
+                    b = j
+                    e = j + 1 if j != len(ring_idx) - 1 else 0
+                    StereoOfRingBond = float(atom_updown[b] * atom_updown[e] *
+                                             len(ring_idx))
+                    if ring_idx[b] < ring_idx[e]:
+                        ij = (ring_idx[b], ring_idx[e])
+                    else:
+                        ij = (ring_idx[e], ring_idx[b])
+                    if g.edges[ij]['ring_stereo'] != 0.:
+                        raise Exception(ij, g.edges[ij]['ring_stereo'],
+                                        StereoOfRingBond)
+                    else:
+                        g.edges[ij]['ring_stereo'] = StereoOfRingBond
+                        if StereoOfRingBond != 0.:
+                            g.nodes[ij[0]]['an_chiral'] = True
+                            g.nodes[ij[1]]['an_chiral'] = True
 
     return _from_networkx(cls, g)

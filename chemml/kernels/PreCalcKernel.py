@@ -78,6 +78,21 @@ def _Kc(self, super, x, y, eval_gradient=False):
     dFxx = np.einsum("i,j,ijk->k", x_weight, x_weight, dKxx)
     Fyy = np.einsum("i,j,ij", y_weight, y_weight, Kyy)
     dFyy = np.einsum("i,j,ijk->k", y_weight, y_weight, dKyy)
+
+    def get_reaction_smarts(g, g_weight):
+        reactants = []
+        products = []
+        for i, weight in enumerate(g_weight):
+            if weight > 0:
+                reactants.append(g.smiles)
+            elif weight < 0:
+                products.append(g.smiles)
+        return '.'.join(reactants) + '>>' '.'.join(products)
+
+    if Fxx <= 0.:
+        raise Exception('trivial reaction: ', get_reaction_smarts(x, x_weight))
+    if Fyy == 0.:
+        raise Exception('trivial reaction: ', get_reaction_smarts(y, y_weight))
     sqrtFxxFyy = np.sqrt(Fxx * Fyy)
     if eval_gradient:
         return Fxy / sqrtFxxFyy, \
@@ -106,9 +121,10 @@ def _call(self, X, Y=None, eval_gradient=False, *args, **kwargs):
                 K[i][j], K_gradient[i][j] = self.Kc(X[i], Y[j],
                                                     eval_gradient=True)
     else:
-        for i in Xidx:
-            for j in Yidx:
-                K[i][j] = self.Kc(X[i], Y[j])
+        for n in range(len(Xidx)):
+            i = Xidx[n]
+            j = Yidx[n]
+            K[i][j] = self.Kc(X[i], Y[j])
     if symmetric:
         K = K + K.T
         K[np.diag_indices_from(K)] += 1.0

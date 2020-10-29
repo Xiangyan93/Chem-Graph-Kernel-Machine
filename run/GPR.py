@@ -123,7 +123,7 @@ def read_input(result_dir, input, kernel_config, properties, params):
     # read input.
     df = get_df(input,
                 os.path.join(result_dir, '%s.pkl' % ','.join(properties)),
-                kernel_config.single_graph, kernel_config.multi_graph)
+                kernel_config.single_graph, kernel_config.multi_graph, [])
     # get df of train and test sets
     df_train, df_test = df_filter(
         df,
@@ -263,8 +263,8 @@ def main():
     )
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
-        'format: single_graph:multi_graph:targets\n'
-        'examples: inchi::tt\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tt\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
@@ -298,7 +298,7 @@ def main():
     # set args
     gpr, optimizer = set_gpr_optimizer(args.gpr)
     kernel, normalized, alpha = set_kernel_normalized_alpha(args.kernel)
-    single_graph, multi_graph, properties = \
+    single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
     mode, train_size, train_ratio, seed = \

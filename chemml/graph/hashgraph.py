@@ -1,3 +1,6 @@
+import os
+CWD = os.path.dirname(os.path.abspath(__file__))
+import pandas as pd
 from rdkit.Chem import AllChem as Chem
 from graphdot import Graph
 from graphdot.graph.reorder import rcm
@@ -31,53 +34,28 @@ class HashGraph(Graph):
         return hash(self.smiles)
 
     @classmethod
-    def from_inchi(cls, inchi):
+    def from_inchi(cls, inchi, rdkit_config):
         mol = Chem.MolFromInchi(inchi)
-        g = cls.from_rdkit(mol, set_morgan_identifier=True,
-                           set_elemental_mode=True,
-                           set_ring_membership=True,
-                           set_ring_stereo=True,
-                           set_hydrogen=False,
-                           set_group=True, set_group_rule='element')
-        g = g.permute(rcm(g))
-        g.smiles = Chem.MolToSmiles(mol)
+        g = cls.from_rdkit(mol, rdkit_config)
         return g
 
     @classmethod
-    def from_smiles(cls, smiles):
+    def from_smiles(self, smiles, rdkit_config):
         mol = Chem.MolFromSmiles(smiles)
-        g = cls.from_rdkit(mol, set_morgan_identifier=True,
-                           set_elemental_mode=True,
-                           set_ring_membership=True,
-                           set_ring_stereo=True,
-                           set_hydrogen=False,
-                           set_group=True, set_group_rule='element')
-        g = g.permute(rcm(g))
-        g.smiles = Chem.MolToSmiles(mol)
+        g = self.from_rdkit(mol, rdkit_config)
         return g
 
     @classmethod
-    def from_inchi_or_smiles(cls, input):
+    def from_inchi_or_smiles(cls, input, rdkit_config):
         if input.startswith('InChI'):
-            return cls.from_inchi(input)
+            return cls.from_inchi(input, rdkit_config)
         else:
-            return cls.from_smiles(input)
+            return cls.from_smiles(input, rdkit_config)
 
     @classmethod
-    def from_rdkit(cls, mol, bond_type='order',
-        set_morgan_identifier=False, morgan_radius=3,
-        set_elemental_mode=False,
-        set_ring_membership=False,
-        set_ring_stereo=False, depth=5,
-        set_hydrogen=False,
-        set_group=False, set_group_rule='element', reaction_center=None
-    ):
-        return _from_rdkit(cls, mol, bond_type=bond_type,
-                           set_morgan_identifier=set_morgan_identifier,
-                           morgan_radius=morgan_radius,
-                           set_elemental_mode=set_elemental_mode,
-                           set_ring_membership=set_ring_membership,
-                           set_ring_stereo=set_ring_stereo, depth=depth,
-                           set_hydrogen=set_hydrogen,
-                           set_group=set_group, set_group_rule=set_group_rule,
-                           reaction_center=reaction_center)
+    def from_rdkit(cls, mol, rdkit_config):
+        rdkit_config.preprocess(mol)
+        g = _from_rdkit(cls, mol, rdkit_config)
+        g.smiles = Chem.MolToSmiles(mol)
+        g = g.permute(rcm(g))
+        return g

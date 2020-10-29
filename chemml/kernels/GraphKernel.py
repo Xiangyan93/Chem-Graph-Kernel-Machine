@@ -2,7 +2,6 @@ import os
 import json
 import pickle
 from graphdot.kernel.marginalized import MarginalizedGraphKernel
-from graphdot.kernel.marginalized.starting_probability import Uniform
 from graphdot.microkernel import (
     Additive,
     Constant as kC,
@@ -12,6 +11,11 @@ from graphdot.microkernel import (
     Convolution as kConv,
     Normalize
 )
+from graphdot.microprobability import (
+    Additive as Additive_p,
+    Constant,
+    UniformProbability
+)
 from chemml.kernels.PreCalcKernel import (
     ConvolutionPreCalcKernel as CPCK,
     _Kc,
@@ -19,6 +23,7 @@ from chemml.kernels.PreCalcKernel import (
 from chemml.kernels.MultipleKernel import _get_uniX
 from chemml.kernels.KernelConfig import KernelConfig
 from chemml.kernels.MultipleKernel import *
+from chemml.graph.hashgraph import HashGraph
 
 
 class MGK(MarginalizedGraphKernel):
@@ -37,15 +42,17 @@ class MGK(MarginalizedGraphKernel):
         X_idx = np.searchsorted(X_unique, X)
         return X_unique, X_idx
 
-    def __graph(self, X):
+    def _graph(self, X):
         if X.__class__ == np.ndarray:
             return X.ravel()
         else:
             return X
 
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        X = self.__graph(X)
-        Y = self.__graph(Y)
+        X = self._graph(X)
+        Y = self._graph(Y)
+        X = HashGraph.unify_datatype(X)
+        Y = HashGraph.unify_datatype(Y) if Y is not None else Y
         if self.unique:
             X_unique, X_idx = self.__unique(X)
             if Y is None:
@@ -66,7 +73,8 @@ class MGK(MarginalizedGraphKernel):
                                     **kwargs)
 
     def diag(self, X, *args, **kwargs):
-        X = self.__graph(X)
+        X = self._graph(X)
+        X = HashGraph.unify_datatype(X)
         if self.unique:
             X_unique, X_idx = self.__unique(X)
             diag = super().diag(X_unique, *args, **kwargs)
@@ -258,7 +266,9 @@ class PreCalcNormalizedGraphKernel(NormalizedGraphKernel):
 class ConvolutionNormalizedGraphKernel(PreCalcNormalizedGraphKernel):
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
         from chemml.kernels.PreCalcKernel import _call
-        return _call(self, X, Y=None, eval_gradient=eval_gradient,
+        X = self._graph(X)
+        Y = self._graph(Y)
+        return _call(self, X, Y=Y, eval_gradient=eval_gradient,
                      *args, **kwargs)
 
     def Kc(self, x, y, eval_gradient=False):
@@ -271,6 +281,7 @@ class ConvolutionNormalizedGraphKernel(PreCalcNormalizedGraphKernel):
         return _get_uniX(graphs)
 
     def PreCalculate(self, X, result_dir, id=None):
+        X = self._graph(X)
         X = self.get_uniX(X)
         self.graphs = np.sort(X)
         self.K, self.K_gradient = super().__call__(self.graphs,
@@ -355,11 +366,16 @@ class GraphKernelConfig(KernelConfig):
                 return kConv(kDelta(microk[1], microk[2]))
             elif microk[0] == 'kC':
                 return kC(microk[1], microk[2])
+            elif microk[0] == 'Uniform_p':
+                return UniformProbability(microk[1], microk[2])
+            elif microk[0] == 'Const_p':
+                return Constant(microk[1], microk[2])
             else:
                 raise Exception('unknown microkernel type')
 
         knode_dict = {}
         kedge_dict = {}
+        p_dict = {}
         for key, microk_list in self.hyperdict.items():
             if key.startswith('atom_'):
                 microk = [get_microk(mk) for mk in microk_list]
@@ -367,16 +383,21 @@ class GraphKernelConfig(KernelConfig):
             elif key.startswith('bond_'):
                 microk = [get_microk(mk) for mk in microk_list]
                 kedge_dict.update({key[5:]: np.product(microk)})
+            elif key.startswith('probability_'):
+                microp = [get_microk(mk) for mk in microk_list]
+                p_dict.update({key[12:]: np.product(microp)})
 
         def fun(type, dict):
             if type == 'Tensorproduct':
                 return TensorProduct(**dict)
             elif type == 'Additive':
                 return Normalize(Additive(**dict))
+            elif type == 'Additive_p':
+                return Additive_p(**dict)
 
         return fun(self.hyperdict['a_type'], knode_dict), \
                fun(self.hyperdict['b_type'], kedge_dict), \
-               Uniform(1.0, "fixed")
+               fun(self.hyperdict['p_type'], p_dict)
 
     def save(self, result_dir, model):
         if hasattr(model, 'kernel_'):
