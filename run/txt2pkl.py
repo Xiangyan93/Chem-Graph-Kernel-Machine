@@ -16,34 +16,51 @@ from chemml.kernels.MultipleKernel import _get_uniX
 from chemml.graph.substructure import AtomEnvironment
 
 
+def unify_datatype(X):
+    if X[0].__class__ == list:
+        graphs = []
+        for x in X:
+            graphs += x[::2]
+        HashGraph.unify_datatype(graphs, inplace=True)
+    else:
+        HashGraph.unify_datatype(X, inplace=True)
+
+
 def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
     def single2graph(series):
         unique_series = _get_uniX(series)
         graphs = list(map(HashGraph.from_inchi_or_smiles, unique_series,
-                          [rdkit_config()] * len(unique_series)))
+                          [rdkit_config()] * len(unique_series),
+                          series['group_id']))
+        unify_datatype(graphs)
         idx = np.searchsorted(unique_series, series)
         return np.asarray(graphs)[idx]
 
-    def multi_graph_transform(line):
+    def multi_graph_transform(line, hash):
+        hashs = [str(hash) + '_%d' % i for i in range(int(len(line)/2))]
         line[::2] = list(map(HashGraph.from_inchi_or_smiles, line[::2],
-                             [rdkit_config()] * int(len(line) / 2)))
+                             [rdkit_config()] * int(len(line) / 2),
+                             hashs))
+        return line
 
-    def reaction2agent(line):
+    def reaction2agent(reaction_smarts, hash):
         agents = []
-        rxn = rdChemReactions.ReactionFromSmarts(line)
+        rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
         # print(line)
-        for mol in rxn.GetAgents():
+        for i, mol in enumerate(rxn.GetAgents()):
             Chem.SanitizeMol(mol)
             try:
-                agents += [HashGraph.from_rdkit(mol, rdkit_config()), 1.0]
+                hash_ = hash + '_%d' % i
+                config_ = rdkit_config()
+                agents += [HashGraph.from_rdkit(mol, config_, hash_), 1.0]
             except:
-                print(line)
+                print(reaction_smarts)
                 exit(0)
         return agents
 
-    def reaction2rp(line):
+    def reaction2rp(reaction_smarts, hash):
         reaction = []
-        rxn = rdChemReactions.ReactionFromSmarts(line)
+        rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
 
         # rxn.Initialize()
         def getAtomMapDict(mols):
@@ -69,18 +86,18 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
         ReactingAtoms = getReactingAtoms(rxn)
         for i, reactant in enumerate(rxn.GetReactants()):
             Chem.SanitizeMol(reactant)
-            reaction += [HashGraph.from_rdkit(
-                reactant, rdkit_config(reaction_center=ReactingAtoms)), 1.0]
-            if reaction[-2].nodes.to_pandas()[
-                'group_reaction'].unique().tolist() == [False]:
-                raise Exception('Reactants error:', line)
+            hash_ = hash + '_r%d' % i
+            config_ = rdkit_config(reaction_center=ReactingAtoms)
+            reaction += [HashGraph.from_rdkit(reactant, config_, hash_), 1.0]
+            if True not in reaction[-2].nodes.to_pandas()['group_reaction']:
+                raise Exception('Reactants error:', reaction_smarts)
         for i, product in enumerate(rxn.GetProducts()):
             Chem.SanitizeMol(product)
-            reaction += [HashGraph.from_rdkit(
-                product, rdkit_config(reaction_center=ReactingAtoms)), -1.0]
-            if reaction[-2].nodes.to_pandas()[
-                'group_reaction'].unique().tolist() == [False]:
-                raise Exception('Products error:', line)
+            hash_ = hash + '_p%d' % i
+            config_ = rdkit_config(reaction_center=ReactingAtoms)
+            reaction += [HashGraph.from_rdkit(product, config_, hash_), -1.0]
+            if True not in reaction[-2].nodes.to_pandas()['group_reaction']:
+                raise Exception('Products error:', reaction_smarts)
         return reaction
 
     if pkl is not None and os.path.exists(pkl):
@@ -101,19 +118,30 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
             df['group_id'] = df['group_id'].astype(int)
         for sg in single_graph:
             print('Processing single graph.')
-            if len(_get_uniX(df[sg])) > 0.5 * len(df[sg]):
-                df[sg] = df[sg].progress_apply(HashGraph.from_inchi_or_smiles,
-                                               args=[rdkit_config()])
+            if len(np.unique(df[sg])) > 0.5 * len(df[sg]):
+                df[sg] = df.progress_apply(
+                    lambda x: HashGraph.from_inchi_or_smiles(
+                        x[sg], rdkit_config(), str(x['group_id'])), axis=1)
+                unify_datatype(df[sg])
             else:
                 df[sg] = single2graph(df[sg])
         for mg in multi_graph:
             print('Processing multi graph.')
-            df[mg] = df[mg].progress_apply(multi_graph_transform)
+            df[mg] = df.progress_apply(
+                lambda x: multi_graph_transform(
+                    x[mg], str(x['group_id'])), axis=1)
+            unify_datatype(df[mg])
+
         for rg in reaction_graph:
             print('Processing reagents graph.')
-            df[rg + '_agents'] = df[rg].progress_apply(reaction2agent)
+            print(df[rg])
+            df[rg + '_agents'] = df.progress_apply(
+                lambda x: reaction2agent(x[rg], str(x['group_id'])), axis=1)
+            unify_datatype(df[rg + '_agents'])
             print('Processing reactions graph.')
-            df[rg] = df[rg].progress_apply(reaction2rp)
+            df[rg] = df.progress_apply(
+                lambda x: reaction2rp(x[rg], str(x['group_id'])), axis=1)
+            unify_datatype(df[rg])
         if pkl is not None:
             df.to_pickle(pkl)
     return df

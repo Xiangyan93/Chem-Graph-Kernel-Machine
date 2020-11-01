@@ -6,6 +6,7 @@ class HyperJsonGenerator:
         self.k_bounds = k_bounds
         self.s_bounds = s_bounds
         self.tensorproduct_basis = {
+            'normalization': True,
             'a_type': 'Tensorproduct',
             'b_type': 'Tensorproduct',
             'p_type': 'Additive_p',
@@ -15,6 +16,7 @@ class HyperJsonGenerator:
             'probability_atomic_number': [['Const_p', 1.0, "fixed"]]
         }
         self.additive_basis = {
+            'normalization': True,
             'a_type': 'Additive',
             'b_type': 'Additive',
             'p_type': 'Additive_p',
@@ -28,7 +30,8 @@ class HyperJsonGenerator:
             'probability_atomic_number': [['Const_p', 1.0, "fixed"]]
         }
 
-    def tensorproduct(self, elemental_mode=False, reaction=False):
+    def tensorproduct(self, elemental_mode=False, reaction=False,
+                      normalization=True):
         tp = self.tensorproduct_basis.copy()
         tp.update({
             'atom_aromatic': [['kDelta', 0.9, self.k_bounds]],
@@ -55,9 +58,12 @@ class HyperJsonGenerator:
             tp.update({
                 'probability_group_reaction': [['Uniform_p', 1.0, "fixed"]]
             })
+        if not normalization:
+            tp['normalization'] = False
         return tp
 
-    def additive(self, elemental_mode=False, reaction=False):
+    def additive(self, elemental_mode=False, reaction=False,
+                 normalization=True):
         ad = self.additive_basis.copy()
         ad.update({
             'atom_aromatic': [
@@ -107,20 +113,26 @@ class HyperJsonGenerator:
             ad.update({
                 'probability_group_reaction': [['Uniform_p', 1.0, "fixed"]]
             })
+        if not normalization:
+            ad['normalization'] = False
         return ad
 
 
 hyper_json = HyperJsonGenerator()
-open('tensorproduct-basis.json', 'w').write(
+open('tensorproduct-basis-NMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct_basis))
-open('tensorproduct.json', 'w').write(
+open('tensorproduct-NMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct()))
-open('tensorproduct-reaction.json', 'w').write(
+open('tensorproduct-MGK.json', 'w').write(
+    json.dumps(hyper_json.tensorproduct(normalization=False)))
+open('tensorproduct-reaction-NMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct(reaction=True)))
 
-open('additive-basis.json', 'w').write(
+open('additive-basis-NMGK.json', 'w').write(
     json.dumps(hyper_json.additive_basis))
-open('additive.json', 'w').write(
+open('additive-NMGK.json', 'w').write(
     json.dumps(hyper_json.additive()))
-open('additive-reaction.json', 'w').write(
+open('additive-MGK.json', 'w').write(
+    json.dumps(hyper_json.additive(normalization=False)))
+open('additive-reaction-NMGK.json', 'w').write(
     json.dumps(hyper_json.additive(reaction=True)))

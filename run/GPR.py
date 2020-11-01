@@ -21,17 +21,11 @@ def set_gpr_optimizer(gpr):
     return gpr, optimizer
 
 
-def set_kernel_normalized_alpha(kernel):
-    kernel, normalized, alpha = kernel.split(':')
+def set_kernel_alpha(kernel):
+    kernel, alpha = kernel.split(':')
     if kernel not in ['graph', 'preCalc']:
         raise Exception('Unknown kernel')
-    if normalized in ['True', 'true', '1']:
-        normalized = True
-    elif normalized in ['False', 'false', '0', '']:
-        normalized = False
-    else:
-        raise Exception('Error: normalized')
-    return kernel, normalized, float(alpha)
+    return kernel, float(alpha)
 
 
 def set_add_feature_hyperparameters(add_features):
@@ -72,31 +66,25 @@ def set_gpr(gpr):
     return GaussianProcessRegressor
 
 
-def set_kernel_config(result_dir, kernel, normalized,
-                      single_graph, multi_graph,
-                      add_features, add_hyperparameters, hyperjson):
+def set_kernel_config(kernel, add_features, add_hyperparameters,
+                      single_graph, multi_graph, hyperjson,
+                      result_dir):
     if kernel == 'graph':
         hyperdict = [
             json.loads(open(f, 'r').readline()) for f in hyperjson.split(',')
         ]
         params = {
-            'NORMALIZED': normalized,
+            'single_graph': single_graph,
+            'multi_graph': multi_graph,
             'hyperdict': hyperdict
         }
         from chemml.kernels.GraphKernel import GraphKernelConfig as KConfig
     else:
         params = {
-            # 'NORMALIZED': normalized,
             'result_dir': result_dir,
         }
         from chemml.kernels.PreCalcKernel import PreCalcKernelConfig as KConfig
-    return KConfig(
-        single_graph,
-        multi_graph,
-        add_features,
-        add_hyperparameters,
-        params,
-    )
+    return KConfig(add_features, add_hyperparameters, params)
 
 
 def read_input(result_dir, input, kernel_config, properties, params):
@@ -124,9 +112,13 @@ def read_input(result_dir, input, kernel_config, properties, params):
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
     # read input.
+    single_graph = kernel_config.single_graph \
+        if hasattr(kernel_config, 'single_graph') else []
+    multi_graph = kernel_config.multi_graph \
+        if hasattr(kernel_config, 'multi_graph') else []
     df = get_df(input,
                 os.path.join(result_dir, '%s.pkl' % ','.join(properties)),
-                kernel_config.single_graph, kernel_config.multi_graph, [])
+                single_graph, multi_graph, [])
     # get df of train and test sets
     df_train, df_test = df_filter(
         df,
@@ -154,7 +146,7 @@ def read_input(result_dir, input, kernel_config, properties, params):
     return (df, df_train, df_test, train_X, train_Y, train_id, test_X,
             test_Y, test_id)
 
-
+'''
 def pre_calculate(kernel_config, df, result_dir, load_K):
     if kernel_config.type == 'graph':
         print('***\tStart: Graph kernels calculating\t***')
@@ -166,7 +158,7 @@ def pre_calculate(kernel_config, df, result_dir, load_K):
             X, _, _ = get_XYid_from_df(df, kernel_config)
             kernel.PreCalculate(X, result_dir=result_dir)
         print('***\tEnd: Graph kernels calculating\t***\n')
-
+'''
 
 def gpr_run(data, result_dir, kernel_config, params,
             load_model=False, load_K=False):
@@ -184,8 +176,10 @@ def gpr_run(data, result_dir, kernel_config, params,
     Learner = params['Learner']
 
     # pre-calculate graph kernel matrix.
+    '''
     if params['optimizer'] is None:
         pre_calculate(kernel_config, df, result_dir, load_K)
+    '''
 
     print('***\tStart: hyperparameters optimization.\t***')
     if mode == 'loocv':  # directly calculate the LOOCV
@@ -254,11 +248,11 @@ def main():
     )
     parser.add_argument(
         '--kernel', type=str,
-        help='format: kernel:Normalized?:alpha.\n'
+        help='format: kernel:alpha.\n'
              'examples:\n'
-             'graph:True:0.01\n'
-             'graph:False:10.0\n'
-             'preCalc::0.01\n'
+             'graph:0.01\n'
+             'graph:10.0\n'
+             'preCalc:0.01\n'
              'For preCalc kernel, run KernelCalc.py first.'
     )
     parser.add_argument(
@@ -300,7 +294,7 @@ def main():
 
     # set args
     gpr, optimizer = set_gpr_optimizer(args.gpr)
-    kernel, normalized, alpha = set_kernel_normalized_alpha(args.kernel)
+    kernel, alpha = set_kernel_alpha(args.kernel)
     single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
@@ -312,10 +306,9 @@ def main():
 
     # set kernel_config
     kernel_config = set_kernel_config(
-        args.result_dir, kernel, normalized,
-        single_graph, multi_graph,
-        add_f, add_p,
-        args.json_hyper
+        kernel, add_f, add_p,
+        single_graph, multi_graph, args.json_hyper,
+        args.result_dir,
     )
 
     # read input

@@ -23,10 +23,6 @@ def main():
              'options: graphdot or sklearn.'
     )
     parser.add_argument(
-        '--normalized', action='store_true',
-        help='use normalized kernel.',
-    )
-    parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
         'format: single_graph:multi_graph:targets\n'
         'examples: inchi::tt\n'
@@ -47,16 +43,14 @@ def main():
     # set Gaussian process regressor
     GPR = set_gpr(args.gpr)
 
-    single_graph, multi_graph, properties = \
+    single_graph, multi_graph, _, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
-
     # set kernel_config
     kernel_config = set_kernel_config(
-        args.result_dir, 'graph', args.normalized,
-        single_graph, multi_graph,
-        add_f, add_p,
-        json.loads(open(args.json_hyper, 'r').readline())
+        'graph', add_f, add_p,
+        single_graph, multi_graph, args.json_hyper,
+        args.result_dir,
     )
     f_model = os.path.join(args.result_dir, 'model.pkl')
     model = GPR.load_cls(f_model, kernel_config.kernel)
