@@ -161,7 +161,7 @@ def pre_calculate(kernel_config, df, result_dir, load_K):
 '''
 
 def gpr_run(data, result_dir, kernel_config, params,
-            load_model=False, load_K=False):
+            load_model=False):
     df = data['df']
     df_train = data['df_train']
     train_X = data['train_X']
@@ -283,10 +283,6 @@ def main():
         help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '--load_K', action='store_true',
-        help='read existed K.pkl',
-    )
-    parser.add_argument(
         '--load_model', action='store_true',
         help='read existed model.pkl',
     )
@@ -343,7 +339,7 @@ def main():
         'Learner': Learner
     }
     gpr_run(data, args.result_dir, kernel_config, gpr_params,
-            load_K=args.load_K, load_model=args.load_model)
+            load_model=args.load_model)
 
 
 if __name__ == '__main__':

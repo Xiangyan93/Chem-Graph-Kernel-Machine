@@ -46,9 +46,10 @@ def main():
                 single_graph, multi_graph, reaction_graph)
     X, group_id = get_Xgroupid_from_df(df, kernel_config)
     print('**\tCalculating kernel matrix\t**')
+    K = kernel_config.kernel.__call__(X)
     kernel_dict = {
         'group_id': group_id,
-        'K': kernel_config.kernel(X),
+        'K': K,
         'theta': kernel_config.kernel.theta
     }
     print('**\tEnd Calculating kernel matrix\t**')

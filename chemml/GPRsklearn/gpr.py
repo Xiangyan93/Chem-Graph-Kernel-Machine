@@ -292,7 +292,6 @@ class RobustFitGaussianProcessRegressor(GPR):
             return result
 
     def fit_robust(self, X, y, cycle=1):
-        self.fit(X, y)
         for i in range(cycle):
             try:
                 print('Try to fit the data with alpha = ', self.alpha)

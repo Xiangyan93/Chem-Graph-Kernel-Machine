@@ -54,8 +54,8 @@ def main():
     )
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
-        'format: single_graph:multi_graph:targets\n'
-        'examples: inchi::tt\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tt\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
@@ -85,28 +85,23 @@ def main():
         help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '--load_K', action='store_true',
-        help='read existed K.pkl',
-    )
-    parser.add_argument(
         '--continued', action='store_true',
         help='whether continue training'
     )
     args = parser.parse_args()
 
     # set args
-    kernel, normalized, alpha = set_kernel_normalized_alpha(args.kernel)
-    single_graph, multi_graph, properties = \
+    kernel, alpha = set_kernel_alpha(args.kernel)
+    single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
     learning_mode, add_mode, init_size, add_size, max_size, search_size, \
     pool_size, stride = set_active_config(args.active_config)
     # set kernel_config
     kernel_config = set_kernel_config(
-        args.result_dir, kernel, normalized,
-        single_graph, multi_graph,
-        add_f, add_p,
-        json.loads(open(args.json_hyper, 'r').readline())
+        kernel, add_f, add_p,
+        single_graph, multi_graph, args.json_hyper,
+        args.result_dir,
     )
 
     if args.continued:
@@ -134,8 +129,6 @@ def main():
         test_id = read_input(
             args.result_dir, args.input, kernel_config, properties, params
         )
-        if optimizer is None:
-            pre_calculate(kernel_config, df, args.result_dir, args.load_K)
         activelearner = ActiveLearner(
             train_X, train_Y, train_id, alpha, kernel_config, learning_mode,
             add_mode, init_size, add_size, max_size, search_size, pool_size,
