@@ -1,6 +1,5 @@
 import os
 import json
-import pandas as pd
 from tqdm import tqdm
 tqdm.pandas()
 from graphdot.kernel.marginalized import MarginalizedGraphKernel
@@ -19,9 +18,9 @@ from graphdot.microprobability import (
     Constant,
     UniformProbability
 )
-from multiprocessing import Pool, cpu_count
 from chemml.kernels.KernelConfig import KernelConfig
 from chemml.kernels.MultipleKernel import *
+from chemml.kernels.ConvKernel import *
 
 
 class MGK(MarginalizedGraphKernel):
@@ -90,182 +89,33 @@ class MGK(MarginalizedGraphKernel):
         )
 
 
-def x2graph(x):
-    return x[::2]
+class ConvolutionGraphKernel(MGK):
+    def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
+        graph, K_graph, K_gradient_graph = self.__get_K_dK(
+            X, Y, eval_gradient)
+        return ConvolutionKernel()(
+            X, Y=Y, eval_gradient=eval_gradient, graph=graph, K_graph=K_graph,
+            K_gradient_graph=K_gradient_graph, theta=self.theta)
 
+    def diag(self, X, eval_gradient=False, n_process=cpu_count(),
+                 K_graph=None, K_gradient_graph=None, *args, **kwargs):
+        graph, K_graph, K_gradient_graph = self.__get_K_dK(
+            X, None, eval_gradient)
+        return ConvolutionKernel().diag(
+            X, eval_gradient=eval_gradient, graph=graph, K_graph=K_graph,
+            K_gradient_graph=K_gradient_graph, theta=self.theta)
 
-def x2weight(x):
-    return np.asarray(x[1::2])
-
-
-def Kxy(x, y, eval_gradient=False, graph=None, K_graph=None,
-        K_gradient_graph=None):
-    def get_reaction_smarts(g, g_weight):
-        reactants = []
-        products = []
-        for i, weight in enumerate(g_weight):
-            if weight > 0:
-                reactants.append(g.smiles)
-            elif weight < 0:
-                products.append(g.smiles)
-        return '.'.join(reactants) + '>>' '.'.join(products)
-
-    x, x_weight = x2graph(x), x2weight(x)
-    y, y_weight = x2graph(y), x2weight(y)
-
-    x_idx = np.searchsorted(graph, x)
-    y_idx = np.searchsorted(graph, y)
-    Kxy = K_graph[x_idx][:, y_idx]
-    Kxx = K_graph[x_idx][:, x_idx]
-    Kyy = K_graph[y_idx][:, y_idx]
-    Fxy = x_weight.dot(Kxy).dot(y_weight)
-    Fxx = x_weight.dot(Kxx).dot(x_weight)
-    Fyy = y_weight.dot(Kyy).dot(y_weight)
-    if Fxx <= 0.:
-        raise Exception('trivial reaction: ',
-                        get_reaction_smarts(x, x_weight))
-    if Fyy == 0.:
-        raise Exception('trivial reaction: ',
-                        get_reaction_smarts(y, y_weight))
-    if eval_gradient:
-        dKxy = K_gradient_graph[x_idx][:, y_idx][:]
-        dKxx = K_gradient_graph[x_idx][:, x_idx][:]
-        dKyy = K_gradient_graph[y_idx][:, y_idx][:]
-        dFxy = np.einsum("i,j,ijk->k", x_weight, y_weight, dKxy)
-        dFxx = np.einsum("i,j,ijk->k", x_weight, x_weight, dKxx)
-        dFyy = np.einsum("i,j,ijk->k", y_weight, y_weight, dKyy)
-        sqrtFxxFyy = np.sqrt(Fxx * Fyy)
-        return Fxy / sqrtFxxFyy, (
-                dFxy - 0.5 * dFxx / Fxx - 0.5 * dFyy / Fyy) / sqrtFxxFyy
-    else:
-        return Fxy / np.sqrt(Fxx * Fyy)
-
-
-def compute_k(args_kwargs):
-    df, X, Y, graph, K_graph = args_kwargs
-    return df.progress_apply(
-        lambda x: Kxy(X[x['Xidx']], Y[x['Yidx']], graph=graph, K_graph=K_graph),
-        axis=1)
-
-
-def compute_k_gradient(args_kwargs):
-    df, X, Y, graph, K_graph, K_gradient_graph = args_kwargs
-    return df.progress_apply(
-        lambda x: Kxy(X[x['Xidx']], Y[x['Yidx']], graph=graph, K_graph=K_graph,
-                      K_gradient_graph=K_gradient_graph, eval_gradient=True),
-        axis=1)
-
-
-class ConvolutionNormalizedGraphKernel(MGK):
-    def __call__(self, X, Y=None, eval_gradient=False, n_process=4,
-                 *args, **kwargs):
-        X = self._format_X(X)
-        Y = self._format_X(Y)
-        graph = self.get_uniX(X, Y)
-        if Y is None:
-            trivial_Xidx = np.arange(0, len(X))[
-                list(map(lambda x: bool(1 - bool(x)), X))]
-            trivial_Yidx = trivial_Xidx
-            Xidx, Yidx = np.triu_indices(len(X))
-            Xidx, Yidx = Xidx.astype(np.uint32), Yidx.astype(np.uint32)
-            Y = X
-            symmetric = True
-        else:
-            trivial_Xidx = np.arange(0, len(X))[
-                list(map(lambda x: bool(1 - bool(x)), X))]
-            trivial_Yidx = np.arange(0, len(Y))[
-                list(map(lambda x: bool(1 - bool(x)), Y))]
-            Xidx, Yidx = np.indices((len(X), len(Y)), dtype=np.uint32)
-            Xidx = Xidx.ravel()
-            Yidx = Yidx.ravel()
-            symmetric = False
-        df_idx = pd.DataFrame({'Xidx': Xidx, 'Yidx': Yidx})
-        df_one = df_idx[(df_idx.Xidx.isin(trivial_Xidx)) &
-                        (df_idx.Yidx.isin(trivial_Yidx))]
-        df_zero = df_idx[(df_idx.Xidx.isin(trivial_Xidx)) ^
-                         (df_idx.Yidx.isin(trivial_Yidx))]
-        df = df_idx[(~df_idx.Xidx.isin(trivial_Xidx)) &
-                    (~df_idx.Yidx.isin(trivial_Yidx))]
-        df_parts = np.array_split(df, n_process)
+    def __get_K_dK(self, X, Y, eval_gradient):
+        X = ConvolutionKernel._format_X(X)
+        Y = ConvolutionKernel._format_X(Y)
+        graph = ConvolutionKernel.get_graph(X, Y)
         if eval_gradient:
-            K = np.zeros((len(X), len(Y)))
-            K_gradient = np.zeros((len(X), len(Y), self.theta.shape[0]))
-            K_graph, K_gradient_graph = super().__call__(graph,
-                                                         eval_gradient=True)
-            with Pool(processes=n_process) as pool:
-                result_parts = pool.map(
-                    compute_k_gradient, [(df_part, np.copy(X), np.copy(Y),
-                                          np.copy(graph), np.copy(K_graph),
-                                          np.copy(K_gradient_graph))
-                                         for df_part in df_parts])
-            result = np.concatenate(result_parts)
-            K[df['Xidx'], df['Yidx']] = list(map(lambda x: x[0], result))
-            K[df_one['Xidx'], df_one['Yidx']] = 1.0
-            K[df_zero['Xidx'], df_zero['Yidx']] = 0.0
-            K_gradient[df['Xidx'], df['Yidx']] = \
-                list(map(lambda x: x[1], result))
-            K_gradient[df_one['Xidx'], df_one['Yidx']] = 0.0
-            K_gradient[df_zero['Xidx'], df_zero['Yidx']] = 0.0
+            K_graph, K_gradient_graph = super().__call__(
+                graph, eval_gradient=True)
         else:
-            K = np.zeros((len(X), len(Y)))
             K_graph = super().__call__(graph)
-            with Pool(processes=n_process) as pool:
-                result_parts = pool.map(
-                    compute_k, [(df_part, np.copy(X), np.copy(Y),
-                                 np.copy(graph), np.copy(K_graph))
-                                for df_part in df_parts])
-            K[df['Xidx'], df['Yidx']] = np.concatenate(result_parts)
-            K[df_one['Xidx'], df_one['Yidx']] = 1.0
-            K[df_zero['Xidx'], df_zero['Yidx']] = 0.0
-
-        if symmetric:
-            K = K + K.T
-            K[np.diag_indices(len(X))] /= 2
-            if eval_gradient:
-                K_gradient = K_gradient + K_gradient.transpose([1, 0, 2])
-                K_gradient[np.diag_indices(len(X))] /= 2
-        if eval_gradient:
-            return K, K_gradient
-        else:
-            return K
-
-    def diag(self, X, eval_gradient=False, *args, **kwargs):
-        X = self._format_X(X)
-        graph = self.get_uniX(X)
-        if eval_gradient:
-            D = np.zeros(len(X))
-            D_gradient = np.zeros((len(X), self.theta.shape[0]))
-            K_graph, K_gradient_graph = super().__call__(graph,
-                                                         eval_gradient=True)
-            for i, x in enumerate(X):
-                if x:
-                    D[i], D_gradient[i] = Kxy(
-                        x, x, eval_gradient=True, graph=graph, K_graph=K_graph,
-                        K_gradient_graph=K_gradient_graph)
-                else:
-                    D[i] = 1.0
-                    D_gradient[i] = 0.
-            return D, D_gradient
-        else:
-            D = np.zeros(len(X))
-            K_graph = super().__call__(graph)
-            for i, x in enumerate(X):
-                if x:
-                    D[i] = Kxy(x, x, graph=graph, K_graph=K_graph)
-                else:
-                    D[i] = 1.0
-            return D
-
-    @staticmethod
-    def get_uniX(X, Y=None):
-        graphs = []
-        for x in X:
-            graphs += x2graph(x)
-        if Y is not None:
-            for y in Y:
-                graphs += x2graph(y)
-        return np.sort(np.unique(graphs))
-
+            K_gradient_graph = None
+        return graph, K_graph, K_gradient_graph
 
 '''
 def _PreCalculate(self, X, result_dir, id=None):
@@ -661,7 +511,7 @@ class GraphKernelConfig(KernelConfig):
 
     def get_conv_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
         knode, kedge, p = self.get_knode_kedge_p(hyperdict)
-        kernel = ConvolutionNormalizedGraphKernel(
+        kernel = ConvolutionGraphKernel(
             node_kernel=knode,
             edge_kernel=kedge,
             q=hyperdict['q'][0],

@@ -127,7 +127,7 @@ class MultipleKernel:
             composition=self.composition,
             combined_rule=self.combined_rule,
         )
-
+    '''
     def PreCalculate(self, X, result_dir):
         # save in several files with id tag.
         X_list = self.get_X_list(X)
@@ -142,9 +142,9 @@ class MultipleKernel:
         for i, kernel in enumerate(self.kernel_list):
             Xi = X_list[i]
             if hasattr(kernel, 'get_uniX'):
-                graphs += kernel.get_uniX(Xi)
+                graphs += kernel.get_unique_graph(Xi)
         return _get_uniX(graphs)
-
+    '''
     def load(self, result_dir):
         for i, kernel in enumerate(self.kernel_list):
             if hasattr(kernel, 'PreCalculate'):

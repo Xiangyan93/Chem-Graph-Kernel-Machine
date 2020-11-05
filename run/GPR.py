@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 import sys
-import json
-import numpy as np
-
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
+import json
 from chemml.kernels.KernelConfig import get_XYid_from_df
 from run.txt2pkl import *
 
