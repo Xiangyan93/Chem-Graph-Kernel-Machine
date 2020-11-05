@@ -42,11 +42,10 @@ def get_XYid_from_df(df, kernel_config, properties=None):
     return X, Y, df['id'].to_numpy()
 
 
-def get_Xgroupid_from_df(df, kernel_config):
+def get_Xgroupid_from_df(df, single_graph, multi_graph):
     if df.size == 0:
         return None, None
-    assert (kernel_config.type == 'graph')
-    X_name = kernel_config.single_graph + kernel_config.multi_graph
+    X_name = single_graph + multi_graph
     df_ = []
     for x in df.groupby('group_id'):
         for name in X_name:

@@ -65,13 +65,7 @@ def main():
     theta = []
     for graph_column in single_graph:
         print('***\tReading graph kernel matrix block: %s\t***' % graph_column)
-        # set kernel_config
-        kernel_config = set_kernel_config(
-            'graph', None, None,
-            [graph_column], [], args.json_hyper.split(',')[n],
-            args.result_dir,
-        )
-        X, group_id = get_Xgroupid_from_df(df, kernel_config)
+        X, group_id = get_Xgroupid_from_df(df, [graph_column], [])
         dict = pickle.load(open(os.path.join(
             args.result_dir, 'graph_kernel_%s_%d_%d.pkl' %
                              (graph_column, block_x_id, block_y_id)), 'rb'))
@@ -83,13 +77,7 @@ def main():
         print('***\tReading finished\t***')
     for graph_column in multi_graph:
         print('***\tReading graph kernel matrix block: %s\t***' % graph_column)
-        # set kernel_config
-        kernel_config = set_kernel_config(
-            'graph', None, None,
-            [], [graph_column], args.json_hyper.split(',')[n],
-            args.result_dir,
-        )
-        X, group_id = get_Xgroupid_from_df(df, kernel_config)
+        X, group_id = get_Xgroupid_from_df(df, [], [graph_column])
         X, Y = X[x0:x1], X[y0:y1]
         if block_x_id != block_y_id:
             dict_xy = pickle.load(open(os.path.join(
