@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 import pickle
@@ -32,24 +33,28 @@ def main():
     parser.add_argument(
         '--input_config', type=str,
         help='Columns in input data. Only one multi graph can be assigned.\n'
-        'format: single_graph:multi_graph:targets\n'
-        'examples: inchi::tt\n'
+             'format: single_graph:multi_graph:targets\n'
+             'examples: inchi::tt\n'
     )
     parser.add_argument(
         '--block_config', type=str, help='Block parameters\n'
-        'format: block_length:x_id,y_id\n'
-        'examples: 10000:0,0\n'
+                                         'format: block_length:x_id,y_id\n'
+                                         'examples: 10000:0,0\n'
     )
     parser.add_argument(
         '--json_hyper', type=str, default=None,
         help='Reading hyperparameter file.\n'
+    )
+    parser.add_argument(
+        '-n', '--ntasks', type=str,
+        help='The cpu numbers for parallel computing.'
     )
     args = parser.parse_args()
 
     # set_graph_property
     single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
-    #set block config
+    # set block config
     block_length, block_x_id, block_y_id = set_block_config(args.block_config)
     x0, x1 = block_x_id * block_length, (block_x_id + 1) * block_length
     y0, y1 = block_y_id * block_length, (block_y_id + 1) * block_length
@@ -111,8 +116,9 @@ def main():
             graph = dict_xy['graph_X']
             K_graph = dict_xy['K_graph']
         assert (False not in (K_graph - K_graph.T < 1e-5))
-        K.append(ConvolutionKernel()(X, Y, graph=graph, K_graph=K_graph,
-                                       theta=dict_xy['theta']))
+        K.append(ConvolutionKernel()(X, Y, n_process=args.ntasks,
+                                     graph=graph, K_graph=K_graph,
+                                     theta=dict_xy['theta']))
         group_id_X.append(group_id[x0:x1])
         group_id_Y.append(group_id[y0:y1])
         theta.append(dict_xy['theta'])
