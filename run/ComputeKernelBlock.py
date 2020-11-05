@@ -46,7 +46,7 @@ def main():
         help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '-n', '--ntasks', type=str,
+        '-n', '--ntasks', type=str, default=cpu_count(),
         help='The cpu numbers for parallel computing.'
     )
     args = parser.parse_args()
