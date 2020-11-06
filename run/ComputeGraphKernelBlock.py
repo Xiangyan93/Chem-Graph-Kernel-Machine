@@ -87,7 +87,7 @@ def main():
     # output
     kernel_pkl = os.path.join(args.result_dir, 'graph_kernel_%s_%d_%d.pkl' %
                               (graph_column, block_x_id, block_y_id))
-    pickle.dump(kernel_dict, open(kernel_pkl, 'wb'))
+    pickle.dump(kernel_dict, open(kernel_pkl, 'wb'), protocol=4)
 
 
 if __name__ == '__main__':
