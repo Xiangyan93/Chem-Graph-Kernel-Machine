@@ -44,7 +44,7 @@ def main():
     df = get_df(args.input,
                 os.path.join(args.result_dir, '%s.pkl' % ','.join(properties)),
                 single_graph, multi_graph, reaction_graph)
-    X, group_id = get_Xgroupid_from_df(df, kernel_config)
+    X, group_id = get_Xgroupid_from_df(df, single_graph, multi_graph)
     print('**\tCalculating kernel matrix\t**')
     K = kernel_config.kernel.__call__(X)
     kernel_dict = {
