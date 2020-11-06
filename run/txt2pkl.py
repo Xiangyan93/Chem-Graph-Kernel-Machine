@@ -46,16 +46,12 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
     def reaction2agent(reaction_smarts, hash):
         agents = []
         rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
-        # print(line)
+        # print(reaction_smarts)
         for i, mol in enumerate(rxn.GetAgents()):
             Chem.SanitizeMol(mol)
-            try:
-                hash_ = hash + '_%d' % i
-                config_ = rdkit_config()
-                agents += [HashGraph.from_rdkit(mol, config_, hash_), 1.0]
-            except:
-                print(reaction_smarts)
-                exit(0)
+            hash_ = hash + '_%d' % i
+            config_ = rdkit_config()
+            agents += [HashGraph.from_rdkit(mol, config_, hash_), 1.0]
         return agents
 
     def reaction2rp(reaction_smarts, hash):

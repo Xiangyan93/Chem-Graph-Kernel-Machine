@@ -36,12 +36,18 @@ def set_add_feature_hyperparameters(add_features):
     assert(len(add_f) == len(add_p))
     return add_f, add_p
 
+
 def set_mode_train_size_ratio_seed(train_test_config):
-    mode, train_size, train_ratio, seed = train_test_config.split(':')
+    result = train_test_config.split(':')
+    if len(result) == 4:
+        mode, train_size, train_ratio, seed = result
+    else:
+        mode, train_size, train_ratio, seed, dynamic_train_size = result
     train_size = int(train_size) if train_size else None
     train_ratio = float(train_ratio) if train_ratio else None
     seed = int(seed) if seed else 0
-    return mode, train_size, train_ratio, seed
+    dynamic_train_size = int(dynamic_train_size) if dynamic_train_size else 0
+    return mode, train_size, train_ratio, seed, dynamic_train_size
 
 
 def set_learner(gpr):
@@ -173,6 +179,7 @@ def gpr_run(data, result_dir, kernel_config, params,
     mode = params['mode']
     alpha = params['alpha']
     Learner = params['Learner']
+    dynamic_train_size = params['dynamic_train_size']
 
     # pre-calculate graph kernel matrix.
     '''
@@ -199,6 +206,19 @@ def gpr_run(data, result_dir, kernel_config, params,
         print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
         out.to_csv('%s/loocv.log' % result_dir, sep='\t', index=False,
+                   float_format='%15.10f')
+    elif mode == 'dynamic':
+        learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
+                          test_id, kernel_config, alpha=alpha,
+                          optimizer=optimizer)
+        r2, ex_var, mse, mae, out = learner.evaluate_test_dynamic(
+            dynamic_train_size=dynamic_train_size)
+        print('Test set:')
+        print('score: %.5f' % r2)
+        print('explained variance score: %.5f' % ex_var)
+        print('mse: %.5f' % mse)
+        print('mae: %.5f' % mae)
+        out.to_csv('%s/test.log' % result_dir, sep='\t', index=False,
                    float_format='%15.10f')
     else:
         learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
@@ -271,11 +291,12 @@ def main():
     )
     parser.add_argument(
         '--train_test_config', type=str, help=
-        'format: mode:train_size:train_ratio:seed\n'
+        'format: mode:train_size:train_ratio:seed:(dynamic train size)\n'
         'examples:\n'
         'loocv:::0\n'
         'train_test:1000::0\n'
         'train_test::0.8:0\n'
+        'dynamic::0.8:0:500'
     )
     parser.add_argument(
         '--json_hyper', type=str, default=None,
@@ -293,7 +314,7 @@ def main():
     single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
-    mode, train_size, train_ratio, seed = \
+    mode, train_size, train_ratio, seed, dynamic_train_size = \
         set_mode_train_size_ratio_seed(args.train_test_config)
 
     # set Gaussian process regressor
@@ -335,7 +356,8 @@ def main():
         'mode': mode,
         'optimizer': optimizer,
         'alpha': alpha,
-        'Learner': Learner
+        'Learner': Learner,
+        'dynamic_train_size': dynamic_train_size
     }
     gpr_run(data, args.result_dir, kernel_config, gpr_params,
             load_model=args.load_model)

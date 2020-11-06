@@ -124,6 +124,8 @@ def get_atom_ring_stereo(mol, atom, ring_idx, depth=5,
             return -1
         elif bonds_in_ring in [[1, 1], [6, 6]]:
             return 0
+    else:
+        return 0
 
     if fg_up > fg_down:
         return 1

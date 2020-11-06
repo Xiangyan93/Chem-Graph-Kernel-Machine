@@ -1,3 +1,5 @@
+from abc import abstractmethod
+import sys
 import os
 import pickle
 import numpy as np
@@ -16,6 +18,7 @@ from sklearn.metrics import (
 class BaseLearner:
     def __init__(self, train_X, train_Y, train_id, test_X, test_Y,
                  test_id, kernel_config, optimizer=None, alpha=0.01):
+        assert (self.__class__ != BaseLearner)
         self.train_X = train_X
         self.train_Y = train_Y
         self.train_id = train_id
@@ -82,6 +85,33 @@ class BaseLearner:
         return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
                                 kernel=self.model.kernel, debug=debug,
                                 alpha=alpha)
+
+    @staticmethod
+    def get_most_similar_graphs(kernel, x, X, n=5):
+        K = kernel(x, X)
+        return np.argsort(-K)[:, :min(n, len(X))]
+
+    def evaluate_test_dynamic(self, dynamic_train_size=500):
+        assert (self.optimizer is None)
+        kernel = self.kernel_config.kernel
+        kindex = self.get_most_similar_graphs(
+            kernel, self.test_X, self.train_X, n=dynamic_train_size)
+        y_pred = []
+        y_std = []
+        for i in range(len(self.test_X)):
+            sys.stdout.write('\r %i / %i' % (i, len(self.test_X)))
+            tx = self.test_X[i:i+1]
+            self.train(train_X=self.train_X[kindex[i]],
+                       train_Y=self.train_Y[kindex[i]])
+            y_pred_, y_std_ = self.model.predict(tx, return_std=True)
+            y_pred.append(y_pred_)
+            y_std.append(y_std_)
+        return self.evaluate_df(self.test_X, self.test_Y, self.test_id,
+                                np.concatenate(y_pred), np.concatenate(y_std))
+
+    @abstractmethod
+    def train(self, train_X=None, train_Y=None):
+        '''GPR fit for training set.'''
 
 
 class ActiveLearner:
