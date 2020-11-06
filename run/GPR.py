@@ -41,6 +41,7 @@ def set_mode_train_size_ratio_seed(train_test_config):
     result = train_test_config.split(':')
     if len(result) == 4:
         mode, train_size, train_ratio, seed = result
+        dynamic_train_size = 0
     else:
         mode, train_size, train_ratio, seed, dynamic_train_size = result
     train_size = int(train_size) if train_size else None
