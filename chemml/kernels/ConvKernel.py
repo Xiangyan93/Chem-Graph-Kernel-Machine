@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
-from multiprocessing import Pool, cpu_count
+import multiprocessing as mp
+from chemml.kernels.pickle4reducer import *
+ctx = mp.get_context()
+ctx.reducer = Pickle4Reducer()
 
 
 class ConvolutionKernel:
-    def __call__(self, X, Y=None, eval_gradient=False, n_process=cpu_count(),
+    def __call__(self, X, Y=None, eval_gradient=False, n_process=mp.cpu_count(),
                  graph=None, K_graph=None, K_gradient_graph=None, theta=None):
         # format X, Y and check input.
         assert (graph is not None and K_graph is not None)
@@ -45,7 +48,7 @@ class ConvolutionKernel:
         if eval_gradient:
             K = np.zeros((len(X), len(Y)))
             K_gradient = np.zeros((len(X), len(Y), theta.shape[0]))
-            with Pool(processes=n_process) as pool:
+            with mp.Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     self.compute_k_gradient, [(df_part, np.copy(X), np.copy(Y),
                                           np.copy(graph), np.copy(K_graph),
@@ -61,7 +64,7 @@ class ConvolutionKernel:
             K_gradient[df_zero['Xidx'], df_zero['Yidx']] = 0.0
         else:
             K = np.zeros((len(X), len(Y)))
-            with Pool(processes=n_process) as pool:
+            with mp.Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     self.compute_k, [(df_part, np.copy(X), np.copy(Y),
                                  np.copy(graph), np.copy(K_graph))
@@ -81,7 +84,7 @@ class ConvolutionKernel:
         else:
             return K
 
-    def diag(self, X, eval_gradient=False, n_process=cpu_count(), graph=None,
+    def diag(self, X, eval_gradient=False, n_process=mp.cpu_count(), graph=None,
              K_graph=None, K_gradient_graph=None, theta=None):
         # format X and check input.
         assert (graph is not None and K_graph is not None)
@@ -104,7 +107,7 @@ class ConvolutionKernel:
         if eval_gradient:
             D = np.zeros(len(X))
             D_gradient = np.zeros((len(X), theta.shape[0]))
-            with Pool(processes=n_process) as pool:
+            with mp.Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     self.compute_k_gradient, [(df_part, np.copy(X), np.copy(X),
                                           np.copy(graph), np.copy(K_graph),
@@ -118,7 +121,7 @@ class ConvolutionKernel:
             return D, D_gradient
         else:
             D = np.zeros(len(X))
-            with Pool(processes=n_process) as pool:
+            with mp.Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     self.compute_k, [(df_part, np.copy(X), np.copy(X),
                                  np.copy(graph), np.copy(K_graph))
