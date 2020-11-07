@@ -62,10 +62,13 @@ class ConvolutionKernel:
         else:
             K = np.zeros((len(X), len(Y)))
             with Pool(processes=n_process) as pool:
+                #result_parts = pool.map(
+                #    self.compute_k, [(df_part, np.copy(X), np.copy(Y),
+                #                 np.copy(graph), np.copy(K_graph))
+                #                for df_part in df_parts])
                 result_parts = pool.map(
-                    self.compute_k, [(df_part, np.copy(X), np.copy(Y),
-                                 np.copy(graph), np.copy(K_graph))
-                                for df_part in df_parts])
+                    self.compute_k, [(df_part, X, Y, graph, K_graph)
+                                     for df_part in df_parts])
             K[df['Xidx'], df['Yidx']] = np.concatenate(result_parts)
             K[df_one['Xidx'], df_one['Yidx']] = 1.0
             K[df_zero['Xidx'], df_zero['Yidx']] = 0.0
