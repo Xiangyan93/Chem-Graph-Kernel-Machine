@@ -47,10 +47,9 @@ class ConvolutionKernel:
             K_gradient = np.zeros((len(X), len(Y), theta.shape[0]))
             with Pool(processes=n_process) as pool:
                 result_parts = pool.map(
-                    self.compute_k_gradient, [(df_part, np.copy(X), np.copy(Y),
-                                          np.copy(graph), np.copy(K_graph),
-                                          np.copy(K_gradient_graph))
-                                         for df_part in df_parts])
+                    self.compute_k_gradient, [(df_part, X, Y, graph, K_graph,
+                                               K_gradient_graph)
+                                              for df_part in df_parts])
             result = np.concatenate(result_parts)
             K[df['Xidx'], df['Yidx']] = list(map(lambda x: x[0], result))
             K[df_one['Xidx'], df_one['Yidx']] = 1.0
@@ -62,10 +61,6 @@ class ConvolutionKernel:
         else:
             K = np.zeros((len(X), len(Y)))
             with Pool(processes=n_process) as pool:
-                #result_parts = pool.map(
-                #    self.compute_k, [(df_part, np.copy(X), np.copy(Y),
-                #                 np.copy(graph), np.copy(K_graph))
-                #                for df_part in df_parts])
                 result_parts = pool.map(
                     self.compute_k, [(df_part, X, Y, graph, K_graph)
                                      for df_part in df_parts])
@@ -109,10 +104,9 @@ class ConvolutionKernel:
             D_gradient = np.zeros((len(X), theta.shape[0]))
             with Pool(processes=n_process) as pool:
                 result_parts = pool.map(
-                    self.compute_k_gradient, [(df_part, np.copy(X), np.copy(X),
-                                          np.copy(graph), np.copy(K_graph),
-                                          np.copy(K_gradient_graph))
-                                         for df_part in df_parts])
+                    self.compute_k_gradient, [(df_part, X, X, graph, K_graph,
+                                               K_gradient_graph)
+                                              for df_part in df_parts])
             result = np.concatenate(result_parts)
             D[df['Xidx']] = list(map(lambda x: x[0], result))
             D[df_one['Xidx']] = 1.0
@@ -123,9 +117,8 @@ class ConvolutionKernel:
             D = np.zeros(len(X))
             with Pool(processes=n_process) as pool:
                 result_parts = pool.map(
-                    self.compute_k, [(df_part, np.copy(X), np.copy(X),
-                                 np.copy(graph), np.copy(K_graph))
-                                for df_part in df_parts])
+                    self.compute_k, [(df_part, X, X, graph, K_graph)
+                                     for df_part in df_parts])
             D[df['Xidx']] = np.concatenate(result_parts)
             D[df_one['Xidx']] = 1.0
             return D
