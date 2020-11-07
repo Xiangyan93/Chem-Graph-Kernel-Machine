@@ -97,7 +97,7 @@ class ConvolutionGraphKernel(MGK):
             X, Y=Y, eval_gradient=eval_gradient, graph=graph, K_graph=K_graph,
             K_gradient_graph=K_gradient_graph, theta=self.theta)
 
-    def diag(self, X, eval_gradient=False, n_process=cpu_count(),
+    def diag(self, X, eval_gradient=False, n_process=mp.cpu_count(),
                  K_graph=None, K_gradient_graph=None, *args, **kwargs):
         graph, K_graph, K_gradient_graph = self.__get_K_dK(
             X, None, eval_gradient)

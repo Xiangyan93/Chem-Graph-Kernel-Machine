@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 import multiprocessing as mp
 from chemml.kernels.pickle4reducer import *
-ctx = mp.get_context()
-ctx.reducer = Pickle4Reducer()
 
 
 class ConvolutionKernel:
@@ -48,6 +46,8 @@ class ConvolutionKernel:
         if eval_gradient:
             K = np.zeros((len(X), len(Y)))
             K_gradient = np.zeros((len(X), len(Y), theta.shape[0]))
+            ctx = mp.get_context()
+            ctx.reducer = Pickle4Reducer()
             with mp.Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     self.compute_k_gradient, [(df_part, np.copy(X), np.copy(Y),
@@ -64,6 +64,8 @@ class ConvolutionKernel:
             K_gradient[df_zero['Xidx'], df_zero['Yidx']] = 0.0
         else:
             K = np.zeros((len(X), len(Y)))
+            ctx = mp.get_context()
+            ctx.reducer = Pickle4Reducer()
             with mp.Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     self.compute_k, [(df_part, np.copy(X), np.copy(Y),

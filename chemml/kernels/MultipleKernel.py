@@ -2,10 +2,6 @@ import copy
 import numpy as np
 
 
-def _get_uniX(X):
-    return np.sort(np.unique(X))
-
-
 class MultipleKernel:
     def __init__(self, kernel_list, composition, combined_rule='product'):
         self.kernel_list = kernel_list

@@ -2,20 +2,9 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
-import pickle
-from run.GPR import *
-from chemml.kernels.KernelConfig import get_Xgroupid_from_df
-from chemml.kernels.ConvKernel import *
-
-
-def set_block_config(block_config):
-    block_length = int(block_config.split(':')[0])
-    block_x_id = int(block_config.split(':')[1].split(',')[0])
-    block_y_id = int(block_config.split(':')[1].split(',')[1])
-    return block_length, block_x_id, block_y_id
+from run.tools import *
 
 
 def main():

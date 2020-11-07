@@ -3,21 +3,8 @@ import os
 import sys
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
+from run.tools import *
 from chemml.learner import ActiveLearner
-from run.GPR import *
-
-
-def set_active_config(active_config):
-    learning_mode, add_mode, init_size, add_size, max_size, search_size, \
-    pool_size, stride = active_config.split(':')
-    init_size = int(init_size) if init_size else 0
-    add_size = int(add_size) if add_size else 0
-    max_size = int(max_size) if max_size else 0
-    search_size = int(search_size) if search_size else 0
-    pool_size = int(pool_size) if pool_size else 0
-    stride = int(stride) if stride else 0
-    return learning_mode, add_mode, init_size, add_size, max_size, \
-           search_size, pool_size, stride
 
 
 def main():

@@ -4,7 +4,7 @@ import os
 import sys
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
-from run.ComputeKernelBlock import *
+from run.tools import *
 
 
 def main():
