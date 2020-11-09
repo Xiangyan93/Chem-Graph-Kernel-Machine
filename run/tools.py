@@ -188,7 +188,7 @@ def read_input(result_dir, input, kernel_config, properties, params):
 
 
 def gpr_run(data, result_dir, kernel_config, params,
-            load_model=False):
+            load_model=False, tag=0):
     df = data['df']
     df_train = data['df_train']
     train_X = data['train_X']
@@ -240,7 +240,7 @@ def gpr_run(data, result_dir, kernel_config, params,
         print('explained variance score: %.5f' % ex_var)
         print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
-        out.to_csv('%s/test.log' % result_dir, sep='\t', index=False,
+        out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
     else:
         learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
@@ -256,7 +256,7 @@ def gpr_run(data, result_dir, kernel_config, params,
         print('explained variance score: %.5f' % ex_var)
         print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
-        out.to_csv('%s/train.log' % result_dir, sep='\t', index=False,
+        out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
         r2, ex_var, mse, mae, out = learner.evaluate_test()
         print('Test set:')
@@ -264,7 +264,7 @@ def gpr_run(data, result_dir, kernel_config, params,
         print('explained variance score: %.5f' % ex_var)
         print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
-        out.to_csv('%s/test.log' % result_dir, sep='\t', index=False,
+        out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
 
 def _get_uniX(X):

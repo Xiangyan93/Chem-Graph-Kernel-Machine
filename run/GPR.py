@@ -121,7 +121,7 @@ def main():
         'dynamic_train_size': dynamic_train_size
     }
     gpr_run(data, args.result_dir, kernel_config, gpr_params,
-            load_model=args.load_model)
+            load_model=args.load_model, tag=seed)
 
 
 if __name__ == '__main__':
