@@ -30,7 +30,7 @@ class HyperJsonGenerator:
             'probability_atomic_number': [['Const_p', 1.0, "fixed"]]
         }
 
-    def tensorproduct(self, elemental_mode=False, reaction=False,
+    def tensorproduct(self, elemental_mode=False, reaction=0,
                       normalization=True):
         tp = self.tensorproduct_basis.copy()
         tp.update({
@@ -53,10 +53,14 @@ class HyperJsonGenerator:
                 'atom_elemental_mode1': [['sExp', 2.0, self.s_bounds]],
                 'atom_elemental_mode2': [['sExp', 3.0, self.s_bounds]],
             })
-        if reaction:
+        if reaction == 1:
             tp.pop('probability_atomic_number')
             tp.update({
                 'probability_group_reaction': [['Uniform_p', 1.0, "fixed"]]
+            })
+        elif reaction == 2:
+            tp.update({
+                'atom_group_reaction': [['kDelta', 0.5, self.k_bounds]]
             })
         if not normalization:
             tp['normalization'] = False
@@ -125,8 +129,10 @@ open('tensorproduct-NMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct()))
 open('tensorproduct-MGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct(normalization=False)))
-open('tensorproduct-reaction-NMGK.json', 'w').write(
-    json.dumps(hyper_json.tensorproduct(reaction=True)))
+open('tensorproduct-reaction1-NMGK.json', 'w').write(
+    json.dumps(hyper_json.tensorproduct(reaction=1)))
+open('tensorproduct-reaction2-NMGK.json', 'w').write(
+    json.dumps(hyper_json.tensorproduct(reaction=2)))
 
 open('additive-basis-NMGK.json', 'w').write(
     json.dumps(hyper_json.additive_basis))
