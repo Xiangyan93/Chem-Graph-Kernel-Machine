@@ -30,8 +30,8 @@ class BaseLearner:
         self.optimizer = optimizer
         self.alpha = alpha
 
-    def evaluate_df(self, x, y, id, y_pred, y_std, kernel=None,
-                    debug=False, alpha=None):
+    def evaluate_df(self, x, y, id, y_pred, y_std, alpha=None, debug=False,
+                    K=None, n_most_similar=5):
         r2 = r2_score(y, y_pred, multioutput='raw_values')
         ex_var = explained_variance_score(y, y_pred, multioutput='raw_values')
         mse = mean_squared_error(y, y_pred, multioutput='raw_values')
@@ -48,10 +48,11 @@ class BaseLearner:
         out.loc[:, 'id'] = id
 
         if debug:
-            n = 5
+            if K is None:
+                K = self.model.kernel(x, self.train_X)
+            assert (K.shape == (len(x), len(self.train_X)))
             similar_info = []
-            K = kernel(x, self.train_X)
-            kindex = np.argsort(-K)[:, :min(n, len(self.train_X))]
+            kindex = self.get_most_similar_graphs(K, n=n_most_similar)
             for i, index in enumerate(kindex):
                 def round5(x):
                     return ',%.5f' % x
@@ -67,35 +68,31 @@ class BaseLearner:
         y = self.test_Y
         y_pred, y_std = self.model.predict(x, return_std=True)
         return self.evaluate_df(x, y, self.test_id, y_pred, y_std,
-                                kernel=self.model.kernel, debug=debug,
-                                alpha=alpha)
+                                alpha=alpha, debug=debug)
 
     def evaluate_train(self, debug=False, alpha=None):
         x = self.train_X
         y = self.train_Y
         y_pred, y_std = self.model.predict(x, return_std=True)
         return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
-                                kernel=self.model.kernel, debug=debug,
-                                alpha=alpha)
+                                alpha=alpha, debug=debug)
 
     def evaluate_loocv(self, debug=True, alpha=None):
         x = self.train_X
         y = self.train_Y
         y_pred, y_std = self.model.predict_loocv(x, y, return_std=True)
         return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
-                                kernel=self.model.kernel, debug=debug,
-                                alpha=alpha)
+                                alpha=alpha, debug=debug)
 
     @staticmethod
-    def get_most_similar_graphs(kernel, x, X, n=5):
-        K = kernel(x, X)
-        return np.argsort(-K)[:, :min(n, len(X))]
+    def get_most_similar_graphs(K, n=5):
+        return np.argsort(-K)[:, :min(n, K.shape[1])]
 
     def evaluate_test_dynamic(self, dynamic_train_size=500):
         assert (self.optimizer is None)
         kernel = self.kernel_config.kernel
-        kindex = self.get_most_similar_graphs(
-            kernel, self.test_X, self.train_X, n=dynamic_train_size)
+        K = kernel(self.test_X, self.train_X)
+        kindex = self.get_most_similar_graphs(K, n=dynamic_train_size)
         y_pred = []
         y_std = []
         for i in range(len(self.test_X)):
@@ -107,7 +104,8 @@ class BaseLearner:
             y_pred.append(y_pred_)
             y_std.append(y_std_)
         return self.evaluate_df(self.test_X, self.test_Y, self.test_id,
-                                np.concatenate(y_pred), np.concatenate(y_std))
+                                np.concatenate(y_pred), np.concatenate(y_std),
+                                debug=True, K=K)
 
     @abstractmethod
     def train(self, train_X=None, train_Y=None):
