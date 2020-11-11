@@ -118,7 +118,6 @@ def main():
         assert (K[i].shape == K[0].shape)
         assert (False not in (group_id_X[i] == group_id_X[0]))
         assert (False not in (group_id_Y[i] == group_id_Y[0]))
-        assert (False not in (theta[i] == theta[0]))
     assert (K[0].shape == (group_id_X[0].shape[0], group_id_Y[0].shape[0]))
     kernel_dict = {
         'group_id_X': group_id_X[0],
