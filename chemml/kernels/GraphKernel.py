@@ -302,12 +302,12 @@ class GraphKernelConfig(KernelConfig):
             p=p,
             unique=self.add_features is not None
         )
-        if hyperdict['normalization'] == True:
+        if hyperdict['Normalization'] == True:
             kernel = Normalization(kernel)
-        elif hyperdict['normalization'][0]:
+        elif hyperdict['Normalization'][0]:
             kernel = NormalizationMolSize(
-                kernel, s=hyperdict['normalization'][1],
-                s_bounds=hyperdict['normalization'][2])
+                kernel, s=hyperdict['Normalization'][1],
+                s_bounds=hyperdict['Normalization'][2])
         return kernel
 
     def get_conv_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
@@ -320,12 +320,12 @@ class GraphKernelConfig(KernelConfig):
             p=p,
             unique=self.add_features is not None
         )
-        if hyperdict['normalization'] == True:
+        if hyperdict['Normalization'] == True:
             kernel = Normalization(kernel)
-        elif hyperdict['normalization'][0]:
+        elif hyperdict['Normalization'][0]:
             kernel = NormalizationMolSize(
-                kernel, s=hyperdict['normalization'][1],
-                s_bounds=hyperdict['normalization'][2])
+                kernel, s=hyperdict['Normalization'][1],
+                s_bounds=hyperdict['Normalization'][2])
         return kernel
 
     @staticmethod
