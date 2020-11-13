@@ -101,7 +101,6 @@ def main():
     test_id = read_input(
         args.result_dir, args.input, kernel_config, properties, params
     )
-
     # gpr
     data = {
         'df': df,

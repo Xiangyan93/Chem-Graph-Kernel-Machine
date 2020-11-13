@@ -125,3 +125,12 @@ class AtomEnvironment(MolecularTree):
             data = atom
         )
         self.tree = self.tree_grow(mol, tree, depth=depth)
+
+    def get_nth_neighbors(self, n=1):
+        assert (n.__class__ == int and n >= 1)
+        neighbors = []
+        for node in self.tree.all_nodes():
+            depth = self.tree.depth(node)
+            if depth == n:
+                neighbors.append(node.data)
+        return neighbors
