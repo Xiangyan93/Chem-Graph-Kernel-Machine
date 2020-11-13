@@ -70,9 +70,9 @@ class HyperJsonGenerator:
                 'atom_group_reaction': [['kDelta', 0.5, self.k_bounds]]
             })
         if normalizationMolSize:
-            tp['normalization'] = [True, 100, "fixed"]
+            tp['Normalization'] = [True, 100, "fixed"]
         elif normalization:
-            tp['normalization'] = True
+            tp['Normalization'] = True
         if inhomogeneous_start_probability:
             tp.pop('probability_atomic_number')
             tp.update({
@@ -130,10 +130,12 @@ class HyperJsonGenerator:
 hyper_json = HyperJsonGenerator()
 open('tensorproduct-basis-NMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct_basis))
+open('tensorproduct-MSNMGK.json', 'w').write(
+    json.dumps(hyper_json.tensorproduct(normalizationMolSize=True)))
 open('tensorproduct-NMGK.json', 'w').write(
-    json.dumps(hyper_json.tensorproduct()))
+    json.dumps(hyper_json.tensorproduct(normalization=True)))
 open('tensorproduct-MGK.json', 'w').write(
-    json.dumps(hyper_json.tensorproduct(normalization=False)))
+    json.dumps(hyper_json.tensorproduct()))
 open('tensorproduct-inhomo-NMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct(inhomogeneous_start_probability=True)))
 open('tensorproduct-em-NMGK.json', 'w').write(
