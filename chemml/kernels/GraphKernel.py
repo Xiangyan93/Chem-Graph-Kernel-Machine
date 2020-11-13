@@ -303,12 +303,13 @@ class GraphKernelConfig(KernelConfig):
             unique=self.add_features is not None
         )
         if hyperdict['Normalization'] == True:
-            kernel = Normalization(kernel)
+            return Normalization(kernel)
+        elif hyperdict['Normalization'] == False:
+            return kernel
         elif hyperdict['Normalization'][0]:
-            kernel = NormalizationMolSize(
+            return NormalizationMolSize(
                 kernel, s=hyperdict['Normalization'][1],
                 s_bounds=hyperdict['Normalization'][2])
-        return kernel
 
     def get_conv_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
         knode, kedge, p = self.get_knode_kedge_p(hyperdict)
@@ -321,12 +322,13 @@ class GraphKernelConfig(KernelConfig):
             unique=self.add_features is not None
         )
         if hyperdict['Normalization'] == True:
-            kernel = Normalization(kernel)
+            return Normalization(kernel)
+        elif hyperdict['Normalization'] == False:
+            return kernel
         elif hyperdict['Normalization'][0]:
-            kernel = NormalizationMolSize(
+            return NormalizationMolSize(
                 kernel, s=hyperdict['Normalization'][1],
                 s_bounds=hyperdict['Normalization'][2])
-        return kernel
 
     @staticmethod
     def get_knode_kedge_p(hyperdict):
