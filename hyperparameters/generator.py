@@ -12,8 +12,8 @@ class HyperJsonGenerator:
             'p_type': 'Additive_p',
             'q': [0.01, [0.0001, 1.0]],
             'atom_AtomicNumber': [['kDelta', 0.75, k_bounds]],
-            # 'bond_Order': [['kDelta', 0.9, k_bounds]],
-            'bond_Order': [['sExp', 1.5, s_bounds]],
+            'bond_Order': [['kDelta', 0.9, k_bounds]],
+            # 'bond_Order': [['sExp', 1.5, s_bounds]],
             'probability_AtomicNumber': [['Const_p', 1.0, "fixed"]]
         }
         self.additive_basis = {
