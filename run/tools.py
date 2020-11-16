@@ -54,7 +54,7 @@ def set_add_feature_hyperparameters(add_features):
     add_f, add_p = add_features.split(':')
     add_f = add_f.split(',')
     add_p = list(map(float, add_p.split(',')))
-    assert(len(add_f) == len(add_p))
+    assert (len(add_f) == len(add_p))
     return add_f, add_p
 
 
@@ -267,27 +267,54 @@ def gpr_run(data, result_dir, kernel_config, params,
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
 
+
 def _get_uniX(X):
     return np.sort(np.unique(X))
 
 
-def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
-    def single2graph(series):
-        unique_series = _get_uniX(series)
-        graphs = list(map(HashGraph.from_inchi_or_smiles, unique_series,
-                          [rdkit_config()] * len(unique_series),
-                          series['group_id']))
-        unify_datatype(graphs)
-        idx = np.searchsorted(unique_series, series)
+def single2graph(args_kwargs):
+    df, sg = args_kwargs
+    if len(np.unique(df[sg])) > 0.5 * len(df[sg]):
+        return df.progress_apply(
+            lambda x: HashGraph.from_inchi_or_smiles(
+                x[sg], rdkit_config(), str(x['group_id'])), axis=1)
+    else:
+        graphs = []
+        gids = []
+        for g in df.groupby('group_id'):
+            assert (len(g[1][sg].unique()) == 1)
+            graphs.append(HashGraph.from_inchi_or_smiles(
+                g[1][sg][0], rdkit_config(), g[0]))
+            gids.append(g[0])
+        idx = np.searchsorted(gids, df['group_id'])
         return np.asarray(graphs)[idx]
 
-    def multi_graph_transform(line, hash):
-        hashs = [str(hash) + '_%d' % i for i in range(int(len(line)/2))]
-        line[::2] = list(map(HashGraph.from_inchi_or_smiles, line[::2],
-                             [rdkit_config()] * int(len(line) / 2),
-                             hashs))
-        return line
 
+def multi_graph_transform(line, hash):
+    hashs = [str(hash) + '_%d' % i for i in range(int(len(line) / 2))]
+    line[::2] = list(map(HashGraph.from_inchi_or_smiles, line[::2],
+                         [rdkit_config()] * int(len(line) / 2),
+                         hashs))
+    return line
+
+
+def multi2graph(args_kwargs):
+    df, mg = args_kwargs
+    if len(np.unique(df[mg])) > 0.5 * len(df[mg]):
+        return df.progress_apply(
+            lambda x: multi_graph_transform(
+                x[mg], str(x['group_id'])), axis=1)
+    else:
+        graphs = []
+        gids = []
+        for g in df.groupby('group_id'):
+            graphs.append(multi_graph_transform(g[1][mg][0], g[0]))
+            gids.append(g[0])
+        idx = np.searchsorted(gids, df['group_id'])
+        return np.asarray(graphs)[idx]
+
+
+def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
     def reaction2agent(reaction_smarts, hash):
         agents = []
         rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
@@ -346,6 +373,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
         df = pd.read_pickle(pkl)
     else:
         df = pd.read_csv(csv, sep='\s+', header=0)
+        # set id and group_id
         if 'id' not in df:
             df['id'] = df.index + 1
             df['group_id'] = df['id']
@@ -357,25 +385,26 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph):
                 df.update(g[1])
             df['id'] = df['id'].astype(int)
             df['group_id'] = df['group_id'].astype(int)
+        df_parts = np.array_split(df, n_process)
+        # transform single graph
         for sg in single_graph:
             print('Processing single graph.')
-            if len(np.unique(df[sg])) > 0.5 * len(df[sg]):
-                df[sg] = df.progress_apply(
-                    lambda x: HashGraph.from_inchi_or_smiles(
-                        x[sg], rdkit_config(), str(x['group_id'])), axis=1)
-                unify_datatype(df[sg])
-            else:
-                df[sg] = single2graph(df[sg])
+            with Pool(processes=n_process) as pool:
+                result_parts = pool.map(
+                    single2graph, [(df_part, sg) for df_part in df_parts])
+            df[sg] = np.concatenate(result_parts)
+            unify_datatype(df[sg])
+        # transform multi graph
         for mg in multi_graph:
             print('Processing multi graph.')
-            df[mg] = df.progress_apply(
-                lambda x: multi_graph_transform(
-                    x[mg], str(x['group_id'])), axis=1)
+            with Pool(processes=n_process) as pool:
+                result_parts = pool.map(
+                    multi2graph, [(df_part, mg) for df_part in df_parts])
+            df[mg] = np.concatenate(result_parts)
             unify_datatype(df[mg])
-
+        # transform reaction graph
         for rg in reaction_graph:
             print('Processing reagents graph.')
-            print(df[rg])
             df[rg + '_agents'] = df.progress_apply(
                 lambda x: reaction2agent(x[rg], str(x['group_id'])), axis=1)
             unify_datatype(df[rg + '_agents'])

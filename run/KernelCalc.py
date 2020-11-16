@@ -5,8 +5,6 @@ import pickle
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from run.GPR import *
-from chemml.kernels.KernelConfig import get_Xgroupid_from_df
-
 
 
 def main():
