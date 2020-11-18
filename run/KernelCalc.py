@@ -21,8 +21,8 @@ def main():
     )
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
-        'format: single_graph:multi_graph:targets\n'
-        'examples: inchi::tt\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tt\n'
     )
     parser.add_argument(
         '--json_hyper', type=str, default=None,

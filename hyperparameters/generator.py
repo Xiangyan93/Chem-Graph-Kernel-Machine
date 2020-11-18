@@ -1,5 +1,5 @@
 import json
-
+from sklearn import svm
 
 class HyperJsonGenerator:
     def __init__(self, k_bounds=[0.5, 0.99], s_bounds=[0.5, 3.0]):
@@ -42,7 +42,7 @@ class HyperJsonGenerator:
             'atom_AtomicNumber_4': [['kConv', 0.9, self.k_bounds]],
             #'atom_AtomicNumber_5': [['kConv', 0.9, self.k_bounds]],
             #'atom_AtomicNumber_6': [['kConv', 0.9, self.k_bounds]],
-            #'atom_Aromatic': [['kDelta', 0.9, self.k_bounds]],
+            # 'atom_Aromatic': [['kDelta', 0.9, self.k_bounds]],
             #'atom_Aromatic_1': [['kConv', 0.9, self.k_bounds]],
             #'atom_Aromatic_2': [['kConv', 0.9, self.k_bounds]],
             #'atom_Aromatic_3': [['kConv', 0.9, self.k_bounds]],
@@ -72,8 +72,8 @@ class HyperJsonGenerator:
             #'bond_Stereo': [['kDelta', 0.9, self.k_bounds]],
             # 'bond_conjugated': [['kDelta', 0.9, self.k_bounds]],
             #'bond_RingStereo': [['kDelta', 0.9, self.k_bounds]],
-            #'bond_RingMembership': [['kConv', 0.9, self.k_bounds]],
-            #'bond_RingNumber': [['kDelta', 0.9, self.k_bounds]],
+            'bond_RingMembership': [['kConv', 0.9, self.k_bounds]],
+            'bond_RingNumber': [['kDelta', 0.9, self.k_bounds]],
             # 'atom_TPSA': [['kDelta', 0.9, self.k_bounds]],
         })
 

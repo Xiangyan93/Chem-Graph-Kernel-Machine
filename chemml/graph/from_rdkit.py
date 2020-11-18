@@ -202,7 +202,7 @@ class rdkit_config:
                  set_elemental_mode=False,
                  set_ring_membership=True,
                  set_ring_stereo=True, depth=5,
-                 set_hydrogen=False,
+                 set_hydrogen=True,
                  set_group=False, set_group_rule='element',
                  reaction_center=None,
                  set_TPSA=False):
@@ -351,6 +351,8 @@ class rdkit_config:
 
 
 def _from_rdkit(cls, mol, rdkit_config):
+    if rdkit_config.set_hydrogen:
+        mol = Chem.AddHs(mol)
     g = nx.Graph()
     # For single heavy-atom molecules, such as water, methane and metalic ion.
     # A ghost atom is created and bond to it, because there must be at least
