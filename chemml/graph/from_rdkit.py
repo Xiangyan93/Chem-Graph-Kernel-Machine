@@ -202,7 +202,7 @@ class rdkit_config:
                  set_elemental_mode=False,
                  set_ring_membership=True,
                  set_ring_stereo=True, depth=5,
-                 set_hydrogen=True,
+                 set_hydrogen=False,
                  set_group=False, set_group_rule='element',
                  reaction_center=None,
                  set_TPSA=False):
