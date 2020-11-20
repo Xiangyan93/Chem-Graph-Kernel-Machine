@@ -284,7 +284,7 @@ def single2graph(args_kwargs):
         for g in df.groupby('group_id'):
             assert (len(g[1][sg].unique()) == 1)
             graphs.append(HashGraph.from_inchi_or_smiles(
-                g[1][sg][0], rdkit_config(), g[0]))
+                g[1][sg].tolist()[0], rdkit_config(), g[0]))
             gids.append(g[0])
         idx = np.searchsorted(gids, df['group_id'])
         return np.asarray(graphs)[idx]
@@ -376,15 +376,13 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
         # set id and group_id
         if 'id' not in df:
             df['id'] = df.index + 1
-            df['group_id'] = df['id']
-        else:
-            groups = df.groupby(single_graph + multi_graph + reaction_graph)
-            df['group_id'] = 0
-            for g in groups:
-                g[1]['group_id'] = int(g[1]['id'].min())
-                df.update(g[1])
-            df['id'] = df['id'].astype(int)
-            df['group_id'] = df['group_id'].astype(int)
+        groups = df.groupby(single_graph + multi_graph + reaction_graph)
+        df['group_id'] = 0
+        for i, g in enumerate(groups):
+            g[1]['group_id'] = i
+            df.update(g[1])
+        df['id'] = df['id'].astype(int)
+        df['group_id'] = df['group_id'].astype(int)
         df_parts = np.array_split(df, n_process)
         # transform single graph
         for sg in single_graph:

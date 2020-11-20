@@ -29,11 +29,11 @@ def main():
     )
     parser.add_argument(
         '--kernel', type=str,
-        help='format: kernel:Normalized?:alpha.\n'
+        help='format: kernel:alpha.\n'
              'examples:\n'
-             'graph:True:0.01\n'
-             'graph:False:10.0\n'
-             'preCalc::0.01\n'
+             'graph:0.01\n'
+             'graph:10.0\n'
+             'preCalc:0.01\n'
              'For preCalc kernel, run KernelCalc.py first.'
     )
     parser.add_argument(
@@ -104,7 +104,7 @@ def main():
         # set Gaussian process regressor
         Learner = set_learner(gpr)
         # set train_test
-        mode, train_size, train_ratio, seed = \
+        mode, train_size, train_ratio, seed, dynamic_train_size = \
             set_mode_train_size_ratio_seed(args.train_test_config)
         # read input
         params = {
