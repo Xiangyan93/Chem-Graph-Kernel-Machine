@@ -37,14 +37,14 @@ class HyperJsonGenerator:
                       normalization=False, normalizationMolSize=False):
         tp = self.tensorproduct_basis.copy()
         tp.update({
-            'atom_AtomicNumber_1': [['kDelta', self.k, self.k_bounds]],
-            'atom_AtomicNumber_2': [['kDelta', self.k, self.k_bounds]],
-            'atom_AtomicNumber_3': [['kDelta', self.k, self.k_bounds]],
-            'atom_AtomicNumber_4': [['kDelta', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_5': [['kConv', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_6': [['kConv', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_7': [['kConv', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_8': [['kConv', self.k, self.k_bounds]],
+            'atom_AtomicNumber_1': [['kConv', self.k, self.k_bounds]],
+            'atom_AtomicNumber_2': [['kConv', self.k, self.k_bounds]],
+            'atom_AtomicNumber_3': [['kConv', self.k, self.k_bounds]],
+            'atom_AtomicNumber_4': [['kConv', self.k, self.k_bounds]],
+            #'atom_AtomicNumber_5': [['kDelta', self.k, self.k_bounds]],
+            #'atom_AtomicNumber_6': [['kDelta', self.k, self.k_bounds]],
+            #'atom_AtomicNumber_7': [['kDelta', self.k, self.k_bounds]],
+            #'atom_AtomicNumber_8': [['kDelta', self.k, self.k_bounds]],
             #'atom_AtomicNumber_9': [['kConv', self.k, self.k_bounds]],
             #'atom_AtomicNumber_10': [['kConv', self.k, self.k_bounds]],
             # 'atom_Aromatic': [['kDelta', self.k, self.k_bounds]],
