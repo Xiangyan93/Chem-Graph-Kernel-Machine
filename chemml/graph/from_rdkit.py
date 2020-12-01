@@ -332,11 +332,15 @@ class rdkit_config:
             else:
                 edge['RingNumber'] = len(self.ringlist_bond[bond.GetIdx()])
 
-    def set_node_propogation(self, graph, mol, attribute, depth=1):
+    def set_node_propogation(self, graph, mol, attribute, depth=1, integer=False):
         if len(mol.GetAtoms()) == 1:
             for depth_ in range(1, depth+1):
-                graph.nodes[0][attribute + '_%i' % depth_] = [0]
-                graph.nodes[1][attribute + '_%i' % depth_] = [0]
+                if integer:
+                    graph.nodes[0][attribute + '_%i' % depth_] = hash('0')
+                    graph.nodes[1][attribute + '_%i' % depth_] = hash('0')
+                else:
+                    graph.nodes[0][attribute + '_%i' % depth_] = [0]
+                    graph.nodes[1][attribute + '_%i' % depth_] = [0]
         else:
             for i, atom in enumerate(mol.GetAtoms()):
                 assert (attribute in graph.nodes[i])
@@ -348,6 +352,9 @@ class rdkit_config:
                             graph.nodes[a.GetIdx()][attribute] for a in neighbors]
                     else:
                         graph.nodes[i][attribute + '_%i' % depth_] = [0]
+                    if integer:
+                        graph.nodes[i][attribute + '_%i' % depth_] = hash(','.join(
+                            list(map(str ,graph.nodes[i][attribute + '_%i' % depth_]))))
 
 
 def _from_rdkit(cls, mol, rdkit_config):
@@ -423,7 +430,7 @@ def _from_rdkit(cls, mol, rdkit_config):
                     else:
                         g.edges[ij]['RingStereo'] = StereoOfRingBond
     rdkit_config.set_node_propogation(g, mol, 'Chiral', depth=1)
-    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=6)
+    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=6, integer=True)
     rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=4)
     rdkit_config.set_node_propogation(g, mol, 'FirstNeighbors', depth=4)
     rdkit_config.set_node_propogation(g, mol, 'Aromatic', depth=4)
