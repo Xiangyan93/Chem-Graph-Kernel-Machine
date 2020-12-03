@@ -1,9 +1,5 @@
 import os
-import argparse
-import pickle
 import json
-import numpy as np
-import pandas as pd
 from tqdm import tqdm
 tqdm.pandas()
 from rdkit import Chem
@@ -32,13 +28,20 @@ def set_block_config(block_config):
 
 def set_gpr_optimizer(gpr):
     gpr, optimizer = gpr.split(':')
-    if gpr not in ['graphdot', 'sklearn']:
-        raise Exception('Unknown gpr')
+    assert (gpr in ['graphdot', 'sklearn'])
     if optimizer in ['None', 'none', '']:
         return gpr, None
     if gpr == 'graphdot' and optimizer != 'L-BFGS-B':
         raise Exception('Please use L-BFGS-B optimizer')
     return gpr, optimizer
+
+
+def set_gpc_optimizer(gpc):
+    gpc, optimizer = gpc.split(':')
+    assert (gpc == 'sklearn')
+    if optimizer in ['None', 'none', '']:
+        return gpc, None
+    return gpc, optimizer
 
 
 def set_kernel_alpha(kernel):
@@ -72,21 +75,29 @@ def set_mode_train_size_ratio_seed(train_test_config):
     return mode, train_size, train_ratio, seed, dynamic_train_size
 
 
-def set_learner(gpr):
+def set_gpr_learner(gpr):
     if gpr == 'graphdot':
-        from chemml.GPRgraphdot.learner import Learner
+        from chemml.regression.GPRgraphdot.learner import Learner
     elif gpr == 'sklearn':
-        from chemml.GPRsklearn.learner import Learner
+        from chemml.regression.GPRsklearn.learner import Learner
     else:
         raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
     return Learner
 
 
+def set_gpc_learner(gpc):
+    if gpc == 'sklearn':
+        from chemml.classification.gpc.learner import Learner
+    else:
+        raise Exception('Unknown GaussianProcessClassifier: %s' % gpc)
+    return Learner
+
+
 def set_gpr(gpr):
     if gpr == 'graphdot':
-        from chemml.GPRgraphdot.gpr import GPR as GaussianProcessRegressor
+        from chemml.regression.GPRgraphdot.gpr import GPR as GaussianProcessRegressor
     elif gpr == 'sklearn':
-        from chemml.GPRsklearn.gpr import RobustFitGaussianProcessRegressor as \
+        from chemml.regression.GPRsklearn.gpr import RobustFitGaussianProcessRegressor as \
             GaussianProcessRegressor
     else:
         raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
@@ -129,6 +140,8 @@ def set_kernel_config(kernel, add_features, add_hyperparameters,
 
 def read_input(result_dir, input, kernel_config, properties, params):
     def df_filter(df, train_size=None, train_ratio=None, bygroup=False, seed=0):
+        if 'IsTrain' in df:
+            return df[df.IsTrain == True], df[df.IsTrain == False]
         np.random.seed(seed)
         if bygroup:
             gname = 'group_id'
@@ -187,8 +200,7 @@ def read_input(result_dir, input, kernel_config, properties, params):
             test_Y, test_id)
 
 
-def gpr_run(data, result_dir, kernel_config, params,
-            load_model=False, tag=0):
+def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
     df = data['df']
     df_train = data['df_train']
     train_X = data['train_X']
@@ -221,7 +233,7 @@ def gpr_run(data, result_dir, kernel_config, params,
             learner.train()
             learner.model.save(result_dir)
             learner.kernel_config.save(result_dir, learner.model)
-        r2, ex_var, mse, mae, out = learner.evaluate_loocv()
+        out, r2, ex_var, mse, mae = learner.evaluate_loocv()
         print('LOOCV:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
@@ -233,7 +245,7 @@ def gpr_run(data, result_dir, kernel_config, params,
         learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
                           test_id, kernel_config, alpha=alpha,
                           optimizer=optimizer)
-        r2, ex_var, mse, mae, out = learner.evaluate_test_dynamic(
+        out, r2, ex_var, mse, mae = learner.evaluate_test_dynamic(
             dynamic_train_size=dynamic_train_size)
         print('Test set:')
         print('score: %.5f' % r2)
@@ -250,7 +262,7 @@ def gpr_run(data, result_dir, kernel_config, params,
         learner.model.save(result_dir)
         learner.kernel_config.save(result_dir, learner.model)
         print('***\tEnd: hyperparameters optimization.\t***\n')
-        r2, ex_var, mse, mae, out = learner.evaluate_train()
+        out, r2, ex_var, mse, mae = learner.evaluate_train()
         print('Training set:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
@@ -258,12 +270,52 @@ def gpr_run(data, result_dir, kernel_config, params,
         print('mae: %.5f' % mae)
         out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
-        r2, ex_var, mse, mae, out = learner.evaluate_test()
+        out, r2, ex_var, mse, mae = learner.evaluate_test()
         print('Test set:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
         print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
+        out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
+                   float_format='%15.10f')
+
+
+def gpc_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
+    df = data['df']
+    df_train = data['df_train']
+    train_X = data['train_X']
+    train_Y = data['train_Y']
+    train_id = data['train_id']
+    test_X = data['test_X']
+    test_Y = data['test_Y']
+    test_id = data['test_id']
+    optimizer = params['optimizer']
+    mode = params['mode']
+    Learner = params['Learner']
+    dynamic_train_size = params['dynamic_train_size']
+
+    print('***\tStart: hyperparameters optimization.\t***')
+    if mode == 'loocv':  # directly calculate the LOOCV
+        # to be done
+        exit(0)
+    elif mode == 'dynamic':
+        # to be done
+        exit(0)
+    else:
+        learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
+                          test_id, kernel_config, optimizer=optimizer)
+        learner.train()
+        learner.model.save(result_dir)
+        learner.kernel_config.save(result_dir, learner.model)
+        print('***\tEnd: hyperparameters optimization.\t***\n')
+        out, correct_ratio = learner.evaluate_train()
+        print('Training set:')
+        print('correct_ratio: %.3f' % correct_ratio)
+        out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
+                   float_format='%15.10f')
+        out, correct_ratio = learner.evaluate_test()
+        print('Test set:')
+        print('correct_ratio: %.3f' % correct_ratio)
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
 

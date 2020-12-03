@@ -10,7 +10,7 @@ from run.tools import *
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description='Gaussian process regression using graph kernel',
+        description='Gaussian process classification using graph kernel',
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
@@ -18,21 +18,19 @@ def main():
         help='The output directory.',
     )
     parser.add_argument(
-        '--gpr', type=str, default="graphdot",
-        help='The GaussianProcessRegressor, optimizer.\n'
-             'format: regressor:optimizer\n'
+        '--gpc', type=str, default="sklearn",
+        help='The GaussianProcessClassifier, optimizer.\n'
+             'format: classifier:optimizer\n'
              'examples:\n'
-             'graphdot:L-BFGS-B\n'
              'sklearn:fmin_l_bfgs_b\n'
-             'graphdot:None'
+             'sklearn:None'
     )
     parser.add_argument(
         '--kernel', type=str,
-        help='format: kernel:alpha.\n'
+        help='format: kernel.\n'
              'examples:\n'
-             'graph:0.01\n'
-             'graph:10.0\n'
-             'preCalc:0.01\n'
+             'graph\n'
+             'preCalc\n'
              'For preCalc kernel, run KernelCalc.py first.'
     )
     parser.add_argument(
@@ -54,10 +52,10 @@ def main():
         '--train_test_config', type=str, help=
         'format: mode:train_size:train_ratio:seed:(dynamic train size)\n'
         'examples:\n'
-        'loocv:::0\n'
+        # 'loocv:::0\n'
         'train_test:1000::0\n'
         'train_test::0.8:0\n'
-        'dynamic::0.8:0:500'
+        # 'dynamic::0.8:0:500'
     )
     parser.add_argument(
         '--json_hyper', type=str, default=None,
@@ -70,16 +68,16 @@ def main():
     args = parser.parse_args()
 
     # set args
-    gpr, optimizer = set_gpr_optimizer(args.gpr)
-    kernel, alpha = set_kernel_alpha(args.kernel)
+    gpc, optimizer = set_gpc_optimizer(args.gpc)
+    kernel = args.kernel
     single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
     mode, train_size, train_ratio, seed, dynamic_train_size = \
         set_mode_train_size_ratio_seed(args.train_test_config)
 
-    # set Gaussian process regressor
-    Learner = set_gpr_learner(gpr)
+    # set Gaussian process classifier
+    Learner = set_gpc_learner(gpc)
 
     # set kernel_config
     kernel_config = set_kernel_config(
@@ -115,11 +113,10 @@ def main():
     gpr_params = {
         'mode': mode,
         'optimizer': optimizer,
-        'alpha': alpha,
         'Learner': Learner,
         'dynamic_train_size': dynamic_train_size
     }
-    gpr_run(data, args.result_dir, kernel_config, gpr_params,
+    gpc_run(data, args.result_dir, kernel_config, gpr_params,
             load_model=args.load_model, tag=seed)
 
 

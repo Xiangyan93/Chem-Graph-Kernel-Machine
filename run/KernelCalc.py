@@ -8,6 +8,7 @@ from run.GPR import *
 
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(
         description='Calculate Kernel Matrix and Gradients.',
         formatter_class=argparse.RawTextHelpFormatter

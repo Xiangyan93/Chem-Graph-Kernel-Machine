@@ -1,8 +1,8 @@
-from .gpr import GPR
-from chemml.learner import BaseLearner
+from .gpr import RobustFitGaussianProcessRegressor as GPR
+from ..gpr_learner import GPRLearner
 
 
-class Learner(BaseLearner):
+class Learner(GPRLearner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = GPR(kernel=self.kernel,
@@ -15,5 +15,5 @@ class Learner(BaseLearner):
             train_X = self.train_X
         if train_Y is None:
             train_Y = self.train_Y
-        self.model.fit_loocv(train_X, train_Y, verbose=True, repeat=1)
-        print('hyperparameter: ', self.model.kernel.hyperparameters)
+        self.model.fit_robust(train_X, train_Y)
+        print('hyperparameter: ', self.kernel_.hyperparameters)

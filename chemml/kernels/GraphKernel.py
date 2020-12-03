@@ -24,7 +24,22 @@ from chemml.kernels.MultipleKernel import *
 from chemml.kernels.ConvKernel import *
 
 
-class NormalizationMolSize(Normalization):
+class Norm(Normalization):
+    def requires_vector_input(self):
+        return False
+
+    def get_params(self, deep=False):
+        return dict(
+            kernel=self.kernel,
+        )
+
+    @property
+    def n_dims(self):
+        """Returns the number of non-fixed hyperparameters of the kernel."""
+        return self.theta.shape[0]
+
+
+class NormalizationMolSize(Norm):
     def __init__(self, kernel, s=100.0, s_bounds=(1e2, 1e3)):
         super().__init__(kernel)
         self.s = s
@@ -303,7 +318,7 @@ class GraphKernelConfig(KernelConfig):
             unique=self.add_features is not None
         )
         if hyperdict['Normalization'] == True:
-            return Normalization(kernel)
+            return Norm(kernel)
         elif hyperdict['Normalization'] == False:
             return kernel
         elif hyperdict['Normalization'][0]:
@@ -322,7 +337,7 @@ class GraphKernelConfig(KernelConfig):
             unique=self.add_features is not None
         )
         if hyperdict['Normalization'] == True:
-            return Normalization(kernel)
+            return Norm(kernel)
         elif hyperdict['Normalization'] == False:
             return kernel
         elif hyperdict['Normalization'][0]:

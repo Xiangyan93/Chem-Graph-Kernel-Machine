@@ -33,7 +33,6 @@ from chemml.optimizer import (
     ensemble,
     sequential_threshold,
     l1_regularization,
-    vanilla_lbfgs
 )
 
 

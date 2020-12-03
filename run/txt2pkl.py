@@ -7,6 +7,7 @@ from run.tools import *
 
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(
         description='Transform input file into pickle file, in which the InChI '
                     'or SMILES string was transformed into graphs.',

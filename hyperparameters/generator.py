@@ -85,8 +85,8 @@ class HyperJsonGenerator:
         if elemental_mode:
             tp.pop('atom_AtomicNumber')
             tp.update({
-                'atom_elemental_mode1': [['sExp', 2.0, self.s_bounds]],
-                'atom_elemental_mode2': [['sExp', 3.0, self.s_bounds]],
+                'atom_ElementalMode1': [['sExp', 2.0, self.s_bounds]],
+                'atom_ElementalMode2': [['sExp', 3.0, self.s_bounds]],
             })
         if reaction == 1:
             tp.pop('probability_AtomicNumber')
@@ -161,7 +161,7 @@ open('tensorproduct-basis-NMGK.json', 'w').write(
 open('tensorproduct-MSNMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct(normalizationMolSize=True)))
 open('tensorproduct-NMGK.json', 'w').write(
-    json.dumps(hyper_json.tensorproduct(normalization=True)))
+    json.dumps(hyper_json.tensorproduct(normalization=True, elemental_mode=True)))
 open('tensorproduct-MGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct()))
 open('tensorproduct-inhomo-NMGK.json', 'w').write(

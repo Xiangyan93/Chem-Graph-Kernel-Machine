@@ -102,7 +102,7 @@ def main():
         # set optimizer
         gpr, optimizer = set_gpr_optimizer(args.gpr)
         # set Gaussian process regressor
-        Learner = set_learner(gpr)
+        Learner = set_gpr_learner(gpr)
         # set train_test
         mode, train_size, train_ratio, seed, dynamic_train_size = \
             set_mode_train_size_ratio_seed(args.train_test_config)
