@@ -98,7 +98,7 @@ class HyperJsonGenerator:
                 'atom_group_reaction': [['kDelta', 0.5, self.k_bounds]]
             })
         if normalizationMolSize:
-            tp['Normalization'] = [True, 1, "fixed"]
+            tp['Normalization'] = [True, 10000, "fixed"]
         elif normalization:
             tp['Normalization'] = True
         if inhomogeneous_start_probability:
