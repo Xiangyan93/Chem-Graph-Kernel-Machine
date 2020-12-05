@@ -4,7 +4,7 @@ import sys
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from run.tools import *
-from chemml.learner import ActiveLearner
+from chemml.regression.active_learner import ActiveLearner
 
 
 def main():
