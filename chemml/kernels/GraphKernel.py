@@ -48,7 +48,7 @@ class NormalizationMolSize(Norm):
     def __diag(self, K, l, r, K_gradient=None):
         l_lr = np.repeat(l, len(r)).reshape(len(l), len(r))
         r_rl = np.repeat(r, len(l)).reshape(len(r), len(l))
-        se = np.exp(-((l_lr - r_rl.T) / self.s) ** 2)
+        se = np.exp(-((1 / l_lr ** 2 - 1 / r_rl.T ** 2) / self.s) ** 2)
         K = np.einsum("i,ij,j,ij->ij", l, K, r, se)
         if K_gradient is None:
             return K

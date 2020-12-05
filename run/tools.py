@@ -427,7 +427,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
         df = pd.read_csv(csv, sep='\s+', header=0)
         # set id and group_id
         if 'id' not in df:
-            df['id'] = df.index + 1
+            df['id'] = df.index
         groups = df.groupby(single_graph + multi_graph + reaction_graph)
         df['group_id'] = 0
         for i, g in enumerate(groups):
