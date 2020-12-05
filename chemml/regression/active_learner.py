@@ -219,9 +219,9 @@ class ActiveLearner:
                        self.add_size)]  # find min-in-cluster-distance associated idx
         return add_idx
 
-    def evaluate(self, train_output=True, debug=True):
+    def evaluate(self, train_output=True):
         # print('%s' % (time.asctime(time.localtime(time.time()))))
-        r2, ex_var, mse, mae, out = self.learner.evaluate_test(debug=debug)
+        out, r2, ex_var, mse, mae = self.learner.evaluate_test()
         print("R-square:%.3f\nMSE:%.5g\nexplained_variance:%.3f\n" %
               (r2, mse, ex_var))
         self.learning_log.loc[self.current_size] = (
@@ -237,7 +237,7 @@ class ActiveLearner:
         )
 
         if train_output:
-            r2, ex_var, mse, mae, out = self.learner.evaluate_train(debug=debug)
+            out, r2, ex_var, mse, mae = self.learner.evaluate_train()
             out.to_csv(
                 '%s/%i-train.log' % (self.result_dir, self.current_size),
                 sep='\t',
