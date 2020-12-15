@@ -1,5 +1,5 @@
 import json
-from sklearn import svm
+
 
 class HyperJsonGenerator:
     def __init__(self, k=0.9, k_bounds=[0.5, 0.99], s_bounds=[0.5, 3.0]):
@@ -14,7 +14,7 @@ class HyperJsonGenerator:
             'q': [0.01, [0.0001, 1.0]],
             'atom_AtomicNumber': [['kDelta', 0.75, k_bounds]],
             'bond_Order': [['kDelta', self.k, k_bounds]],
-            # 'bond_Order': [['sExp', 1.5, s_bounds]],
+            # 'bond_Order': [['sExp', 0.1, s_bounds]],
             'probability_AtomicNumber': [['Const_p', 1.0, "fixed"]]
         }
         self.additive_basis = {
@@ -27,60 +27,100 @@ class HyperJsonGenerator:
                 ['kC', 0.5, [0.0001, 1.0]], ['kDelta', 0.75, self.k_bounds]
             ],
             'bond_Order': [
-                ['kC', 0.5, [0.0001, 1.0]], ['kDelta', 0.75, self.k_bounds]
+                ['kC', 0.5, [0.0001, 1.0]], ['kDelta', self.k, self.k_bounds]
             ],
             'probability_AtomicNumber': [['Const_p', 1.0, "fixed"]]
         }
 
     def tensorproduct(self, elemental_mode=False, reaction=0,
                       inhomogeneous_start_probability=False,
-                      normalization=False, normalizationMolSize=False):
+                      normalization=False, normalizationMolSize=False,
+                      defined=True):
         tp = self.tensorproduct_basis.copy()
-        tp.update({
-            'atom_AtomicNumber_1': [['kConv', self.k, self.k_bounds]],
-            'atom_AtomicNumber_2': [['kConv', self.k, self.k_bounds]],
-            'atom_AtomicNumber_3': [['kConv', self.k, self.k_bounds]],
-            'atom_AtomicNumber_4': [['kConv', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_5': [['kDelta', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_6': [['kDelta', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_7': [['kDelta', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_8': [['kDelta', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_9': [['kConv', self.k, self.k_bounds]],
-            #'atom_AtomicNumber_10': [['kConv', self.k, self.k_bounds]],
-            # 'atom_Aromatic': [['kDelta', self.k, self.k_bounds]],
-            #'atom_Aromatic_1': [['kConv', self.k, self.k_bounds]],
-            #'atom_Aromatic_2': [['kConv', self.k, self.k_bounds]],
-            #'atom_Aromatic_3': [['kConv', self.k, self.k_bounds]],
-            #'atom_Aromatic_4': [['kConv', self.k, self.k_bounds]],
-            'atom_RingNumber': [['kDelta', self.k, self.k_bounds]],
-            'atom_Chiral': [['kDelta', self.k, self.k_bounds]],
-            # 'atom_chiral_1': [['kConv', self.k, self.k_bounds]],
-            #'atom_hybridization': [['kDelta', self.k, self.k_bounds]],
-            'atom_RingMembership': [['kConv', self.k, self.k_bounds]],
-            # 'atom_Charge': [['kDelta', self.k, self.k_bounds]],
-            #'atom_Charge': [['sExp', 2.5, self.k_bounds]],
-            'atom_MorganHash': [['kDelta', self.k, self.k_bounds]],
-            #'atom_InRing': [['kDelta', self.k, self.k_bounds]],
-            #'bond_InRing': [['kDelta', self.k, self.k_bounds]],
-            'atom_FirstNeighbors': [['kDelta', self.k, self.k_bounds]],
-            'atom_SecondNeighbors': [['kDelta', self.k, self.k_bounds]],
-            #'atom_third_neighbors': [['kDelta', self.k, self.k_bounds]],
-            #'atom_fourth_neighbors': [['kDelta', self.k, self.k_bounds]],
-            #'atom_hcount_1': [['kConv', self.k, self.k_bounds]],
-            # 'atom_hcount_2': [['kConv', self.k, self.k_bounds]],
-            #'atom_hcount_3': [['kConv', self.k, self.k_bounds]],
-            #'atom_hcount_4': [['kConv', self.k, self.k_bounds]],
-            'atom_Hcount': [['kDelta', self.k, self.k_bounds]],
-            # 'atom_FirstNeighbors_1': [['kConv', self.k, self.k_bounds]],
-            # 'atom_FirstNeighbors_2': [['kConv', self.k, self.k_bounds]],
-            #'bond_Aromatic': [['kDelta', self.k, self.k_bounds]],
-            'bond_Stereo': [['kDelta', self.k, self.k_bounds]],
-            # 'bond_Conjugated': [['kDelta', self.k, self.k_bounds]],
-            'bond_RingStereo': [['kDelta', self.k, self.k_bounds]],
-            #'bond_RingMembership': [['kConv', self.k, self.k_bounds]],
-            #'bond_RingNumber': [['kDelta', self.k, self.k_bounds]],
-            # 'atom_TPSA': [['kDelta', self.k, self.k_bounds]],
-        })
+        if defined:
+            tp.update({
+                'atom_AtomicNumber_list_1': [['kConv', self.k, self.k_bounds]],
+                'atom_AtomicNumber_list_2': [['kConv', self.k, self.k_bounds]],
+                'atom_AtomicNumber_list_3': [['kConv', self.k, self.k_bounds]],
+                'atom_AtomicNumber_list_4': [['kConv', self.k, self.k_bounds]],
+                'atom_AtomicNumber_list_5': [['kConv', self.k, self.k_bounds]],
+                # 'atom_AtomicNumber_list_6': [['kConv', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_6': [['kConv', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_7': [['kConv', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_8': [['kConv', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_9': [['kConv', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_10': [['kConv', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_1': [['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_2': [['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_3': [['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_4': [['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_5': [['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_6': [['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_hash_7': [['kDelta', self.k, self.k_bounds]],
+                'atom_MorganHash': [['kDelta', self.k, self.k_bounds]],
+                'atom_Ring_count': [['kDelta', self.k, self.k_bounds]],
+                'atom_RingSize_list': [['kConv', self.k, self.k_bounds]],
+                # 'atom_RingSize_hash': [['kDelta', self.k, self.k_bounds]],
+                'atom_Hcount': [['kDelta', self.k, self.k_bounds]],
+                'atom_AtomicNumber_count_1': [['kDelta', self.k, self.k_bounds]],
+                'atom_AtomicNumber_count_2': [
+                    ['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_count_3': [
+                #    ['kDelta', self.k, self.k_bounds]],
+                #'atom_AtomicNumber_count_4': [
+                    #['kDelta', self.k, self.k_bounds]],
+                # 'atom_Chiral': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Hybridization': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Aromatic': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Charge': [['kDelta', self.k, self.k_bounds]],
+                # 'bond_Aromatic': [['kDelta', self.k, self.k_bounds]],
+                # 'bond_Stereo': [['kDelta', self.k, self.k_bounds]],
+                # 'bond_Conjugated': [['kDelta', self.k, self.k_bounds]],
+                # 'bond_RingStereo': [['kDelta', self.k, self.k_bounds]],
+
+                'atom_Hcount_sum_1': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Hcount_sum_2': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Hcount_sum_3': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Hcount_hash_4': [['kDelta', self.k, self.k_bounds]],
+
+                #'atom_Hcount_list_1': [['kConv', self.k, self.k_bounds]],
+                #'atom_Hcount_list_2': [['kConv', self.k, self.k_bounds]],
+                #'atom_Hcount_list_3': [['kConv', self.k, self.k_bounds]],
+                #'atom_Hcount_list_4': [['kConv', self.k, self.k_bounds]],
+                #'atom_Hcount_list_5': [['kConv', self.k, self.k_bounds]],
+                #'atom_Hcount_list_6': [['kConv', self.k, self.k_bounds]],
+                #'atom_Hcount_list_7': [['kConv', self.k, self.k_bounds]],
+
+                #'atom_Hcount_hash_1': [['kDelta', self.k, self.k_bounds]],
+                #'atom_Hcount_hash_2': [['kDelta', self.k, self.k_bounds]],
+                #'atom_Hcount_hash_3': [['kDelta', self.k, self.k_bounds]],
+                #'atom_Hcount_hash_4': [['kDelta', self.k, self.k_bounds]],
+                #'atom_Hcount_hash_5': [['kDelta', self.k, self.k_bounds]],
+                #'atom_Hcount_hash_6': [['kDelta', self.k, self.k_bounds]],
+                #'atom_Hcount_hash_7': [['kDelta', self.k, self.k_bounds]],
+
+                #'atom_Aromatic_1': [['kConv', self.k, self.k_bounds]],
+                #'atom_Aromatic_2': [['kConv', self.k, self.k_bounds]],
+                #'atom_Aromatic_3': [['kConv', self.k, self.k_bounds]],
+                #'atom_Aromatic_4': [['kConv', self.k, self.k_bounds]],
+                # 'atom_chiral_1': [['kConv', self.k, self.k_bounds]],
+                #'atom_Charge': [['sExp', 2.5, self.k_bounds]],
+                #'atom_InRing': [['kDelta', self.k, self.k_bounds]],
+                #'bond_InRing': [['kDelta', self.k, self.k_bounds]],
+                #'atom_FirstNeighbors': [['kDelta', self.k, self.k_bounds]],
+                #'atom_SecondNeighbors': [['kDelta', self.k, self.k_bounds]],
+                #'atom_third_neighbors': [['kDelta', self.k, self.k_bounds]],
+                #'atom_fourth_neighbors': [['kDelta', self.k, self.k_bounds]],
+                #'atom_hcount_1': [['kConv', self.k, self.k_bounds]],
+                # 'atom_hcount_2': [['kConv', self.k, self.k_bounds]],
+                #'atom_hcount_3': [['kConv', self.k, self.k_bounds]],
+                #'atom_hcount_4': [['kConv', self.k, self.k_bounds]],
+                # 'atom_FirstNeighbors_1': [['kConv', self.k, self.k_bounds]],
+                # 'atom_FirstNeighbors_2': [['kConv', self.k, self.k_bounds]],
+                #'bond_RingMembership': [['kConv', self.k, self.k_bounds]],
+                #'bond_RingNumber': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_TPSA': [['kDelta', self.k, self.k_bounds]],
+            })
 
         if elemental_mode:
             tp.pop('atom_AtomicNumber')
@@ -98,7 +138,7 @@ class HyperJsonGenerator:
                 'atom_group_reaction': [['kDelta', 0.5, self.k_bounds]]
             })
         if normalizationMolSize:
-            tp['Normalization'] = [True, 10000, "fixed"]
+            tp['Normalization'] = [True, 2500, "fixed"]
         elif normalization:
             tp['Normalization'] = True
         if inhomogeneous_start_probability:
@@ -156,12 +196,14 @@ class HyperJsonGenerator:
 
 
 hyper_json = HyperJsonGenerator()
-open('tensorproduct-basis-NMGK.json', 'w').write(
+open('tensorproduct-basis-MGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct_basis))
+open('tensorproduct-basis-NMGK.json', 'w').write(
+    json.dumps(hyper_json.tensorproduct(defined=False, normalization=True)))
+open('tensorproduct-NMGK.json', 'w').write(
+    json.dumps(hyper_json.tensorproduct(normalization=True, elemental_mode=False)))
 open('tensorproduct-MSNMGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct(normalizationMolSize=True)))
-open('tensorproduct-NMGK.json', 'w').write(
-    json.dumps(hyper_json.tensorproduct(normalization=True, elemental_mode=True)))
 open('tensorproduct-MGK.json', 'w').write(
     json.dumps(hyper_json.tensorproduct()))
 open('tensorproduct-inhomo-NMGK.json', 'w').write(

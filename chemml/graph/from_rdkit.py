@@ -230,6 +230,10 @@ class rdkit_config:
                 53: 'group_an53'
             }
 
+    @staticmethod
+    def get_list_hash(l):
+        return hash(','.join(list(map(str, np.sort(l)))))
+
     def preprocess(self, mol):
         if self.set_hydrogen:
             mol = Chem.AddHs(mol)
@@ -279,11 +283,6 @@ class rdkit_config:
         node['Hybridization'] = atom.GetHybridization()
         node['Aromatic'] = atom.GetIsAromatic()
         node['Chiral'] = get_chiral_tag(mol, atom)
-        AE = AtomEnvironment(mol, atom, depth=4)
-        node['FirstNeighbors'] = len(AE.get_nth_neighbors(1))
-        node['SecondNeighbors'] = len(AE.get_nth_neighbors(2))
-        node['ThirdNeighbors'] = len(AE.get_nth_neighbors(3))
-        node['FourthNeighbors'] = len(AE.get_nth_neighbors(4))
         node['InRing'] = atom.IsInRing()
         node['SingleAtom'] = True if mol.GetNumAtoms() == 1 else False
         if self.set_elemental_mode:
@@ -305,11 +304,12 @@ class rdkit_config:
 
         # set ring information
         if self.set_ring_membership:
-            node['RingMembership'] = self.ringlist_atom[atom.GetIdx()]
+            node['RingSize_list'] = self.ringlist_atom[atom.GetIdx()]
+            node['RingSize_hash'] = self.get_list_hash(node['RingSize_list'])
             if self.ringlist_atom[atom.GetIdx()] == [0]:
-                node['RingNumber'] = 0
+                node['Ring_count'] = 0
             else:
-                node['RingNumber'] = len(self.ringlist_atom[atom.GetIdx()])
+                node['Ring_count'] = len(self.ringlist_atom[atom.GetIdx()])
         if self.set_TPSA:
             node['TPSA'] = self.TPSA[atom.GetIdx()]
 
@@ -326,21 +326,28 @@ class rdkit_config:
         if self.set_ring_stereo:
             edge['RingStereo'] = 0.
         if self.set_ring_membership:
-            edge['RingMembership'] = self.ringlist_bond[bond.GetIdx()]
+            edge['RingSize_list'] = self.ringlist_bond[bond.GetIdx()]
+            edge['RingSize_hash'] = self.get_list_hash(edge['RingSize_list'])
             if self.ringlist_bond[bond.GetIdx()] == [0]:
-                edge['RingNumber'] = 0
+                edge['Ring_count'] = 0
             else:
-                edge['RingNumber'] = len(self.ringlist_bond[bond.GetIdx()])
+                edge['Ring_count'] = len(self.ringlist_bond[bond.GetIdx()])
 
-    def set_node_propogation(self, graph, mol, attribute, depth=1, integer=False):
+    def set_node_propogation(self, graph, mol, attribute, depth=1, count=True,
+                             usehash=True, sum=True):
         if len(mol.GetAtoms()) == 1:
             for depth_ in range(1, depth+1):
-                if integer:
-                    graph.nodes[0][attribute + '_%i' % depth_] = hash('0')
-                    graph.nodes[1][attribute + '_%i' % depth_] = hash('0')
-                else:
-                    graph.nodes[0][attribute + '_%i' % depth_] = [0]
-                    graph.nodes[1][attribute + '_%i' % depth_] = [0]
+                graph.nodes[0][attribute + '_list_%i' % depth_] = [0]
+                graph.nodes[1][attribute + '_list_%i' % depth_] = [0]
+                if count:
+                    graph.nodes[0][attribute + '_count_%i' % depth_] = 1
+                    graph.nodes[1][attribute + '_count_%i' % depth_] = 1
+                if usehash:
+                    graph.nodes[0][attribute + '_hash_%i' % depth_] = hash('0')
+                    graph.nodes[1][attribute + '_hash_%i' % depth_] = hash('0')
+                if sum:
+                    graph.nodes[0][attribute + '_sum_%i' % depth_] = 0
+                    graph.nodes[1][attribute + '_sum_%i' % depth_] = 0
         else:
             for i, atom in enumerate(mol.GetAtoms()):
                 assert (attribute in graph.nodes[i])
@@ -348,13 +355,19 @@ class rdkit_config:
                 for depth_ in range(1, depth+1):
                     neighbors = AE.get_nth_neighbors(depth_)
                     if neighbors:
-                        graph.nodes[i][attribute + '_%i' % depth_] = [
+                        graph.nodes[i][attribute + '_list_%i' % depth_] = [
                             graph.nodes[a.GetIdx()][attribute] for a in neighbors]
                     else:
-                        graph.nodes[i][attribute + '_%i' % depth_] = [0]
-                    if integer:
-                        graph.nodes[i][attribute + '_%i' % depth_] = hash(','.join(
-                            list(map(str , np.sort(graph.nodes[i][attribute + '_%i' % depth_])))))
+                        graph.nodes[i][attribute + '_list_%i' % depth_] = [0]
+                    if count:
+                        graph.nodes[i][attribute + '_count_%i' % depth_] = \
+                            len(graph.nodes[i][attribute + '_list_%i' % depth_])
+                    if usehash:
+                        graph.nodes[i][attribute + '_hash_%i' % depth_] = \
+                            self.get_list_hash(graph.nodes[i][attribute + '_list_%i' % depth_])
+                    if sum:
+                        graph.nodes[i][attribute + '_sum_%i' % depth_] = \
+                            np.sum(graph.nodes[i][attribute + '_list_%i' % depth_])
 
 
 def _from_rdkit(cls, mol, rdkit_config):
@@ -383,8 +396,9 @@ def _from_rdkit(cls, mol, rdkit_config):
         if rdkit_config.set_ring_stereo:
             g.edges[ij]['RingStereo'] = 0.
         if rdkit_config.set_ring_membership:
-            g.edges[ij]['RingMembership'] = [0]
-            g.edges[ij]['RingNumber'] = 0
+            g.edges[ij]['RingSize_list'] = [0]
+            g.edges[ij]['RingSize_hash'] = hash('0')
+            g.edges[ij]['Ring_count'] = 0
     else:
         for i, atom in enumerate(mol.GetAtoms()):
             assert (atom.GetIdx() == i)
@@ -401,7 +415,7 @@ def _from_rdkit(cls, mol, rdkit_config):
             for ring_idx in mol.GetRingInfo().AtomRings():
                 atom_updown = []
                 for idx in ring_idx:
-                    if g.nodes[idx]['RingNumber'] != 1:
+                    if g.nodes[idx]['Ring_count'] != 1:
                         atom_updown.append(0)
                     else:
                         atom = mol.GetAtomWithIdx(idx)
@@ -430,8 +444,8 @@ def _from_rdkit(cls, mol, rdkit_config):
                     else:
                         g.edges[ij]['RingStereo'] = StereoOfRingBond
     #rdkit_config.set_node_propogation(g, mol, 'Chiral', depth=1)
-    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=4, integer=False)
-    #rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=4)
+    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=5, sum=False)
+    rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=1, sum=True)
     #rdkit_config.set_node_propogation(g, mol, 'FirstNeighbors', depth=4)
     #rdkit_config.set_node_propogation(g, mol, 'Aromatic', depth=4)
     return _from_networkx(cls, g)
