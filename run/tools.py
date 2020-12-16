@@ -1,5 +1,6 @@
 import os
 import json
+import pickle
 from tqdm import tqdm
 tqdm.pandas()
 from rdkit import Chem

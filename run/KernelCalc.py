@@ -53,7 +53,7 @@ def main():
     }
     print('**\tEnd Calculating kernel matrix\t**')
     kernel_pkl = os.path.join(args.result_dir, 'kernel.pkl')
-    pickle.dump(kernel_dict, open(kernel_pkl, 'wb'))
+    pickle.dump(kernel_dict, open(kernel_pkl, 'wb'), protocol=4)
 
 
 if __name__ == '__main__':
