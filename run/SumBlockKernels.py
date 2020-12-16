@@ -8,6 +8,7 @@ from run.tools import *
 
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(
         description='Concatenate the kernel matrix from blocks.',
         formatter_class=argparse.RawTextHelpFormatter

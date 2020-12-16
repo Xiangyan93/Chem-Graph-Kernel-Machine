@@ -61,10 +61,13 @@ def main():
     for graph_column in single_graph:
         print('***\tReading graph kernel matrix block: %s\t***' % graph_column)
         X, group_id = get_Xgroupid_from_df(df, [graph_column], [])
+        X, Y = X[x0:x1], X[y0:y1]
         dict = pickle.load(open(os.path.join(
             args.result_dir, 'graph_kernel_%s_%d_%d.pkl' %
                              (graph_column, block_x_id, block_y_id)), 'rb'))
-        K.append(dict['K_graph'])
+        idx_x = np.searchsorted(dict['graph_X'], X).ravel()
+        idx_y = np.searchsorted(dict['graph_Y'], Y).ravel()
+        K.append(dict['K_graph'][idx_x][:, idx_y])
         group_id_X.append(group_id[x0:x1])
         group_id_Y.append(group_id[y0:y1])
         theta.append(dict['theta'])
