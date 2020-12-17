@@ -25,6 +25,7 @@ from chemml.kernels.ConvKernel import *
 
 
 class Norm(Normalization):
+    @property
     def requires_vector_input(self):
         return False
 
