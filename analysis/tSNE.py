@@ -27,7 +27,7 @@ def main():
     R = kernel['K']
     d = R.diagonal() ** -0.5
     K = d[:, None] * R * d[None, :]
-    D = np.sqrt(np.maximum(0, 2-2 * K**0.1))
+    D = np.sqrt(np.maximum(0, 2-2 * K**2))
     embed = TSNE(n_components=2).fit_transform(D)
     df = pd.read_csv(args.input, sep='\s+')
     df['embed_X'] = embed[:, 0]
