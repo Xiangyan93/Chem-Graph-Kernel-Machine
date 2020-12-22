@@ -19,20 +19,24 @@ def main():
         help='The kernel.pkl file.',
     )
     parser.add_argument(
-        '-i', '--input', type=str, help='Input data in csv format.'
+        '-i', '--input', type=str, help='Input data in csv,pkl format.'
     )
     args = parser.parse_args()
 
     kernel = pickle.load(open(args.kernel, 'rb'))
-    R = kernel['K']
+    f1, f2 = args.input.split(',')
+    df = pd.read_csv(f1, sep='\s+')
+    df_ = pd.read_pickle(f2)
+    df['id'] = df_['id']
+    df['group_id'] = df_['group_id']
+    gid = df_['group_id']
+    R = kernel['K'][gid][:, gid]
     d = R.diagonal() ** -0.5
     K = d[:, None] * R * d[None, :]
     D = np.sqrt(np.maximum(0, 2-2 * K**2))
     embed = TSNE(n_components=2).fit_transform(D)
-    df = pd.read_csv(args.input, sep='\s+')
     df['embed_X'] = embed[:, 0]
     df['embed_Y'] = embed[:, 1]
-    df['group_id'] = kernel['group_id']
     df.to_csv('embed.log', sep=' ', index=False)
 
 
