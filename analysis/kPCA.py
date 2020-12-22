@@ -2,17 +2,16 @@
 
 import os
 import sys
-
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from run.tools import *
-from sklearn.manifold import TSNE
+from sklearn.decomposition import KernelPCA
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description='Generate tSNE embedding.',
+        description='Generate kernel PCA embedding.',
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
@@ -28,12 +27,12 @@ def main():
     )
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
-                                         'format: single_graph:multi_graph:reaction_graph:targets\n'
-                                         'examples: inchi:::tt\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tt\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
-        help='Additional vector features with RBF kernel.\n'
+        help='Additional vector features with RBF kernel.\n' 
              'examples:\n'
              'red_T:0.1\n'
              'T,P:100,500'
@@ -62,14 +61,11 @@ def main():
     test_id = read_input(
         args.result_dir, args.input, kernel_config, properties, params
     )
-    R = kernel_config.kernel(train_X)
-    d = R.diagonal() ** -0.5
-    K = d[:, None] * R * d[None, :]
-    D = np.sqrt(np.maximum(0, 2-2 * K**2))
-    embed = TSNE(n_components=2).fit_transform(D)
+    transformer = KernelPCA(n_components=2, kernel=kernel_config.kernel)
+    embed = transformer.fit_transform(train_X)
     df_out['embed_X'] = embed[:, 0]
     df_out['embed_Y'] = embed[:, 1]
-    df_out.to_csv('embed_tSNE.log', sep=' ', index=False)
+    df_out.to_csv('embed_kPCA.log', sep=' ', index=False)
 
 
 if __name__ == '__main__':
