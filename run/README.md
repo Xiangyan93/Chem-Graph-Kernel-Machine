@@ -42,7 +42,8 @@ critical density of molecules obtained from molecular dynamics (MD) simulation.
         ```
         python3 preCalc2graph.py --result_dir tc --gpr graphdot --input_config SMILES:::tc --json_hyper ../hyperparameters/tensorproduct-MSNMGK.json
         ```
-      Prepare a file of molecules to be predicted as datasets/predict.txt
+    - Prepare a file of molecules to be predicted formatted as datasets/predict.txt.
+        the results are save in predict.csv.
         ```
         python3 predict.py --result_dir tc --gpr sklearn -i datasets/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/tensorproduct-MSNMGK.json --f_model tc/model.pkl
         ```
