@@ -501,11 +501,18 @@ def get_Xgroupid_from_df(df, single_graph, multi_graph):
     return df_[X_name].to_numpy(), df_['group_id'].to_numpy()
 
 
-def unify_datatype(X):
+def unify_datatype(X, Y=None):
     if X[0].__class__ == list:
         graphs = []
         for x in X:
             graphs += x[::2]
+        if Y is not None:
+            for y in Y:
+                graphs += y[::2]
         HashGraph.unify_datatype(graphs, inplace=True)
     else:
-        HashGraph.unify_datatype(X, inplace=True)
+        if Y is not None:
+            graphs = np.concatenate([X, Y], axis=0)
+        else:
+            graphs = X
+        HashGraph.unify_datatype(graphs, inplace=True)
