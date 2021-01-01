@@ -65,7 +65,7 @@ class PreCalcKernel:
             theta=self.theta_
         )
 
-
+'''
 def _Kc(self, super, x, y, eval_gradient=False):
     x, x_weight = self.x2graph(x), self.x2weight(x)
     y, y_weight = self.x2graph(y), self.x2weight(y)
@@ -169,54 +169,33 @@ class ConvolutionPreCalcKernel(PreCalcKernel):
     @staticmethod
     def x2weight(x):
         return x[1::2]
+'''
 
 
 class PreCalcKernelConfig(KernelConfig):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        params = self.params
-        ns = len(self.single_graph)
-        nm = len(self.multi_graph)
-        if ns == 1 and nm == 0 and self.add_features is None:
-            kernel_pkl = os.path.join(params['result_dir'], 'kernel.pkl')
-            self.kernel = self.get_single_graph_kernel(kernel_pkl)
-        elif ns == 0 and nm == 1 and self.add_features is None:
-            kernel_pkl = os.path.join(params['result_dir'], 'kernel.pkl')
-            self.kernel = self.get_conv_graph_kernel(kernel_pkl)
+        self.type = 'preCalc'
+        kernel_pkl = os.path.join(self.params['result_dir'], 'kernel.pkl')
+        if self.add_features is None:
+            self.kernel = self.get_preCalc_kernel(kernel_pkl)
         else:
-            kernels = []
-            for i in range(ns):
-                kernel_pkl = os.path.join(params['result_dir'],
-                                          'kernel_%d.pkl' % i)
-                kernels += [self.get_single_graph_kernel(kernel_pkl)]
-            for i in range(ns, ns+nm):
-                kernel_pkl = os.path.join(params['result_dir'],
-                                          'kernel_%d.pkl' % i)
-                kernels += [self.get_conv_graph_kernel(kernel_pkl)]
+            kernels = [self.get_preCalc_kernel(kernel_pkl)]
             kernels += self.get_rbf_kernel()
-            composition = [(i,) for i in range(ns+nm)] + \
-                [tuple(np.arange(ns+nm, len(self.add_features) + ns+nm))]
+            composition = [(0,)] + \
+                          [tuple(np.arange(1, len(self.add_features) + 1))]
             self.kernel = MultipleKernel(
                 kernel_list=kernels,
                 composition=composition,
                 combined_rule='product',
             )
 
-    def get_single_graph_kernel(self, kernel_pkl):
-        self.type = 'preCalc'
+    def get_preCalc_kernel(self, kernel_pkl):
         kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
-        graphs = kernel_dict['graphs']
+        X = kernel_dict['group_id']
         K = kernel_dict['K']
         theta = kernel_dict['theta']
-        return PreCalcKernel(graphs, K, theta)
-
-    def get_conv_graph_kernel(self, kernel_pkl):
-        self.type = 'preCalc'
-        kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
-        graphs = kernel_dict['graphs'][0],
-        K = kernel_dict['K'][0],
-        theta = kernel_dict['theta'][0],
-        return ConvolutionPreCalcKernel(graphs, K, theta)
+        return PreCalcKernel(X, K, theta)
 
     def save(self, result_dir, model):
         pass

@@ -33,7 +33,6 @@ from chemml.optimizer import (
     ensemble,
     sequential_threshold,
     l1_regularization,
-    vanilla_lbfgs
 )
 
 
@@ -293,7 +292,7 @@ class RobustFitGaussianProcessRegressor(GPR):
 
     def fit_robust(self, X, y, cycle=1):
         self.fit(X, y)
-        for i in range(cycle):
+        for i in range(cycle - 1):
             try:
                 print('Try to fit the data with alpha = ', self.alpha)
                 self.fit(X, y)

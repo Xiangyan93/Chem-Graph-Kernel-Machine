@@ -1,7 +1,10 @@
 import os
 import json
-import pickle
+from tqdm import tqdm
+tqdm.pandas()
 from graphdot.kernel.marginalized import MarginalizedGraphKernel
+from graphdot.util.pretty_tuple import pretty_tuple
+from graphdot.kernel.fix import Normalization
 from graphdot.microkernel import (
     Additive,
     Constant as kC,
@@ -16,14 +19,161 @@ from graphdot.microprobability import (
     Constant,
     UniformProbability
 )
-from chemml.kernels.PreCalcKernel import (
-    ConvolutionPreCalcKernel as CPCK,
-    _Kc,
-)
-from chemml.kernels.MultipleKernel import _get_uniX
 from chemml.kernels.KernelConfig import KernelConfig
 from chemml.kernels.MultipleKernel import *
-from chemml.graph.hashgraph import HashGraph
+from chemml.kernels.ConvKernel import *
+
+
+class Norm(Normalization):
+    @property
+    def requires_vector_input(self):
+        return False
+
+    def get_params(self, deep=False):
+        return dict(
+            kernel=self.kernel,
+        )
+
+    @property
+    def n_dims(self):
+        """Returns the number of non-fixed hyperparameters of the kernel."""
+        return self.theta.shape[0]
+
+
+class NormalizationMolSize(Norm):
+    def __init__(self, kernel, s=100.0, s_bounds=(1e2, 1e3)):
+        super().__init__(kernel)
+        self.s = s
+        self.s_bounds = s_bounds
+
+    def __diag(self, K, l, r, K_gradient=None):
+        l_lr = np.repeat(l, len(r)).reshape(len(l), len(r))
+        r_rl = np.repeat(r, len(l)).reshape(len(r), len(l))
+        se = np.exp(-((1 / l_lr ** 2 - 1 / r_rl.T ** 2) / self.s) ** 2)
+        K = np.einsum("i,ij,j,ij->ij", l, K, r, se)
+        if K_gradient is None:
+            return K
+        else:
+            K_gradient = np.einsum("ijk,i,j,ij->ijk", K_gradient, l, r, se)
+            if self.s_bounds == "fixed":
+                return K, K_gradient
+            else:
+                dK_s = 2 * (l_lr - r_rl.T) ** 2 / self.s ** 3 * K
+                dK_s = dK_s.reshape(len(l), len(r), 1)
+                print(K.max(), K.min())
+                print(dK_s.max(), dK_s.min())
+                print(self.theta)
+                return K, np.concatenate([K_gradient, dK_s], axis=2)
+            # return K, np.einsum("ijk,i,j,ij->ijk", K_gradient, l, r, se)
+
+    def __call__(self, X, Y=None, eval_gradient=False, **options):
+        """Normalized outcome of
+        :py:`self.kernel(X, Y, eval_gradient, **options)`.
+
+        Parameters
+        ----------
+        Inherits that of the graph kernel object.
+
+        Returns
+        -------
+        Inherits that of the graph kernel object.
+        """
+        if eval_gradient is True:
+            R, dR = self.kernel(X, Y, eval_gradient=True, **options)
+            if Y is None:
+                ldiag = rdiag = R.diagonal()
+            else:
+                ldiag, ldDiag = self.kernel.diag(X, True, **options)
+                rdiag, rdDiag = self.kernel.diag(Y, True, **options)
+            ldiag_inv = 1 / ldiag
+            rdiag_inv = 1 / rdiag
+            ldiag_rsqrt = np.sqrt(ldiag_inv)
+            rdiag_rsqrt = np.sqrt(rdiag_inv)
+            return self.__diag(R, ldiag_rsqrt, rdiag_rsqrt, dR)
+        else:
+            R = self.kernel(X, Y, **options)
+            if Y is None:
+                ldiag = rdiag = R.diagonal()
+            else:
+                ldiag = self.kernel.diag(X, **options)
+                rdiag = self.kernel.diag(Y, **options)
+            ldiag_inv = 1 / ldiag
+            rdiag_inv = 1 / rdiag
+            ldiag_rsqrt = np.sqrt(ldiag_inv)
+            rdiag_rsqrt = np.sqrt(rdiag_inv)
+            # K = ldiag_rsqrt[:, None] * R * rdiag_rsqrt[None, :]
+            return self.__diag(R, ldiag_rsqrt, rdiag_rsqrt)
+
+    @property
+    def n_dims(self):
+        if self.s_bounds == "fixed":
+            return len(self.kernel.theta)
+        else:
+            return len(self.kernel.theta) + 1
+
+    @property
+    def hyperparameters(self):
+        if self.s_bounds == "fixed":
+            return self.kernel.hyperparameters
+        else:
+            return pretty_tuple(
+                'MarginalizedGraphKernel',
+                ['starting_probability', 'stopping_probability', 'node_kernel',
+                 'edge_kernel', 'normalize_size']
+            )(self.kernel.p.theta,
+              self.kernel.q,
+              self.kernel.node_kernel.theta,
+              self.kernel.edge_kernel.theta,
+              self.s)
+
+    @property
+    def hyperparameter_bounds(self):
+        if self.s_bounds == "fixed":
+            return self.kernel.hyperparameter_bounds
+        else:
+            return pretty_tuple(
+                'GraphKernelHyperparameterBounds',
+                ['starting_probability', 'stopping_probability', 'node_kernel',
+                 'edge_kernel', 'normalize_size']
+            )(self.kernel.p.bounds,
+              self.kernel.q_bounds,
+              self.kernel.node_kernel.bounds,
+              self.kernel.edge_kernel.bounds,
+              self.s_bounds)
+
+    @property
+    def theta(self):
+        if self.s_bounds == "fixed":
+            return self.kernel.theta
+        else:
+            return np.r_[self.kernel.theta, self.s]
+
+    @theta.setter
+    def theta(self, value):
+        if self.s_bounds == "fixed":
+            self.kernel.theta = value
+        else:
+            self.kernel.theta = value[:-1]
+            self.s = value[-1]
+
+    @property
+    def bounds(self):
+        if self.s_bounds == "fixed":
+            return self.kernel.bounds
+        else:
+            return np.r_[self.kernel.bounds, np.reshape(self.s_bounds, (1, 2))]
+
+    def clone_with_theta(self, theta):
+        clone = copy.deepcopy(self)
+        clone.theta = theta
+        return clone
+
+    def get_params(self, deep=False):
+        return dict(
+            kernel=self.kernel,
+            s=self.s,
+            s_bounds=self.s_bounds,
+        )
 
 
 class MGK(MarginalizedGraphKernel):
@@ -37,28 +187,28 @@ class MGK(MarginalizedGraphKernel):
         super().__init__(*args, **kwargs)
         self.unique = unique
 
-    def __unique(self, X):
+    @staticmethod
+    def _unique(X):
         X_unique = np.sort(np.unique(X))
         X_idx = np.searchsorted(X_unique, X)
         return X_unique, X_idx
 
-    def _graph(self, X):
+    @staticmethod
+    def _format_X(X):
         if X.__class__ == np.ndarray:
-            return X.ravel()
+            return X.ravel()  # .tolist()
         else:
             return X
 
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        X = self._graph(X)
-        Y = self._graph(Y)
-        X = HashGraph.unify_datatype(X)
-        Y = HashGraph.unify_datatype(Y) if Y is not None else Y
+        X = self._format_X(X)
+        Y = self._format_X(Y)
         if self.unique:
-            X_unique, X_idx = self.__unique(X)
+            X_unique, X_idx = self._unique(X)
             if Y is None:
                 Y_unique, Y_idx = X_unique, X_idx
             else:
-                Y_unique, Y_idx = self.__unique(Y)
+                Y_unique, Y_idx = self._unique(Y)
             if eval_gradient:
                 K, K_gradient = super().__call__(
                     X_unique, Y_unique, eval_gradient=True, *args, **kwargs
@@ -73,10 +223,9 @@ class MGK(MarginalizedGraphKernel):
                                     **kwargs)
 
     def diag(self, X, *args, **kwargs):
-        X = self._graph(X)
-        X = HashGraph.unify_datatype(X)
+        X = self._format_X(X)
         if self.unique:
-            X_unique, X_idx = self.__unique(X)
+            X_unique, X_idx = self._unique(X)
             diag = super().diag(X_unique, *args, **kwargs)
             return diag[X_idx]
         else:
@@ -93,205 +242,42 @@ class MGK(MarginalizedGraphKernel):
         )
 
 
-class NormalizedGraphKernel(MGK):
-    def __diag2K(self, K, dx, dy, l, K_gradient=None):
-        a = np.repeat(dx ** -2, len(dy)).reshape(len(dx), len(dy))
-        b = np.repeat(dy ** -2, len(dx)).reshape(len(dy), len(dx))
-        c = np.exp(-((a - b.T) / l) ** 2)
-        K = np.einsum("i,ij,j,ij->ij", dx, K, dy, c)
-        if K_gradient is None:
-            return K
-        else:
-            return K, np.einsum("ijk,i,j,ij->ijk", K_gradient, dx, dy, c)
-
-    def __normalize(self, X, Y, R, length=50000):
-        if Y is None:
-            # square matrix
-            if type(R) is tuple:
-                d = np.diag(R[0]) ** -0.5
-                return self.__diag2K(R[0], d, d, length, K_gradient=R[1])
-            else:
-                d = np.diag(R) ** -0.5
-                return self.__diag2K(R, d, d, length)
-        else:
-            # rectangular matrix, must have X and Y
-            # diag_X = (super().diag(X) ** -0.5).flatten()
-            # diag_Y = (super().diag(Y) ** -0.5).flatten()
-            dx = super().diag(X) ** -0.5
-            dy = super().diag(Y) ** -0.5
-            if type(R) is tuple:
-                return self.__diag2K(R[0], dx, dy, length, K_gradient=R[1])
-            else:
-                return self.__diag2K(R, dx, dy, length)
-
-    '''
-    def __normalize_old(self, X, Y, R):
-        if Y is None:
-            # square matrix
-            if type(R) is tuple:
-                d = np.diag(R[0]) ** -0.5
-                K = np.diag(d).dot(R[0]).dot(np.diag(d))
-                K_gradient = np.einsum("ijk,i,j->ijk", R[1], d, d)
-                return K, K_gradient
-            else:
-                d = np.diag(R) ** -0.5
-                K = np.diag(d).dot(R).dot(np.diag(d))
-                return K
-        else:
-            # rectangular matrix, must have X and Y
-            if type(R) is tuple:
-                diag_X = super().diag(X) ** -0.5
-                diag_Y = super().diag(Y) ** -0.5
-                K = np.diag(diag_X).dot(R[0]).dot(np.diag(diag_Y))
-                K_gradient = np.einsum("ijk,i,j->ijk", R[1], diag_X, diag_Y)
-                return K, K_gradient
-            else:
-                diag_X = super().diag(X) ** -0.5
-                diag_Y = super().diag(Y) ** -0.5
-                K = np.einsum("ij,i,j->ij", R, diag_X, diag_Y)
-                return K
-    '''
-
-    def __call__(self, X, Y=None, *args, **kwargs):
-        R = super().__call__(X, Y, *args, **kwargs)
-        return self.__normalize(X, Y, R)
-
-    def diag(self, X, *args, **kwargs):
-        return np.ones(len(X))
-
-
-def _PreCalculate(self, X, result_dir, id=None):
-    self.graphs = X
-    self.K, self.K_gradient = self(self.graphs, eval_gradient=True)
-    self.save(result_dir, id=id)
-
-
-def _save(self, result_dir, id=None):
-    if id is None:
-        f_kernel = os.path.join(result_dir, 'kernel.pkl')
-    else:
-        f_kernel = os.path.join(result_dir, 'kernel_%i.pkl' % id)
-    store_dict = self.__dict__.copy()
-    for key in ['node_kernel', 'edge_kernel', 'p', 'q', 'q_bounds',
-                'element_dtype', 'backend']:
-        store_dict.pop(key, None)
-    store_dict['theta'] = self.theta
-    pickle.dump(store_dict, open(f_kernel, 'wb'), protocol=4)
-
-
-def _load(self, result_dir):
-    f_kernel = os.path.join(result_dir, 'kernel.pkl')
-    store_dict = pickle.load(open(f_kernel, 'rb'))
-    self.__dict__.update(**store_dict)
-
-
-def _get_params(self, super, deep=False):
-    params = super.get_params(deep=deep)
-    params.update(dict(
-        graphs=self.graphs,
-        K=self.K,
-        K_gradient=self.K_gradient,
-    ))
-    return params
-
-
-def _call(self, super, X, Y=None, eval_gradient=False, *args, **kwargs):
-    if self.K is None or self.K_gradient is None:
-        return super.__call__(X, Y=Y, eval_gradient=eval_gradient, *args,
-                              **kwargs)
-    else:
-        X_idx = np.searchsorted(self.graphs, X).ravel()
-        Y_idx = np.searchsorted(self.graphs, Y).ravel() if Y is not None \
-            else X_idx
-    if eval_gradient:
-        return self.K[X_idx][:, Y_idx], self.K_gradient[X_idx][:, Y_idx][:]
-    else:
-        return self.K[X_idx][:, Y_idx]
-
-
-class PreCalcMarginalizedGraphKernel(MGK):
-    def __init__(self, graphs=None, K=None, K_gradient=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.graphs = graphs
-        self.K = K
-        self.K_gradient = K_gradient
-
-    def get_uniX(self, X):
-        return _get_uniX(X)
-
-    def PreCalculate(self, X, result_dir, id=None):
-        _PreCalculate(self, self.get_uniX(X), result_dir, id=id)
-
-    def save(self, result_dir, id=None):
-        _save(self, result_dir, id=id)
-
-    def load(self, result_dir):
-        _load(self, result_dir)
-
+class ConvolutionGraphKernel(MGK):
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        return _call(self, super(), X, Y=Y, eval_gradient=eval_gradient,
-                     *args, **kwargs)
+        graph, K_graph, K_gradient_graph = self.__get_K_dK(
+            X, Y, eval_gradient)
+        return ConvolutionKernel()(
+            X, Y=Y, eval_gradient=eval_gradient, graph=graph, K_graph=K_graph,
+            K_gradient_graph=K_gradient_graph, theta=self.theta)
 
-    def get_params(self, deep=False):
-        return _get_params(self, deep)
+    def diag(self, X, eval_gradient=False, n_process=cpu_count(),
+                 K_graph=None, K_gradient_graph=None, *args, **kwargs):
+        graph, K_graph, K_gradient_graph = self.__get_K_dK(
+            X, None, eval_gradient)
+        return ConvolutionKernel().diag(
+            X, eval_gradient=eval_gradient, graph=graph, K_graph=K_graph,
+            K_gradient_graph=K_gradient_graph, theta=self.theta)
 
-
-class PreCalcNormalizedGraphKernel(NormalizedGraphKernel):
-    def __init__(self, graphs=None, K=None, K_gradient=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.graphs = graphs
-        self.K = K
-        self.K_gradient = K_gradient
-
-    def get_uniX(self, X):
-        return _get_uniX(X)
-
-    def PreCalculate(self, X, result_dir, id=None):
-        _PreCalculate(self, self.get_uniX(X), result_dir, id=id)
-
-    def save(self, result_dir, id=None):
-        _save(self, result_dir, id=id)
-
-    def load(self, result_dir):
-        _load(self, result_dir)
-
-    def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        return _call(self, super(), X, Y=Y, eval_gradient=eval_gradient,
-                     *args, **kwargs)
-
-    def get_params(self, deep=False):
-        return _get_params(self, super(), deep)
-
-
-class ConvolutionNormalizedGraphKernel(PreCalcNormalizedGraphKernel):
-    def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
-        from chemml.kernels.PreCalcKernel import _call
-        X = self._graph(X)
-        Y = self._graph(Y)
-        return _call(self, X, Y=Y, eval_gradient=eval_gradient,
-                     *args, **kwargs)
-
-    def Kc(self, x, y, eval_gradient=False):
-        return _Kc(CPCK, super(), x, y, eval_gradient=eval_gradient)
-
-    def get_uniX(self, X):
-        graphs = []
-        for x in X:
-            graphs += CPCK.x2graph(x)
-        return _get_uniX(graphs)
-
-    def PreCalculate(self, X, result_dir, id=None):
-        X = self._graph(X)
-        X = self.get_uniX(X)
-        self.graphs = np.sort(X)
-        self.K, self.K_gradient = super().__call__(self.graphs,
-                                                   eval_gradient=True)
-        self.save(result_dir, id=id)
+    def __get_K_dK(self, X, Y, eval_gradient):
+        X = ConvolutionKernel._format_X(X)
+        Y = ConvolutionKernel._format_X(Y)
+        graph = ConvolutionKernel.get_graph(X, Y)
+        if eval_gradient:
+            K_graph, K_gradient_graph = super().__call__(
+                graph, eval_gradient=True)
+        else:
+            K_graph = super().__call__(graph)
+            K_gradient_graph = None
+        return graph, K_graph, K_gradient_graph
 
 
 class GraphKernelConfig(KernelConfig):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.type = 'graph'
+        self.single_graph = self.params['single_graph']
+        self.multi_graph = self.params['multi_graph']
+        self.hyperdict = self.params['hyperdict']
         ns = len(self.single_graph)
         nm = len(self.multi_graph)
         assert (len(self.hyperdict) == ns + nm)
@@ -304,11 +290,11 @@ class GraphKernelConfig(KernelConfig):
             kernels = []
             for i in range(ns):
                 kernels += [self.get_single_graph_kernel(self.hyperdict[i])]
-            for i in range(ns, ns+nm):
+            for i in range(ns, ns + nm):
                 kernels += [self.get_conv_graph_kernel(self.hyperdict[i])]
             kernels += self.get_rbf_kernel()
-            composition = [(i,) for i in range(ns+nm)] + \
-                [tuple(np.arange(ns+nm, na+ns+nm))]
+            composition = [(i,) for i in range(ns + nm)] + \
+                          [tuple(np.arange(ns + nm, na + ns + nm))]
             self.kernel = MultipleKernel(
                 kernel_list=kernels,
                 composition=composition,
@@ -323,14 +309,8 @@ class GraphKernelConfig(KernelConfig):
                 self.kernel = self.kernel.clone_with_theta(theta)
 
     def get_single_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
-        params = self.params
-        self.type = 'graph'
-        if params['NORMALIZED']:
-            KernelObject = PreCalcNormalizedGraphKernel
-        else:
-            KernelObject = PreCalcMarginalizedGraphKernel
         knode, kedge, p = self.get_knode_kedge_p(hyperdict)
-        return KernelObject(
+        kernel = MGK(
             node_kernel=knode,
             edge_kernel=kedge,
             q=hyperdict['q'][0],
@@ -338,16 +318,18 @@ class GraphKernelConfig(KernelConfig):
             p=p,
             unique=self.add_features is not None
         )
+        if hyperdict['Normalization'] == True:
+            return Norm(kernel)
+        elif hyperdict['Normalization'] == False:
+            return kernel
+        elif hyperdict['Normalization'][0]:
+            return NormalizationMolSize(
+                kernel, s=hyperdict['Normalization'][1],
+                s_bounds=hyperdict['Normalization'][2])
 
     def get_conv_graph_kernel(self, hyperdict):  # dont delete kernel_pkl
-        params = self.params
-        self.type = 'graph'
-        if params['NORMALIZED']:
-            KernelObject = ConvolutionNormalizedGraphKernel
-        else:
-            raise Exception('not supported option')
         knode, kedge, p = self.get_knode_kedge_p(hyperdict)
-        return KernelObject(
+        kernel = ConvolutionGraphKernel(
             node_kernel=knode,
             edge_kernel=kedge,
             q=hyperdict['q'][0],
@@ -355,6 +337,14 @@ class GraphKernelConfig(KernelConfig):
             p=p,
             unique=self.add_features is not None
         )
+        if hyperdict['Normalization'] == True:
+            return Norm(kernel)
+        elif hyperdict['Normalization'] == False:
+            return kernel
+        elif hyperdict['Normalization'][0]:
+            return NormalizationMolSize(
+                kernel, s=hyperdict['Normalization'][1],
+                s_bounds=hyperdict['Normalization'][2])
 
     @staticmethod
     def get_knode_kedge_p(hyperdict):
@@ -365,7 +355,7 @@ class GraphKernelConfig(KernelConfig):
                 return kDelta(microk[1], microk[2])
             elif microk[0] == 'sExp':
                 # if microk[2] == 'fixed':
-                    # microk[2] = (microk[1], microk[1])
+                # microk[2] = (microk[1], microk[1])
                 return sExp(microk[1], length_scale_bounds=microk[2])
             elif microk[0] == 'kConv':
                 return kConv(kDelta(microk[1], microk[2]))
@@ -377,6 +367,7 @@ class GraphKernelConfig(KernelConfig):
                 return Constant(microk[1], microk[2])
             else:
                 raise Exception('unknown microkernel type')
+
         knode_dict = {}
         kedge_dict = {}
         p_dict = {}
@@ -398,6 +389,8 @@ class GraphKernelConfig(KernelConfig):
                 return Normalize(Additive(**dict))
             elif type == 'Additive_p':
                 return Additive_p(**dict)
+            else:
+                raise Exception('unknown type:', type)
 
         return fun(hyperdict['a_type'], knode_dict), \
                fun(hyperdict['b_type'], kedge_dict), \
@@ -410,10 +403,10 @@ class GraphKernelConfig(KernelConfig):
             for i, hyperdict in enumerate(self.hyperdict):
                 theta = kernel.kernel_list[i].theta
                 hyperdict.update({'theta': theta.tolist()})
-                open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w')\
+                open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w') \
                     .write(json.dumps(self.hyperdict))
         else:
             theta = kernel.theta
             self.hyperdict[0].update({'theta': theta.tolist()})
             open(os.path.join(path, 'hyperparameters.json'), 'w') \
-                .write(json.dumps(self.hyperdict))
+                .write(json.dumps(self.hyperdict[0]))
