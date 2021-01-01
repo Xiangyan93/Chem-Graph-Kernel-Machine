@@ -65,7 +65,7 @@ def main():
     embed = transformer.fit_transform(train_X)
     df_out['embed_X'] = embed[:, 0]
     df_out['embed_Y'] = embed[:, 1]
-    df_out.to_csv('embed_kPCA.log', sep=' ', index=False)
+    df_out.to_csv('%s_embed_kPCA.log' % properties[0], sep=' ', index=False)
 
 
 if __name__ == '__main__':

@@ -69,7 +69,7 @@ def main():
     embed = TSNE(n_components=2).fit_transform(D)
     df_out['embed_X'] = embed[:, 0]
     df_out['embed_Y'] = embed[:, 1]
-    df_out.to_csv('embed_tSNE.log', sep=' ', index=False)
+    df_out.to_csv('%s_embed_tSNE.log' % properties[0], sep=' ', index=False)
 
 
 if __name__ == '__main__':
