@@ -15,8 +15,16 @@ class MultipleKernel:
     def get_X_list(self, X):
         def f(c):
             return X[:, c]
+        X = self._format_X(X)
         X_list = list(map(f, self.composition))
         return X_list
+
+    @staticmethod
+    def _format_X(X):
+        if X.ndim == 1:
+            return X.reshape(1, X.size)  # .tolist()
+        else:
+            return X
 
     def __call__(self, X, Y=None, eval_gradient=False):
         X_list = self.get_X_list(X)
