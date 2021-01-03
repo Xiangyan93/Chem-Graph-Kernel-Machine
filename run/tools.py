@@ -337,7 +337,7 @@ def single2graph(args_kwargs):
         for g in df.groupby('group_id'):
             assert (len(g[1][sg].unique()) == 1)
             graphs.append(HashGraph.from_inchi_or_smiles(
-                g[1][sg].tolist()[0], rdkit_config(), g[0]))
+                g[1][sg].tolist()[0], rdkit_config(), str(g[0])))
             gids.append(g[0])
         idx = np.searchsorted(gids, df['group_id'])
         return np.asarray(graphs)[idx]
