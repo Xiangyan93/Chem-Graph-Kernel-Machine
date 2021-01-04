@@ -96,13 +96,12 @@ def set_gpc_learner(gpc):
 
 def set_gpr(gpr):
     if gpr == 'graphdot':
-        from chemml.regression.GPRgraphdot.gpr import GPR as GaussianProcessRegressor
+        from chemml.regression.GPRgraphdot.gpr import GPR
     elif gpr == 'sklearn':
-        from chemml.regression.GPRsklearn.gpr import RobustFitGaussianProcessRegressor as \
-            GaussianProcessRegressor
+        from chemml.regression.GPRsklearn.gpr import GPR
     else:
         raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
-    return GaussianProcessRegressor
+    return GPR
 
 
 def set_active_config(active_config):
@@ -260,7 +259,7 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
                           test_id, kernel_config, alpha=alpha,
                           optimizer=optimizer)
         learner.train()
-        learner.model.save(result_dir)
+        learner.model.save(result_dir, overwrite=True)
         learner.kernel_config.save(result_dir, learner.model)
         print('***\tEnd: hyperparameters optimization.\t***\n')
         out, r2, ex_var, mse, mae = learner.evaluate_train()

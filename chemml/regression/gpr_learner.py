@@ -35,7 +35,7 @@ class GPRLearner(BaseLearner):
 
         if n_most_similar is not None:
             if K is None:
-                K = self.kernel_(x, self.train_X)
+                K = self.model.kernel_(x, self.train_X)
             assert (K.shape == (len(x), len(self.train_X)))
             similar_info = []
             kindex = self.get_most_similar_graphs(K, n=n_most_similar)

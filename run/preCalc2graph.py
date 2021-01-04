@@ -75,13 +75,9 @@ def main():
         properties=properties,
     )
     # change group_id to graph
-    if args.gpr == 'graphdot':
-        idx = [X_.tolist().index(x.tolist()) for x in model._X]
-        model._X = X[idx, :]
-    elif args.gpr == 'sklearn':
-        idx = [X_.tolist().index(x.tolist()) for x in model.X_train_]
-        model.X_train_ = X[idx, :]
-    model.save(args.result_dir)
+    idx = [X_.tolist().index(x.tolist()) for x in model.X_train_]
+    model.X_train_ = X[idx, :]
+    model.save(args.result_dir, overwrite=True)
 
 
 if __name__ == '__main__':

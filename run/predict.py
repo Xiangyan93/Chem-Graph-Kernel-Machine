@@ -61,10 +61,7 @@ def main():
     df = get_df(args.input, None, kernel_config.single_graph, kernel_config.multi_graph, [])
     X, _, _ = get_XYid_from_df(df, kernel_config, properties=None)
     for i in range(len(kernel_config.single_graph)+len(kernel_config.multi_graph)):
-        if args.gpr == 'graphdot':
-            unify_datatype(X[:,i].ravel(), model._X[:,i].ravel())
-        elif args.gpr == 'sklearn':
-            unify_datatype(X[:, i].ravel(), model.X_train_[:, i].ravel())
+        unify_datatype(X[:, i].ravel(), model.X_train_[:, i].ravel())
     y, y_std = model.predict(X, return_std=True)
     df = pd.read_csv(args.input, sep='\s+')
     df['predict'] = y

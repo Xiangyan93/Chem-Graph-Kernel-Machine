@@ -16,13 +16,6 @@ class BaseLearner:
         self.optimizer = optimizer
         self.model = None
 
-    @property
-    def kernel_(self):
-        if hasattr(self.model, 'kernel_'):
-            return self.model.kernel_
-        else:
-            return self.model.kernel
-
     @staticmethod
     def get_most_similar_graphs(K, n=5):
         return np.argsort(-K)[:, :min(n, K.shape[1])]

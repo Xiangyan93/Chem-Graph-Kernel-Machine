@@ -16,4 +16,4 @@ class Learner(GPRLearner):
         if train_Y is None:
             train_Y = self.train_Y
         self.model.fit_loocv(train_X, train_Y, verbose=True, repeat=1)
-        print('hyperparameter: ', self.kernel_.hyperparameters)
+        print('hyperparameter: ', self.model.kernel_.hyperparameters)

@@ -4,6 +4,9 @@ This directory contains the executable files for GPR-NMGK.
 ## Single-Valued Property
 1. The datasets/critical-sim.txt contains the critical temperature and
 critical density of molecules obtained from molecular dynamics (MD) simulation.
+It is suggested to use a preCalc kernel as show in step 2-4. Use graph kernel
+directly will be 2-3 times slower due to repeated calculations, as shown in 
+step 5.
 
 2. Preparation
     - Transfer the SMILES or inchi into graph object.
@@ -45,7 +48,7 @@ critical density of molecules obtained from molecular dynamics (MD) simulation.
     - Prepare a file of molecules to be predicted formatted as datasets/predict.txt.
         the results are save in predict.csv.
         ```
-        python3 predict.py --result_dir tc --gpr sklearn -i datasets/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/tensorproduct-MSNMGK.json --f_model tc/model.pkl
+        python3 predict.py --result_dir tc --gpr graphdot -i datasets/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/tensorproduct-MSNMGK.json --f_model tc/model.pkl
         ```
 
 ## Temperature-Dependent Property

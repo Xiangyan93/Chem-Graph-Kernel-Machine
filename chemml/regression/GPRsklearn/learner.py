@@ -1,4 +1,4 @@
-from .gpr import RobustFitGaussianProcessRegressor as GPR
+from .gpr import GPR
 from ..gpr_learner import GPRLearner
 
 
@@ -15,5 +15,5 @@ class Learner(GPRLearner):
             train_X = self.train_X
         if train_Y is None:
             train_Y = self.train_Y
-        self.model.fit_robust(train_X, train_Y)
-        print('hyperparameter: ', self.kernel_.hyperparameters)
+        self.model.fit(train_X, train_Y)
+        print('hyperparameter: ', self.model.kernel_.hyperparameters)

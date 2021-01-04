@@ -1,36 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 import pickle
 from graphdot.model.gaussian_process.gpr import GaussianProcessRegressor
 
 
 class GPR(GaussianProcessRegressor):
-    def save(self, dir):
-        """Save the GaussianProcessRegressor: dir/model.pkl.
-
-        Parameters
-        ----------
-        dir: string
-            The directory of saved model.
-
-        """
-        f_model = os.path.join(dir, 'model.pkl')
-        store_dict = self.__dict__.copy()
-        store_dict['theta'] = self.kernel.theta
-        store_dict.pop('kernel', None)
-        pickle.dump(store_dict, open(f_model, 'wb'), protocol=4)
-
-    def load(self, dir):
-        """Load the GaussianProcessRegressor: dir/model.pkl.
-
-        Parameters
-        ----------
-        dir: string
-            The directory of saved model.
-
-        """
-        f_model = os.path.join(dir, 'model.pkl')
-        return self.load_cls(f_model, self.kernel)
-
     @classmethod
     def load_cls(cls, f_model, kernel):
         store_dict = pickle.load(open(f_model, 'rb'))
@@ -38,3 +13,16 @@ class GPR(GaussianProcessRegressor):
         model = cls(kernel)
         model.__dict__.update(**store_dict)
         return model
+
+    """sklearn GPR parameters"""
+    @property
+    def kernel_(self):
+        return self.kernel
+
+    @property
+    def X_train_(self):
+        return self._X
+
+    @X_train_.setter
+    def X_train_(self, value):
+        self._X = value
