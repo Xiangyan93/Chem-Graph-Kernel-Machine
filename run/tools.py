@@ -292,15 +292,17 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
         learner.model.save(result_dir, overwrite=True)
         kernel_config.save(result_dir, learner.model_)
         print('***\tEnd: hyperparameters optimization.\t***\n')
-        out, r2, ex_var, mae, rmse, mse = learner.evaluate_train()
-        print('Training set:')
-        print('score: %.5f' % r2)
-        print('explained variance score: %.5f' % ex_var)
-        print('mae: %.5f' % mae)
-        print('rmse: %.5f' % rmse)
-        print('mse: %.5f' % mse)
-        out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
-                   float_format='%15.10f')
+        predict_train = False
+        if predict_train:
+            out, r2, ex_var, mae, rmse, mse = learner.evaluate_train()
+            print('Training set:')
+            print('score: %.5f' % r2)
+            print('explained variance score: %.5f' % ex_var)
+            print('mae: %.5f' % mae)
+            print('rmse: %.5f' % rmse)
+            print('mse: %.5f' % mse)
+            out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
+                       float_format='%15.10f')
         out, r2, ex_var, mae, rmse, mse = learner.evaluate_test()
         print('Test set:')
         print('score: %.5f' % r2)
