@@ -304,7 +304,7 @@ class rdkit_config:
 
         # set ring information
         if self.set_ring_membership:
-            node['RingSize_list'] = self.ringlist_atom[atom.GetIdx()]
+            node['RingSize_list'] = np.asarray(self.ringlist_atom[atom.GetIdx()])
             node['RingSize_hash'] = self.get_list_hash(node['RingSize_list'])
             if self.ringlist_atom[atom.GetIdx()] == [0]:
                 node['Ring_count'] = 0
@@ -326,7 +326,7 @@ class rdkit_config:
         if self.set_ring_stereo:
             edge['RingStereo'] = 0.
         if self.set_ring_membership:
-            edge['RingSize_list'] = self.ringlist_bond[bond.GetIdx()]
+            edge['RingSize_list'] = np.asarray(self.ringlist_bond[bond.GetIdx()])
             edge['RingSize_hash'] = self.get_list_hash(edge['RingSize_list'])
             if self.ringlist_bond[bond.GetIdx()] == [0]:
                 edge['Ring_count'] = 0
@@ -337,8 +337,8 @@ class rdkit_config:
                              usehash=True, sum=True):
         if len(mol.GetAtoms()) == 1:
             for depth_ in range(1, depth+1):
-                graph.nodes[0][attribute + '_list_%i' % depth_] = [0]
-                graph.nodes[1][attribute + '_list_%i' % depth_] = [0]
+                graph.nodes[0][attribute + '_list_%i' % depth_] = np.asarray([0])
+                graph.nodes[1][attribute + '_list_%i' % depth_] = np.asarray([0])
                 if count:
                     graph.nodes[0][attribute + '_count_%i' % depth_] = 1
                     graph.nodes[1][attribute + '_count_%i' % depth_] = 1
@@ -355,10 +355,10 @@ class rdkit_config:
                 for depth_ in range(1, depth+1):
                     neighbors = AE.get_nth_neighbors(depth_)
                     if neighbors:
-                        graph.nodes[i][attribute + '_list_%i' % depth_] = [
-                            graph.nodes[a.GetIdx()][attribute] for a in neighbors]
+                        graph.nodes[i][attribute + '_list_%i' % depth_] = np.asarray([
+                            graph.nodes[a.GetIdx()][attribute] for a in neighbors])
                     else:
-                        graph.nodes[i][attribute + '_list_%i' % depth_] = [0]
+                        graph.nodes[i][attribute + '_list_%i' % depth_] = np.asarray([0])
                     if count:
                         graph.nodes[i][attribute + '_count_%i' % depth_] = \
                             len(graph.nodes[i][attribute + '_list_%i' % depth_])
@@ -396,7 +396,7 @@ def _from_rdkit(cls, mol, rdkit_config):
         if rdkit_config.set_ring_stereo:
             g.edges[ij]['RingStereo'] = 0.
         if rdkit_config.set_ring_membership:
-            g.edges[ij]['RingSize_list'] = [0]
+            g.edges[ij]['RingSize_list'] = np.asarray([0])
             g.edges[ij]['RingSize_hash'] = hash('0')
             g.edges[ij]['Ring_count'] = 0
     else:

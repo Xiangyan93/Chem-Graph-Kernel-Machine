@@ -1,9 +1,9 @@
-from chemml.baselearner import BaseLearner
+from chemml.base_learner import KernelLearner
 import pandas as pd
 import numpy as np
 
 
-class GPCLearner(BaseLearner):
+class GPCLearner(KernelLearner):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

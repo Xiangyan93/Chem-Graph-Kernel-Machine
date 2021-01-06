@@ -100,7 +100,7 @@ def main():
         print("model continued from checkpoint")
     else:
         # set optimizer
-        gpr, optimizer = set_gpr_optimizer(args.gpr)
+        gpr, optimizer = set_gpr_optimizer_consensus(args.gpr)
         # set Gaussian process regressor
         Learner = set_gpr_learner(gpr)
         # set train_test

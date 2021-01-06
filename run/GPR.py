@@ -44,6 +44,12 @@ def main():
         'examples: inchi:::tt\n'
     )
     parser.add_argument(
+        '--consensus_config', type=str, default=None,
+        help='Consensus model config.\n'
+        'format: n_estimators:n_sample_per_model:n_jobs:consensus_rule\n'
+        'examples: 100:2000:4:smallest_uncertainty\n'
+    )
+    parser.add_argument(
         '--add_features', type=str, default=None,
         help='Additional vector features with RBF kernel.\n' 
              'examples:\n'
@@ -77,16 +83,15 @@ def main():
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
     mode, train_size, train_ratio, seed, dynamic_train_size = \
         set_mode_train_size_ratio_seed(args.train_test_config)
-
-    # set Gaussian process regressor
-    Learner = set_gpr_learner(gpr)
-
     # set kernel_config
     kernel_config = set_kernel_config(
         kernel, add_f, add_p,
         single_graph, multi_graph, args.json_hyper,
         args.result_dir,
     )
+
+    # set Gaussian process regressor
+    model = set_gpr_model(gpr, kernel_config, optimizer, alpha)
 
     # read input
     params = {
@@ -114,9 +119,8 @@ def main():
     }
     gpr_params = {
         'mode': mode,
-        'optimizer': optimizer,
-        'alpha': alpha,
-        'Learner': Learner,
+        'model': model,
+        'consensus_config': args.consensus_config,
         'dynamic_train_size': dynamic_train_size
     }
     gpr_run(data, args.result_dir, kernel_config, gpr_params,

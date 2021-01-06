@@ -2,21 +2,20 @@
 # -*- coding: utf-8 -*-
 from sklearn.gaussian_process._gpr import *
 from sklearn.preprocessing import StandardScaler
-from numpy.linalg import eigh
 import pickle
 import os
-from chemml.solver import CholSolver
-from chemml.optimizer import (
-    ensemble,
-    sequential_threshold,
-    l1_regularization,
-)
 
 
 class GPR(GaussianProcessRegressor):
-    def __init__(self, y_scale=True, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, kernel=None, *, alpha=1e-10,
+                 optimizer="fmin_l_bfgs_b", n_restarts_optimizer=0,
+                 copy_X_train=True, random_state=None, y_scale=True):
+        super().__init__(kernel=kernel, alpha=alpha, optimizer=optimizer,
+                         n_restarts_optimizer=n_restarts_optimizer,
+                         normalize_y=False, copy_X_train=copy_X_train,
+                         random_state=random_state)
         self.y_scale = y_scale
+        self.kernel_ = clone(self.kernel)
 
     def fit(self, X, y):
         # scale y according to train y and save the scalar

@@ -1,79 +1,63 @@
-from chemml.baselearner import BaseLearner
+from chemml.base_learner import KernelRegressionBaseLearner
+from chemml.regression.consensus import ConsensusRegressor
+from chemml.regression.GPRgraphdot.gpr import GPR as GPRgraphdot
+from chemml.regression.GPRsklearn.gpr import GPR as GPRsklearn
 import numpy as np
-import pandas as pd
 import sys
-from sklearn.metrics import (
-    explained_variance_score,
-    mean_squared_error,
-    mean_absolute_error,
-    r2_score,
-)
 
 
-class GPRLearner(BaseLearner):
-    def __init__(self, *args, **kwargs):
-        self.alpha = kwargs['alpha']
-        kwargs.pop('alpha')
-        super().__init__(*args, **kwargs)
+class GPRLearner(KernelRegressionBaseLearner):
+    def train(self, train_X=None, train_y=None):
+        if train_X is None:
+            train_X = self.train_X
+        if train_y is None:
+            train_y = self.train_Y
+        if self.model.__class__ == ConsensusRegressor:
+            self.model.fit(train_X, train_y)
+        elif self.model.__class__ == GPRgraphdot:
+            self.model.fit(train_X, train_y, loss='loocv', verbose=True,
+                           repeat=1)
+            print('hyperparameter: ', self.model.kernel_.hyperparameters)
+        elif self.model.__class__ == GPRsklearn:
+            self.model.fit(train_X, train_y)
+            print('hyperparameter: ', self.model.kernel_.hyperparameters)
+        else:
+            raise RuntimeError(f'Unknown regressor {self.model}')
 
-    def evaluate_df(self, x, y, id, y_pred, y_std, alpha=None, K=None,
-                    n_most_similar=None):
-        r2 = r2_score(y, y_pred, multioutput='raw_values')
-        ex_var = explained_variance_score(y, y_pred, multioutput='raw_values')
-        mse = mean_squared_error(y, y_pred, multioutput='raw_values')
-        mae = mean_absolute_error(y, y_pred, multioutput='raw_values')
-        out = pd.DataFrame({
-            '#target': y,
-            'predict': y_pred,
-            'uncertainty': y_std,
-            'abs_dev': abs(y - y_pred),
-            # 'rel_dev': abs((y - y_pred) / y)
-        })
+    def evaluate_df__(self, *args, **kwargs):
+        y_std = kwargs.pop('y_std', None)
+        alpha = kwargs.pop('alpha', None)
+        df_out, r2, ex_var, mae, rmse, mse = self.evaluate_df_(*args, **kwargs)
+        if y_std is not None:
+            df_out.loc[:, 'uncertainty'] = y_std
         if alpha is not None:
-            out.loc[:, 'alpha'] = alpha
-        out.loc[:, 'id'] = id
-
-        if n_most_similar is not None:
-            if K is None:
-                K = self.model.kernel_(x, self.train_X)
-            assert (K.shape == (len(x), len(self.train_X)))
-            similar_info = []
-            kindex = self.get_most_similar_graphs(K, n=n_most_similar)
-            for i, index in enumerate(kindex):
-                def round5(x):
-                    return ',%.5f' % x
-                k = list(map(round5, K[i][index]))
-                id = list(map(str, self.train_id[index].tolist()))
-                info = ';'.join(list(map(str.__add__, id, k)))
-                similar_info.append(info)
-            out.loc[:, 'similar_mols'] = similar_info
-        return out.sort_values(by='abs_dev', ascending=False), \
-               r2, ex_var, mse, mae
+            df_out.loc[:, 'alpha'] = alpha
+        return df_out, r2, ex_var, mae, rmse, mse
 
     def evaluate_test(self, alpha=None):
         x = self.test_X
         y = self.test_Y
         y_pred, y_std = self.model.predict(x, return_std=True)
-        return self.evaluate_df(x, y, self.test_id, y_pred, y_std,
-                                alpha=alpha, n_most_similar=5)
+        return self.evaluate_df__(x, y, y_pred, self.test_id, y_std=y_std,
+                                  alpha=alpha, n_most_similar=5)
 
     def evaluate_train(self, alpha=None):
         x = self.train_X
         y = self.train_Y
         y_pred, y_std = self.model.predict(x, return_std=True)
-        return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
-                                alpha=alpha)
+        return self.evaluate_df__(x, y, y_pred, self.train_id, y_std=y_std,
+                                  alpha=alpha)
 
     def evaluate_loocv(self, alpha=None):
         x = self.train_X
         y = self.train_Y
         y_pred, y_std = self.model.predict_loocv(x, y, return_std=True)
-        return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
-                                alpha=alpha, n_most_similar=5)
+        return self.evaluate_df__(x, y, y_pred, self.train_id, y_std=y_std,
+                                  alpha=alpha, n_most_similar=5)
 
     def evaluate_test_dynamic(self, dynamic_train_size=500):
-        assert (self.optimizer is None)
-        K = self.kernel(self.test_X, self.train_X)
+        assert (self.model_.optimizer is None)
+        K = self.model_.kernel_(self.test_X, self.train_X)
         kindex = self.get_most_similar_graphs(K, n=dynamic_train_size)
         y_pred = []
         y_std = []
@@ -81,10 +65,10 @@ class GPRLearner(BaseLearner):
             sys.stdout.write('\r %i / %i' % (i, len(self.test_X)))
             tx = self.test_X[i:i+1]
             self.train(train_X=self.train_X[kindex[i]],
-                       train_Y=self.train_Y[kindex[i]])
+                       train_y=self.train_Y[kindex[i]])
             y_pred_, y_std_ = self.model.predict(tx, return_std=True)
             y_pred.append(y_pred_)
             y_std.append(y_std_)
-        return self.evaluate_df(self.test_X, self.test_Y, self.test_id,
-                                np.concatenate(y_pred), np.concatenate(y_std),
-                                K=K)
+        return self.evaluate_df__(
+            self.test_X, self.test_Y, np.concatenate(y_pred), self.test_id,
+            np.concatenate(y_std), K=K)

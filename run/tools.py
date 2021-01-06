@@ -5,6 +5,7 @@ from tqdm import tqdm
 tqdm.pandas()
 from rdkit import Chem
 from rdkit.Chem import rdChemReactions
+from chemml.regression.gpr_learner import GPRLearner
 from chemml.graph.hashgraph import HashGraph
 from chemml.graph.from_rdkit import rdkit_config
 from chemml.graph.substructure import AtomEnvironment
@@ -76,14 +77,22 @@ def set_mode_train_size_ratio_seed(train_test_config):
     return mode, train_size, train_ratio, seed, dynamic_train_size
 
 
-def set_gpr_learner(gpr):
+def set_gpr_model(gpr, kernel_config, optimizer, alpha):
     if gpr == 'graphdot':
-        from chemml.regression.GPRgraphdot.learner import Learner
+        from chemml.regression.GPRgraphdot.gpr import GPR
+        model = GPR(kernel=kernel_config.kernel,
+                    optimizer=optimizer,
+                    alpha=alpha,
+                    normalize_y=True)
     elif gpr == 'sklearn':
-        from chemml.regression.GPRsklearn.learner import Learner
+        from chemml.regression.GPRsklearn.gpr import GPR
+        model = GPR(kernel=kernel_config.kernel,
+                    optimizer=optimizer,
+                    alpha=alpha,
+                    y_scale=True)
     else:
         raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
-    return Learner
+    return model
 
 
 def set_gpc_learner(gpc):
@@ -103,6 +112,15 @@ def set_gpr(gpr):
         raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
     return GPR
 
+
+def set_consensus_config(consensus_config):
+    if consensus_config is None:
+        return False, 0, 0, 0, 0
+    else:
+        n_estimators, n_sample_per_model, n_jobs, consensus_rule = \
+            consensus_config.split(':')
+        return True, int(n_estimators), int(n_sample_per_model), int(n_jobs), \
+               consensus_rule
 
 def set_active_config(active_config):
     learning_mode, add_mode, init_size, add_size, max_size, search_size, \
@@ -209,10 +227,11 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
     test_X = data['test_X']
     test_Y = data['test_Y']
     test_id = data['test_id']
-    optimizer = params['optimizer']
     mode = params['mode']
-    alpha = params['alpha']
-    Learner = params['Learner']
+    model = params['model']
+    consensus_config = params['consensus_config']
+    consensus, n_estimators, n_sample_per_model, n_jobs, consensus_rule = \
+        set_consensus_config(consensus_config)
     dynamic_train_size = params['dynamic_train_size']
 
     # pre-calculate graph kernel matrix.
@@ -223,59 +242,72 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
 
     print('***\tStart: hyperparameters optimization.\t***')
     if mode == 'loocv':  # directly calculate the LOOCV
-        learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
-                          test_id, kernel_config, alpha=alpha,
-                          optimizer=optimizer)
+        learner = GPRLearner(
+            model, train_X, train_Y, train_id, test_X, test_Y, test_id,
+            consensus=consensus, n_estimators=n_estimators,
+            n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
+            consensus_rule=consensus_rule
+        )
         if load_model:
             print('loading existed model')
             learner.model.load(result_dir)
         else:
             learner.train()
             learner.model.save(result_dir)
-            learner.kernel_config.save(result_dir, learner.model)
-        out, r2, ex_var, mse, mae = learner.evaluate_loocv()
+            kernel_config.save(result_dir, learner.model_)
+        out, r2, ex_var, mae, rmse, mse = learner.evaluate_loocv()
         print('LOOCV:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
-        print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
+        print('rmse: %.5f' % rmse)
+        print('mse: %.5f' % mse)
         out.to_csv('%s/loocv.log' % result_dir, sep='\t', index=False,
                    float_format='%15.10f')
     elif mode == 'dynamic':
-        learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
-                          test_id, kernel_config, alpha=alpha,
-                          optimizer=optimizer)
-        out, r2, ex_var, mse, mae = learner.evaluate_test_dynamic(
+        learner = GPRLearner(
+            model, train_X, train_Y, train_id, test_X, test_Y, test_id,
+            consensus=consensus, n_estimators=n_estimators,
+            n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
+            consensus_rule=consensus_rule
+        )
+        out, r2, ex_var, mae, rmse, mse = learner.evaluate_test_dynamic(
             dynamic_train_size=dynamic_train_size)
         print('Test set:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
-        print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
+        print('rmse: %.5f' % rmse)
+        print('mse: %.5f' % mse)
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
     else:
-        learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
-                          test_id, kernel_config, alpha=alpha,
-                          optimizer=optimizer)
+        learner = GPRLearner(
+            model, train_X, train_Y, train_id, test_X, test_Y, test_id,
+            consensus=consensus, n_estimators=n_estimators,
+            n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
+            consensus_rule=consensus_rule
+        )
         learner.train()
         learner.model.save(result_dir, overwrite=True)
-        learner.kernel_config.save(result_dir, learner.model)
+        kernel_config.save(result_dir, learner.model_)
         print('***\tEnd: hyperparameters optimization.\t***\n')
-        out, r2, ex_var, mse, mae = learner.evaluate_train()
+        out, r2, ex_var, mae, rmse, mse = learner.evaluate_train()
         print('Training set:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
-        print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
+        print('rmse: %.5f' % rmse)
+        print('mse: %.5f' % mse)
         out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
-        out, r2, ex_var, mse, mae = learner.evaluate_test()
+        out, r2, ex_var, mae, rmse, mse = learner.evaluate_test()
         print('Test set:')
         print('score: %.5f' % r2)
         print('explained variance score: %.5f' % ex_var)
-        print('mse: %.5f' % mse)
         print('mae: %.5f' % mae)
+        print('rmse: %.5f' % rmse)
+        print('mse: %.5f' % mse)
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
 
