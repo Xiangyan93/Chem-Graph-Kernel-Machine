@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import math
 import threading
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
@@ -71,9 +72,29 @@ class ConsensusRegressor:
             for i, m in enumerate(models))
         self.models.extend(models)
 
-    def predict(self, *args, **kwargs):
+    def predict(self, X, return_std=False, memory_save=True,
+                n_memory_save=1000):
         if self.model.__class__ in [GPRgraphdot, GPRsklearn]:
-            return self.predict_gpr(*args, **kwargs)
+            if memory_save:
+                N = X.shape[0]
+                y_mean = np.array([])
+                y_std = np.array([])
+                for i in range(math.ceil(N / n_memory_save)):
+                    X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
+                    if return_std:
+                        y_mean_, y_std_ = self.predict_gpr(
+                            X_, return_std=True)
+                        y_std = np.r_[y_std, y_std_]
+                    else:
+                        y_mean_ = self.predict_gpr(
+                            X_, return_std=False)
+                    y_mean = np.r_[y_mean, y_mean_]
+                if return_std:
+                    return y_mean, y_std
+                else:
+                    return y_mean
+            else:
+                return self.predict_gpr( X, return_std=return_std)
         else:
             raise RuntimeError(
                 f'The regressor {self.model} are not supported for '
