@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import pandas as pd
 from chemml.regression.consensus import ConsensusRegressor
@@ -31,7 +32,7 @@ class RegressionBaseLearner(BaseLearner):
         consensus_rule = kwargs.pop('consensus_rule', None) or \
                          'smallest_uncertainty'
         super().__init__(*args, **kwargs)
-        if consensus:
+        if consensus and n_estimators != 1:
             self.model = ConsensusRegressor(
                 self.model_,
                 n_estimators=n_estimators,
@@ -39,6 +40,13 @@ class RegressionBaseLearner(BaseLearner):
                 n_jobs=n_jobs,
                 consensus_rule=consensus_rule
             )
+        elif n_estimators == 1:
+            self.model = self.model_
+            idx = np.random.choice(
+                len(self.train_X), n_sample_per_model, replace=True)
+            self.train_X = self.train_X[idx]
+            self.train_Y = self.train_Y[idx]
+            self.train_id = self.train_id[idx]
         else:
             self.model = self.model_
 
@@ -72,23 +80,37 @@ class ClassificationBaseLearner(BaseLearner):
 
 
 class KernelRegressionBaseLearner(RegressionBaseLearner):
-    def evaluate_df_(self, x, y, y_pred, id, K=None, n_most_similar=None):
+    def evaluate_df_(self, X, y, y_pred, id, n_most_similar=None,
+                     memory_save=True, n_memory_save=1000):
         df_out, r2, ex_var, mae, rmse, mse = self.evaluate_df(y, y_pred, id)
         if n_most_similar is not None:
-            if K is None:
-                K = self.model_.kernel_(x, self.train_X)
-            assert (K.shape == (len(x), len(self.train_X)))
-            similar_info = []
-            kindex = self.get_most_similar_graphs(K, n=n_most_similar)
-            for i, index in enumerate(kindex):
-                def round5(x):
-                    return ',%.5f' % x
-                k = list(map(round5, K[i][index]))
-                id = list(map(str, self.train_id[index].tolist()))
-                info = ';'.join(list(map(str.__add__, id, k)))
-                similar_info.append(info)
+            if memory_save:
+                similar_info = []
+                N = X.shape[0]
+                for i in range(math.ceil(N / n_memory_save)):
+                    X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
+                    similar_info.extend(
+                        self.get_similar_info(X_, n_most_similar))
+            else:
+                similar_info = self.get_similar_info(X, n_most_similar)
+
             df_out.loc[:, 'similar_mols'] = similar_info
         return df_out, r2, ex_var, mae, rmse, mse
+
+    def get_similar_info(self, X, n_most_similar):
+        K = self.model_.kernel_(X, self.train_X)
+        assert (K.shape == (len(X), len(self.train_X)))
+        similar_info = []
+        kindex = self.get_most_similar_graphs(K, n=n_most_similar)
+        for i, index in enumerate(kindex):
+            def round5(x):
+                return ',%.5f' % x
+
+            k = list(map(round5, K[i][index]))
+            id = list(map(str, self.train_id[index].tolist()))
+            info = ';'.join(list(map(str.__add__, id, k)))
+            similar_info.append(info)
+        return similar_info
 
     @staticmethod
     def get_most_similar_graphs(K, n=5):
