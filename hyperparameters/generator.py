@@ -64,14 +64,14 @@ class HyperJsonGenerator:
                 #    ['kDelta', self.k, self.k_bounds]],
                 #'atom_AtomicNumber_count_4': [
                     #['kDelta', self.k, self.k_bounds]],
-                # 'atom_Chiral': [['kDelta', self.k, self.k_bounds]],
+                'atom_Chiral': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Hybridization': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Aromatic': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Charge': [['kDelta', self.k, self.k_bounds]],
                 # 'bond_Aromatic': [['kDelta', self.k, self.k_bounds]],
-                # 'bond_Stereo': [['kDelta', self.k, self.k_bounds]],
+                'bond_Stereo': [['kDelta', self.k, self.k_bounds]],
                 # 'bond_Conjugated': [['kDelta', self.k, self.k_bounds]],
-                # 'bond_RingStereo': [['kDelta', self.k, self.k_bounds]],
+                'bond_RingStereo': [['kDelta', self.k, self.k_bounds]],
 
                 'atom_Hcount_sum_1': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Hcount_sum_2': [['kDelta', self.k, self.k_bounds]],
