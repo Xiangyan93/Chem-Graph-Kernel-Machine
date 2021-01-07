@@ -7,16 +7,17 @@ from graphdot.model.gaussian_process.gpr import GaussianProcessRegressor
 
 
 class GPR(GaussianProcessRegressor):
-    def predict(self, X, return_std=False, return_cov=False, memory_save=True):
+    def predict(self, X, return_std=False, return_cov=False, memory_save=True,
+                n_memory_save=1000):
         if return_cov or not memory_save:
             return super().predict(X, return_std=return_std,
-                                 return_cov=return_cov)
+                                   return_cov=return_cov)
         else:
             N = X.shape[0]
             y_mean = np.array([])
             y_std = np.array([])
-            for i in range(math.ceil(N / 1000)):
-                X_ = X[i * 1000:(i + 1) * 1000]
+            for i in range(math.ceil(N / n_memory_save)):
+                X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
                 if return_std:
                     y_mean_, y_std_ = super().predict(
                         X_, return_std=return_std, return_cov=return_cov)
