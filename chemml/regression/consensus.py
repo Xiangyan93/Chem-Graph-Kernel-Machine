@@ -65,7 +65,7 @@ class ConsensusRegressor:
     def fit(self, X, y):
         models = [copy.copy(self.model) for i in range(self.n_estimators)]
         models = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
-                          **_joblib_parallel_args(prefer='threads'))(
+                          **_joblib_parallel_args(require="sharedmem"))(
             delayed(_parallel_build_models)(
                 m, self, X, y, i, len(models), verbose=self.verbose)
             for i, m in enumerate(models))
