@@ -4,6 +4,7 @@ from sklearn.gaussian_process._gpr import *
 from sklearn.preprocessing import StandardScaler
 import pickle
 import os
+import math
 
 
 class GPR(GaussianProcessRegressor):
@@ -26,41 +27,11 @@ class GPR(GaussianProcessRegressor):
             super().fit(X, y)
         return self
 
-    def predict(self, X, return_std=False, return_cov=False):
+    def predict_(self, X, return_std=False, return_cov=False):
         """Predict using the Gaussian process regression model
-
-        We can also predict based on an unfitted model by using the GP prior.
-        In addition to the mean of the predictive distribution, also its
-        standard deviation (return_std=True) or covariance (return_cov=True).
-        Note that at most one of the two can be requested.
-
-        Parameters
-        ----------
-        X : sequence of length n_samples
-            Query points where the GP is evaluated.
-            Could either be array-like with shape = (n_samples, n_features)
-            or a list of objects.
-
-        return_std : bool, default: False
-            If True, the standard-deviation of the predictive distribution at
-            the query points is returned along with the mean.
-
-        return_cov : bool, default: False
-            If True, the covariance of the joint predictive distribution at
-            the query points is returned along with the mean
-
-        Returns
-        -------
-        y_mean : array, shape = (n_samples, [n_output_dims])
-            Mean of predictive distribution a query points
-
-        y_std : array, shape = (n_samples,), optional
-            Standard deviation of predictive distribution at query points.
-            Only returned when return_std is True.
-
-        y_cov : array, shape = (n_samples, n_samples), optional
-            Covariance of joint predictive distribution a query points.
-            Only returned when return_cov is True.
+        This is copy from sklearn.gaussian_process.GaussianProcessRegressor
+        .predict, but the data validation part is removed since it is designed
+        for vector input
         """
         if return_std and return_cov:
             raise RuntimeError(
@@ -114,6 +85,29 @@ class GPR(GaussianProcessRegressor):
                                   "Setting those variances to 0.")
                     y_var[y_var_negative] = 0.0
                 return y_mean, np.sqrt(y_var)
+            else:
+                return y_mean
+
+    def predict(self, X, return_std=False, return_cov=False, memory_save=True):
+        if return_cov or not memory_save:
+            return self.predict_(X, return_std=return_std,
+                                 return_cov=return_cov)
+        else:
+            N = X.shape[0]
+            y_mean = np.array([])
+            y_std = np.array([])
+            for i in range(math.ceil(N / 1000)):
+                X_ = X[i * 1000:(i + 1) * 1000]
+                if return_std:
+                    y_mean_, y_std_ = self.predict_(
+                        X_, return_std=return_std, return_cov=return_cov)
+                    y_std = np.r_[y_std, y_std_]
+                else:
+                    y_mean_ = self.predict_(
+                        X_, return_std=return_std, return_cov=return_cov)
+                y_mean = np.r_[y_mean, y_mean_]
+            if return_std:
+                return y_mean, y_std
             else:
                 return y_mean
 
