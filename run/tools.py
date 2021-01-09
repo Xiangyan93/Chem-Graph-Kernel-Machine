@@ -472,7 +472,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
         df_parts = np.array_split(df, n_process)
         # transform single graph
         for sg in single_graph:
-            print('Processing single graph.')
+            print('Transforming molecules into graphs. (pure compounds)')
             with Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     single2graph, [(df_part, sg) for df_part in df_parts])
@@ -480,7 +480,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
             unify_datatype(df[sg])
         # transform multi graph
         for mg in multi_graph:
-            print('Processing multi graph.')
+            print('Transforming molecules into graphs. (mixtures)')
             with Pool(processes=n_process) as pool:
                 result_parts = pool.map(
                     multi2graph, [(df_part, mg) for df_part in df_parts])
@@ -488,11 +488,11 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
             unify_datatype(df[mg])
         # transform reaction graph
         for rg in reaction_graph:
-            print('Processing reagents graph.')
+            print('Transforming reagents into graphs.')
             df[rg + '_agents'] = df.progress_apply(
                 lambda x: reaction2agent(x[rg], str(x['group_id'])), axis=1)
             unify_datatype(df[rg + '_agents'])
-            print('Processing reactions graph.')
+            print('Transforming chemical reactions into graphs.')
             df[rg] = df.progress_apply(
                 lambda x: reaction2rp(x[rg], str(x['group_id'])), axis=1)
             unify_datatype(df[rg])

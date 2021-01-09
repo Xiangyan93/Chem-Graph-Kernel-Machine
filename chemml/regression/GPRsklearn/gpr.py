@@ -18,13 +18,14 @@ class GPR(GaussianProcessRegressor):
         self.y_scale = y_scale
         self.kernel_ = clone(self.kernel)
 
-    def fit(self, X, y):
+    def fit(self, X, y, id=None):
         # scale y according to train y and save the scalar
         if self.y_scale:
             self.scaler = StandardScaler().fit(y.reshape(-1, 1))
             super().fit(X, self.scaler.transform(y.reshape(-1, 1)).ravel())
         else:
             super().fit(X, y)
+        self.X_id_ = id
         return self
 
     def predict_(self, X, return_std=False, return_cov=False):

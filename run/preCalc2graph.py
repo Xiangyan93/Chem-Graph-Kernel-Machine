@@ -58,7 +58,7 @@ def main():
     # read input file
     df = get_df(None, os.path.join(args.result_dir, '%s.pkl' % ','.join(properties)),
                 kernel_config.single_graph, kernel_config.multi_graph, [])
-    X, Y, id = get_XYid_from_df(
+    X, y, id = get_XYid_from_df(
         df,
         kernel_config,
         properties=properties,
@@ -69,13 +69,16 @@ def main():
         single_graph, multi_graph, args.json_hyper,
         args.result_dir,
     )
-    X_, Y, id = get_XYid_from_df(
+    _, y_, id_ = get_XYid_from_df(
         df,
         kernel_config_,
         properties=properties,
     )
     # change group_id to graph
-    idx = [X_.tolist().index(x.tolist()) for x in model.X_train_]
+    assert (np.array_equal(np.sort(id), id))
+    assert (np.array_equal(id, id_))
+    assert (np.array_equal(y, y_))
+    idx = np.searchsorted(id, model.X_id_)
     model.X_train_ = X[idx, :]
     model.save(args.result_dir, overwrite=True)
 

@@ -7,19 +7,21 @@ import sys
 
 
 class GPRLearner(KernelRegressionBaseLearner):
-    def train(self, train_X=None, train_y=None):
+    def train(self, train_X=None, train_y=None, train_id=None):
         if train_X is None:
             train_X = self.train_X
         if train_y is None:
             train_y = self.train_Y
+        if train_id is None:
+            train_id = self.train_id
         if self.model.__class__ == ConsensusRegressor:
-            self.model.fit(train_X, train_y)
+            self.model.fit(train_X, train_y, train_id)
         elif self.model.__class__ == GPRgraphdot:
-            self.model.fit(train_X, train_y, loss='loocv', verbose=True,
-                           repeat=1)
+            self.model.fit(train_X, train_y, id=train_id, loss='loocv',
+                           verbose=True, repeat=1)
             print('hyperparameter: ', self.model.kernel_.hyperparameters)
         elif self.model.__class__ == GPRsklearn:
-            self.model.fit(train_X, train_y)
+            self.model.fit(train_X, train_y, id=train_id)
             print('hyperparameter: ', self.model.kernel_.hyperparameters)
         else:
             raise RuntimeError(f'Unknown regressor {self.model}')

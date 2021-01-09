@@ -8,7 +8,7 @@ from chemml.regression.GPRgraphdot.gpr import GPR as GPRgraphdot
 from chemml.regression.GPRsklearn.gpr import GPR as GPRsklearn
 
 
-def _parallel_build_models(model, models, X, y, model_idx, n_models,
+def _parallel_build_models(model, models, X, y, id, model_idx, n_models,
                            verbose=0):
     """
     Private function used to fit a consensus model in parallel."""
@@ -18,9 +18,9 @@ def _parallel_build_models(model, models, X, y, model_idx, n_models,
     idx = np.random.choice(np.arange(len(X)), models.n_sample_per_model,
                            replace=False)
     if X.ndim == 1:
-        model.fit(X[idx], y[idx])
+        model.fit(X[idx], y[idx], id=id[idx])
     elif X.ndim == 2:
-        model.fit(X[idx, :], y[idx])
+        model.fit(X[idx, :], y[idx], id=id[idx])
     else:
         raise RuntimeError(
             'X must be 1 or 2 dimensional'
@@ -63,12 +63,12 @@ class ConsensusRegressor:
         self.consensus_rule = consensus_rule
         assert (n_estimators > 0)
 
-    def fit(self, X, y):
+    def fit(self, X, y, id):
         models = [copy.copy(self.model) for i in range(self.n_estimators)]
         models = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                           **_joblib_parallel_args(require="sharedmem"))(
             delayed(_parallel_build_models)(
-                m, self, X, y, i, len(models), verbose=self.verbose)
+                m, self, X, y, id, i, len(models), verbose=self.verbose)
             for i, m in enumerate(models))
         self.models.extend(models)
 

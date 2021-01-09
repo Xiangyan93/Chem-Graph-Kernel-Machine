@@ -7,6 +7,10 @@ from graphdot.model.gaussian_process.gpr import GaussianProcessRegressor
 
 
 class GPR(GaussianProcessRegressor):
+    def fit(self, *args, **kwargs):
+        self.X_id_ = kwargs.pop('id', None)
+        return super().fit(*args, **kwargs)
+
     def predict_(self, Z, return_std=False, return_cov=False):
         """Predict using the trained GPR model.
 
