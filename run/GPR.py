@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
 import sys
@@ -99,7 +99,7 @@ def main():
         'train_ratio': train_ratio,
         'seed': seed,
     }
-    if mode == 'loocv' or mode == 'lomocv':
+    if mode == 'loocv' or mode == 'lomocv' or mode == 'all':
         params['train_size'] = None
         params['train_ratio'] = 1.0
     df, df_train, df_test, train_X, train_Y, train_id, test_X, test_Y, \

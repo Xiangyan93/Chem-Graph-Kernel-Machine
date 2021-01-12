@@ -281,7 +281,7 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
         print('mse: %.5f' % mse)
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
-    else:
+    elif mode == 'train_test':
         learner = GPRLearner(
             model, train_X, train_Y, train_id, test_X, test_Y, test_id,
             consensus=consensus, n_estimators=n_estimators,
@@ -312,7 +312,19 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
         print('mse: %.5f' % mse)
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
-
+    elif mode == 'all':
+        learner = GPRLearner(
+            model, train_X, train_Y, train_id, test_X, test_Y, test_id,
+            consensus=consensus, n_estimators=n_estimators,
+            n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
+            consensus_rule=consensus_rule
+        )
+        learner.train()
+        learner.model.save(result_dir, overwrite=True)
+        kernel_config.save(result_dir, learner.model_)
+        print('***\tEnd: hyperparameters optimization.\t***\n')
+    else:
+        raise RuntimeError(f'Unknown mode{mode}')
 
 def gpc_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
     df = data['df']
