@@ -1,6 +1,7 @@
 from chemml.base_learner import KernelRegressionBaseLearner
 from chemml.regression.consensus import ConsensusRegressor
 from chemml.regression.GPRgraphdot.gpr import GPR as GPRgraphdot
+from chemml.regression.GPRgraphdot.gpr import LRAGPR
 from chemml.regression.GPRsklearn.gpr import GPR as GPRsklearn
 import numpy as np
 import sys
@@ -17,11 +18,22 @@ class GPRLearner(KernelRegressionBaseLearner):
         if self.model.__class__ == ConsensusRegressor:
             self.model.fit(train_X, train_y, train_id)
         elif self.model.__class__ == GPRgraphdot:
-            self.model.fit(train_X, train_y, id=train_id, loss='loocv',
+            self.model.fit(train_X, train_y, loss='loocv',
                            verbose=True, repeat=1)
+            self.model.X_id_ = train_id
+            print('hyperparameter: ', self.model.kernel_.hyperparameters)
+        elif self.model.__class__ == LRAGPR:
+            idx = np.random.choice(
+                len(train_X), self.n_nystrom_core, replace=True)
+            C = train_X[idx]
+            self.model.fit(C, train_X, train_y, loss='loocv',
+                           verbose=True, repeat=1)
+            self.model.X_id_ = train_id
+            self.model.C_id_ = train_id[idx]
             print('hyperparameter: ', self.model.kernel_.hyperparameters)
         elif self.model.__class__ == GPRsklearn:
-            self.model.fit(train_X, train_y, id=train_id)
+            self.model.fit(train_X, train_y)
+            self.model.X_id_ = train_id
             print('hyperparameter: ', self.model.kernel_.hyperparameters)
         else:
             raise RuntimeError(f'Unknown regressor {self.model}')

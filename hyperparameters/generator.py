@@ -43,7 +43,7 @@ class HyperJsonGenerator:
                 'atom_AtomicNumber_list_2': [['kConv', self.k, self.k_bounds]],
                 'atom_AtomicNumber_list_3': [['kConv', self.k, self.k_bounds]],
                 'atom_AtomicNumber_list_4': [['kConv', self.k, self.k_bounds]],
-                'atom_AtomicNumber_list_5': [['kConv', self.k, self.k_bounds]],
+                # 'atom_AtomicNumber_list_5': [['kConv', self.k, self.k_bounds]],
                 # 'atom_AtomicNumber_list_6': [['kConv', self.k, self.k_bounds]],
                 #'atom_AtomicNumber_hash_1': [['kDelta', self.k, self.k_bounds]],
                 #'atom_AtomicNumber_hash_2': [['kDelta', self.k, self.k_bounds]],
@@ -73,7 +73,7 @@ class HyperJsonGenerator:
                 # 'bond_Conjugated': [['kDelta', self.k, self.k_bounds]],
                 'bond_RingStereo': [['kDelta', self.k, self.k_bounds]],
 
-                'atom_Hcount_sum_1': [['kDelta', self.k, self.k_bounds]],
+                # 'atom_Hcount_sum_1': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Hcount_sum_2': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Hcount_sum_3': [['kDelta', self.k, self.k_bounds]],
                 # 'atom_Hcount_hash_4': [['kDelta', self.k, self.k_bounds]],

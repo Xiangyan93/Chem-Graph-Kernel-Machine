@@ -2,6 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 from chemml.regression.consensus import ConsensusRegressor
+from chemml.regression.GPRgraphdot.gpr import LRAGPR
 from sklearn.metrics import (
     explained_variance_score,
     mean_squared_error,
@@ -31,7 +32,10 @@ class RegressionBaseLearner(BaseLearner):
         n_jobs = kwargs.pop('n_jobs', None) or 1
         consensus_rule = kwargs.pop('consensus_rule', None) or \
                          'smallest_uncertainty'
+        self.n_nystrom_core = kwargs.pop('n_nystrom_core', None) or 0
         super().__init__(*args, **kwargs)
+        if self.model_.__class__ == LRAGPR:
+            assert (not consensus)
         if consensus and n_estimators != 1:
             self.model = ConsensusRegressor(
                 self.model_,

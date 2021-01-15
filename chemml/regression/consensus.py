@@ -18,13 +18,14 @@ def _parallel_build_models(model, models, X, y, id, model_idx, n_models,
     idx = np.random.choice(np.arange(len(X)), models.n_sample_per_model,
                            replace=False)
     if X.ndim == 1:
-        model.fit(X[idx], y[idx], id=id[idx])
+        model.fit(X[idx], y[idx])
     elif X.ndim == 2:
-        model.fit(X[idx, :], y[idx], id=id[idx])
+        model.fit(X[idx, :], y[idx])
     else:
         raise RuntimeError(
             'X must be 1 or 2 dimensional'
         )
+    model.X_id_ = id[idx]
     return model
 
 
@@ -141,5 +142,11 @@ class ConsensusRegressor:
             m.save(path, filename='model_%d.pkl' % i, overwrite=overwrite)
 
     def load(self, path):
-        for i, m in enumerate(self.models):
+        models = [copy.copy(self.model) for i in range(self.n_estimators)]
+        for i, m in enumerate(models):
             m.load(path, filename='model_%d.pkl' % i)
+        self.models = models
+
+    @property
+    def X_train_(self):
+        return np.concatenate([m.X_train_ for m in self.models])

@@ -24,7 +24,7 @@ def main():
              'examples:\n'
              'graphdot:L-BFGS-B\n'
              'sklearn:fmin_l_bfgs_b\n'
-             'graphdot:None'
+             'graphdot_nystrom:None'
     )
     parser.add_argument(
         '--kernel', type=str,
@@ -41,19 +41,13 @@ def main():
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
         'format: single_graph:multi_graph:reaction_graph:targets\n'
-        'examples: inchi:::tt\n'
-    )
-    parser.add_argument(
-        '--consensus_config', type=str, default=None,
-        help='Consensus model config.\n'
-        'format: n_estimators:n_sample_per_model:n_jobs:consensus_rule\n'
-        'examples: 100:2000:4:smallest_uncertainty\n'
+        'examples: inchi:::tc\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
         help='Additional vector features with RBF kernel.\n' 
              'examples:\n'
-             'red_T:0.1\n'
+             'Tred:0.1\n'
              'T,P:100,500'
     )
     parser.add_argument(
@@ -71,7 +65,20 @@ def main():
     )
     parser.add_argument(
         '--load_model', action='store_true',
-        help='read existed model.pkl',
+        help='read existed model file',
+    )
+    parser.add_argument(
+        '--consensus_config', type=str, default=None,
+        help='Need to be set if consensus model is used.\n'
+        'format: n_estimators:n_sample_per_model:n_jobs:consensus_rule\n'
+        'examples: 100:2000:4:smallest_uncertainty\n'
+        'examples: 100:2000:4:weight_uncertainty\n'
+    )
+    parser.add_argument(
+        '--nystrom_config', type=str, default='0',
+        help='Need to be set if Nystrom approximation is used.\n'
+        'format: n_sample_core\n'
+        'examples: 2000\n'
     )
     args = parser.parse_args()
 
@@ -121,6 +128,7 @@ def main():
         'mode': mode,
         'model': model,
         'consensus_config': args.consensus_config,
+        'nystrom_config': args.nystrom_config,
         'dynamic_train_size': dynamic_train_size
     }
     gpr_run(data, args.result_dir, kernel_config, gpr_params,

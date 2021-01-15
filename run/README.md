@@ -43,12 +43,12 @@ step 5.
 6. Prediction
     - Convert the model from preCalc kernel to graph kernel.
         ```
-        python3 preCalc2graph.py --result_dir tc --gpr graphdot --input_config SMILES:::tc --json_hyper ../hyperparameters/hyper1.json
+        python3 preCalc2graph.py --result_dir tc --gpr graphdot:none --input_config SMILES:::tc --json_hyper ../hyperparameters/hyper1.json
         ```
     - Prepare a file of molecules to be predicted formatted as datasets/predict.txt.
         the results are save in predict.csv.
         ```
-        python3 predict.py --result_dir tc --gpr graphdot -i datasets/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model tc/model.pkl
+        python3 predict.py --result_dir tc --gpr graphdot:none -i datasets/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model tc/model.pkl
         ```
 
 ## Temperature-Dependent Property
@@ -77,10 +77,25 @@ dependent on temperature.
 6. Prediction
     - Convert the model from preCalc kernel to graph kernel.
         ```
-        python3 preCalc2graph.py --result_dir st --gpr graphdot --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
+        python3 preCalc2graph.py --result_dir st --gpr graphdot:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
         ```
     - Prepare a file of molecules to be predicted formatted as datasets/predict_T.txt.
         the results are save in predict.csv.
         ```
-        python3 predict.py --result_dir st --gpr graphdot -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
+        python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
+        ```
+
+7. Low Rank approximation
+    - Use Nystrom low rank approximation
+        ```
+        python3 GPR.py --result_dir st --gpr graphdot_nystrom:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100 --nystrom_config 1000
+        python3 preCalc2graph.py --result_dir st --gpr graphdot_nystrom:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
+        python3 predict.py --result_dir st --gpr graphdot_nystrom:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
+        ```
+8. Consensus model
+    - Use consensus model
+        ```
+        python3 GPR.py --result_dir st --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100 --consensus_config 10:1000:10:weight_uncertainty
+        python3 preCalc2graph.py --result_dir st --gpr graphdot:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100 --consensus_config 10:1000:10:weight_uncertainty
+        python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100 --consensus_config 10:1000:1:weight_uncertainty
         ```

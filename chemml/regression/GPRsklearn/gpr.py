@@ -18,14 +18,13 @@ class GPR(GaussianProcessRegressor):
         self.y_scale = y_scale
         self.kernel_ = clone(self.kernel)
 
-    def fit(self, X, y, id=None):
+    def fit(self, X, y):
         # scale y according to train y and save the scalar
         if self.y_scale:
             self.scaler = StandardScaler().fit(y.reshape(-1, 1))
             super().fit(X, self.scaler.transform(y.reshape(-1, 1)).ravel())
         else:
             super().fit(X, y)
-        self.X_id_ = id
         return self
 
     def predict_(self, X, return_std=False, return_cov=False):
@@ -175,7 +174,12 @@ class GPR(GaussianProcessRegressor):
             The file name for the saved model.
         """
         f_model = os.path.join(path, filename)
-        return self.load_cls(f_model, self.kernel)
+        store = pickle.load(open(f_model, 'rb'))
+        theta = store.pop('theta')
+        theta_ = store.pop('theta_')
+        self.__dict__.update(**store)
+        self.kernel.theta = theta
+        self.kernel_.theta = theta_
 
     @classmethod
     def load_cls(cls, f_model, kernel):

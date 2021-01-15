@@ -6,6 +6,8 @@ tqdm.pandas()
 from rdkit import Chem
 from rdkit.Chem import rdChemReactions
 from chemml.regression.gpr_learner import GPRLearner
+from chemml.regression.consensus import ConsensusRegressor
+from chemml.regression.GPRgraphdot.gpr import LRAGPR
 from chemml.graph.hashgraph import HashGraph
 from chemml.graph.from_rdkit import rdkit_config
 from chemml.graph.substructure import AtomEnvironment
@@ -30,11 +32,9 @@ def set_block_config(block_config):
 
 def set_gpr_optimizer(gpr):
     gpr, optimizer = gpr.split(':')
-    assert (gpr in ['graphdot', 'sklearn'])
+    assert (gpr in ['graphdot', 'sklearn', 'graphdot_nystrom'])
     if optimizer in ['None', 'none', '']:
         return gpr, None
-    if gpr == 'graphdot' and optimizer != 'L-BFGS-B':
-        raise Exception('Please use L-BFGS-B optimizer')
     return gpr, optimizer
 
 
@@ -90,6 +90,13 @@ def set_gpr_model(gpr, kernel_config, optimizer, alpha):
                     optimizer=optimizer,
                     alpha=alpha,
                     y_scale=True)
+    elif gpr == 'graphdot_nystrom':
+        from chemml.regression.GPRgraphdot.gpr import LRAGPR
+        model = LRAGPR(
+            kernel=kernel_config.kernel,
+            optimizer=optimizer,
+            alpha=alpha,
+            normalize_y=True)
     else:
         raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
     return model
@@ -232,6 +239,7 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
     consensus_config = params['consensus_config']
     consensus, n_estimators, n_sample_per_model, n_jobs, consensus_rule = \
         set_consensus_config(consensus_config)
+    n_nystrom_core = int(params['nystrom_config'])
     dynamic_train_size = params['dynamic_train_size']
 
     # pre-calculate graph kernel matrix.
@@ -246,7 +254,8 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
             model, train_X, train_Y, train_id, test_X, test_Y, test_id,
             consensus=consensus, n_estimators=n_estimators,
             n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
-            consensus_rule=consensus_rule
+            consensus_rule=consensus_rule,
+            n_nystrom_core=n_nystrom_core
         )
         if load_model:
             print('loading existed model')
@@ -269,7 +278,8 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
             model, train_X, train_Y, train_id, test_X, test_Y, test_id,
             consensus=consensus, n_estimators=n_estimators,
             n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
-            consensus_rule=consensus_rule
+            consensus_rule=consensus_rule,
+            n_nystrom_core=n_nystrom_core
         )
         out, r2, ex_var, mae, rmse, mse = learner.evaluate_test_dynamic(
             dynamic_train_size=dynamic_train_size)
@@ -286,7 +296,8 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
             model, train_X, train_Y, train_id, test_X, test_Y, test_id,
             consensus=consensus, n_estimators=n_estimators,
             n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
-            consensus_rule=consensus_rule
+            consensus_rule=consensus_rule,
+            n_nystrom_core=n_nystrom_core
         )
         learner.train()
         learner.model.save(result_dir, overwrite=True)
@@ -317,7 +328,8 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
             model, train_X, train_Y, train_id, test_X, test_Y, test_id,
             consensus=consensus, n_estimators=n_estimators,
             n_sample_per_model=n_sample_per_model, n_jobs=n_jobs,
-            consensus_rule=consensus_rule
+            consensus_rule=consensus_rule,
+            n_nystrom_core=n_nystrom_core
         )
         learner.train()
         learner.model.save(result_dir, overwrite=True)
