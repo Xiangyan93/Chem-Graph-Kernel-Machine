@@ -32,8 +32,28 @@ def _predict(predict, X, return_std=False, return_cov=False, memory_save=True,
 
 
 class GPR(GaussianProcessRegressor):
+    def predict_(self, Z, return_std=False, return_cov=False):
+        if not hasattr(self, 'Kinv'):
+            raise RuntimeError('Model not trained.')
+        Ks = self._gramian(Z, self.X)
+        ymean = (Ks @ self.Ky) * self.y_std + self.y_mean
+        if return_std is True:
+            Kss = self._gramian(Z, diag=True)
+            Kss.flat[::len(Kss) + 1] -= self.alpha
+            std = np.sqrt(
+                np.maximum(0, Kss - (Ks @ (self.Kinv @ Ks.T)).diagonal())
+            )
+            return (ymean, std)
+        elif return_cov is True:
+            Kss = self._gramian(Z)
+            Kss.flat[::len(Kss) + 1] -= self.alpha
+            cov = np.maximum(0, Kss - Ks @ (self.Kinv @ Ks.T))
+            return (ymean, cov)
+        else:
+            return ymean
+
     def predict(self, X, return_std=False, return_cov=False):
-        return _predict(super().predict, X, return_std=return_std,
+        return _predict(self.predict_, X, return_std=return_std,
                         return_cov=return_cov)
 
     @classmethod
@@ -92,7 +112,6 @@ class LRAGPR(GPR):
         kernel to data.
     """
     def fit(self, *args, **kwargs):
-
         return self.fit(*args, **kwargs)
 
     @property
@@ -205,89 +224,6 @@ class LRAGPR(GPR):
         self.Ky = self.Kinv @ self.y
 
         return self
-
-    # def fit_loocv(self, X, y, return_mean=False, return_std=False,
-    #               tol=1e-4, repeat=1, theta_jitter=1.0, verbose=False):
-    #     """Train a GPR model and return the leave-one-out cross validation
-    #     results on the dataset. If the `optimizer` argument was set while
-    #     initializing the GPR object, the hyperparameters of the kernel will be
-    #     optimized with regard to the LOOCV RMSE.
-
-    #     Parameters
-    #     ----------
-    #     X: list of objects or feature vectors.
-    #         Input values of the training data.
-    #     y: 1D array
-    #         Output/target values of the training data.
-    #     return_mean: boolean
-    #         If True, the leave-one-out predictive mean of the model on the
-    #         training data are returned along with the model.
-    #     return_std: boolean
-    #         If True, the leave-one-out predictive standard deviations of the
-    #         model on the training data are returned along with the model.
-    #     tol: float
-    #         Tolerance for termination.
-    #     repeat: int
-    #         Repeat the hyperparameter optimization by the specified number of
-    #         times and return the best result.
-    #     theta_jitter: float
-    #         Standard deviation of the random noise added to the initial
-    #         logscale hyperparameters across repeated optimization runs.
-    #     verbose: bool
-    #         Whether or not to print out the optimization progress and outcome.
-
-    #     Returns
-    #     -------
-    #     self: GaussianProcessRegressor
-    #         returns an instance of self.
-    #     ymean: 1D array, only if return_mean is True
-    #         Mean of the leave-one-out predictive distribution at query points.
-    #     std: 1D array, only if return_std is True
-    #         Standard deviation of the leave-one-out predictive distribution.
-    #     """
-    #     self.X = X
-    #     self.y = y
-
-    #     '''hyperparameter optimization'''
-    #     if self.optimizer:
-    #         opt = self._hyper_opt(
-    #             lambda theta, self=self: self.squared_loocv_error(
-    #                 theta, eval_gradient=True, clone_kernel=False,
-    #                 verbose=verbose
-    #             ),
-    #             self.kernel.theta.copy(),
-    #             tol, repeat, theta_jitter, verbose
-    #         )
-    #         if verbose:
-    #             print(f'Optimization result:\n{opt}')
-
-    #         if opt.success:
-    #             self.kernel.theta = opt.x
-    #         else:
-    #             raise RuntimeError(
-    #                 f'Minimum LOOCV optimization did not converge, got:\n'
-    #                 f'{opt}'
-    #             )
-
-    #     '''build and store GPR model'''
-    #     self._compute_low_rank_subspace(inplace=True)
-    #     self.Kxc = self._gramian(self.X, self.C)
-    #     self.Fxc = self.Kxc @ self.Kcc_rsqrt
-    #     self.Kinv = LowRankApproximateInverse(self.Fxc, self.beta)
-    #     self.Ky = self.Kinv @ self.y
-
-    #     if return_mean is False and return_std is False:
-    #         return self
-    #     else:
-    #         retvals = []
-    #         Kinv_diag = self.Kinv.diagonal()
-    #         if return_mean is True:
-    #             ymean = self.y - self.Kinv @ self.y / Kinv_diag
-    #             retvals.append(ymean * self.y_std + self.y_mean)
-    #         if return_std is True:
-    #             ystd = np.sqrt(1 / np.maximum(Kinv_diag, 1e-14))
-    #             retvals.append(ystd * self.y_std)
-    #         return (self, *retvals)
 
     def predict_(self, Z, return_std=False, return_cov=False):
         """Predict using the trained GPR model.
@@ -518,91 +454,3 @@ class LRAGPR(GPR):
             )
 
         return retval
-
-    # def squared_loocv_error(self, theta=None, X=None, y=None,
-    #                         eval_gradient=False, clone_kernel=True,
-    #                         verbose=False):
-    #     """Returns the squared LOOCV error of a given set of log-scale
-    #     hyperparameters.
-
-    #     Parameters
-    #     ----------
-    #     theta: array-like
-    #         Kernel hyperparameters for which the log-marginal likelihood is
-    #         to be evaluated. If None, the current hyperparameters will be
-    #         used.
-    #     X: list of objects or feature vectors.
-    #         Input values of the training data. If None, the data saved by
-    #         fit() will be used.
-    #     y: 1D array
-    #         Output/target values of the training data. If None, the data
-    #         saved by fit() will be used.
-    #     eval_gradient: boolean
-    #         If True, the gradient of the log-marginal likelihood with respect
-    #         to the kernel hyperparameters at position theta will be returned
-    #         alongside.
-    #     clone_kernel: boolean
-    #         If True, the kernel is copied so that probing with theta does not
-    #         alter the trained kernel. If False, the kernel hyperparameters
-    #         will be modified in-place.
-    #     verbose: boolean
-    #         If True, the log-likelihood value and its components will be
-    #         printed to the screen.
-
-    #     Returns
-    #     -------
-    #     squared_error: float
-    #         Squared LOOCV error of theta for training data.
-    #     squared_error_gradient: 1D array
-    #         Gradient of the Squared LOOCV error with respect to the kernel
-    #         hyperparameters at position theta. Only returned when
-    #         eval_gradient is True.
-    #     """
-    #     raise RuntimeError('Not implemented')
-    #     theta = theta if theta is not None else self.kernel.theta
-    #     X = X if X is not None else self.X
-    #     y = y if y is not None else self.y
-
-    #     if clone_kernel is True:
-    #         kernel = self.kernel.clone_with_theta(theta)
-    #     else:
-    #         kernel = self.kernel
-    #         kernel.theta = theta
-
-    #     t_kernel = time.perf_counter()
-    #     if eval_gradient is True:
-    #         K, dK = self._gramian(X, kernel=kernel, jac=True)
-    #     else:
-    #         K = self._gramian(X, kernel=kernel)
-    #     t_kernel = time.perf_counter() - t_kernel
-
-    #     t_linalg = time.perf_counter()
-    #     L = CholSolver(K)
-    #     Kinv = L(np.eye(len(X)))
-    #     Kinv_diag = Kinv.diagonal()
-    #     Ky = Kinv @ y
-    #     e = Ky / Kinv_diag
-    #     squared_error = 0.5 * np.sum(e**2)
-    #     t_linalg = time.perf_counter() - t_linalg
-
-    #     if eval_gradient is True:
-    #         D_theta = np.zeros_like(theta)
-    #         for i, t in enumerate(theta):
-    #             dk = dK[:, :, i]
-    #             KdK = Kinv @ dk
-    #             D_theta[i] = (
-    #                 - (e / Kinv_diag) @ (KdK @ Ky)
-    #                 + (e**2 / Kinv_diag) @ (KdK @ Kinv).diagonal()
-    #             ) * np.exp(t)
-    #         if verbose:
-    #             mprint.table(
-    #                 ('Sq.Err.', '%12.5g', squared_error),
-    #                 ('logdet(K)', '%12.5g', np.prod(np.linalg.slogdet(K))),
-    #                 ('Norm(dK)', '%12.5g', np.linalg.norm(D_theta)),
-    #                 ('Cond(K)', '%12.5g', np.linalg.cond(K)),
-    #                 ('t_GPU (s)', '%10.2g', t_kernel),
-    #                 ('t_CPU (s)', '%10.2g', t_linalg),
-    #             )
-    #         return squared_error, D_theta
-    #     else:
-    #         return squared_error

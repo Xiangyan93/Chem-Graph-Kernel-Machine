@@ -87,7 +87,7 @@ class GPR(GaussianProcessRegressor):
                 return y_mean
 
     def predict(self, X, return_std=False, return_cov=False):
-        return _predict(super().predict, X, return_std=return_std,
+        return _predict(self.predict_, X, return_std=return_std,
                         return_cov=return_cov)
 
     def predict_loocv(self, X, y, return_std=False):  # return loocv prediction
