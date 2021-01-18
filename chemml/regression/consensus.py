@@ -6,6 +6,7 @@ from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
 from chemml.regression.GPRgraphdot.gpr import GPR as GPRgraphdot
 from chemml.regression.GPRsklearn.gpr import GPR as GPRsklearn
+from .GPRgraphdot.gpr import _predict
 
 
 def _parallel_build_models(model, models, X, y, id, model_idx, n_models,
@@ -54,7 +55,7 @@ def _accumulate_prediction(predict, X, out, out_u, lock, return_std=False):
 
 class ConsensusRegressor:
     def __init__(self, model, n_estimators=100, n_sample_per_model=2000,
-                 n_jobs=1, verbose=0, consensus_rule='smallest_uncertainty'):
+                 n_jobs=1, verbose=0, consensus_rule='smallest_uncertainty',):
         self.model = model
         self.models = []
         self.n_estimators = n_estimators
@@ -73,36 +74,18 @@ class ConsensusRegressor:
             for i, m in enumerate(models))
         self.models.extend(models)
 
-    def predict(self, X, return_std=False, memory_save=True,
-                n_memory_save=1000):
+    def predict(self, X, return_std=False, return_cov=False):
+        assert (not return_cov)
         if self.model.__class__ in [GPRgraphdot, GPRsklearn]:
-            if memory_save:
-                N = X.shape[0]
-                y_mean = np.array([])
-                y_std = np.array([])
-                for i in range(math.ceil(N / n_memory_save)):
-                    X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
-                    if return_std:
-                        y_mean_, y_std_ = self.predict_gpr(
-                            X_, return_std=True)
-                        y_std = np.r_[y_std, y_std_]
-                    else:
-                        y_mean_ = self.predict_gpr(
-                            X_, return_std=False)
-                    y_mean = np.r_[y_mean, y_mean_]
-                if return_std:
-                    return y_mean, y_std
-                else:
-                    return y_mean
-            else:
-                return self.predict_gpr( X, return_std=return_std)
+            return _predict(self.predict_gpr, X, return_std=return_std,
+                            return_cov=return_cov)
         else:
             raise RuntimeError(
                 f'The regressor {self.model} are not supported for '
                 f'ConsensusRegressor yet'
             )
 
-    def predict_gpr(self, X, return_std=False):
+    def predict_gpr(self, X, return_std=False, return_cov=False):
         y_hat = []
         u_hat = []
         # Parallel loop

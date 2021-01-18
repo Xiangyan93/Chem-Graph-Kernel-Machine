@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 from sklearn.gaussian_process._gpr import *
 from sklearn.preprocessing import StandardScaler
+from ..GPRgraphdot.gpr import _predict
 import pickle
 import os
-import math
 
 
 class GPR(GaussianProcessRegressor):
@@ -28,10 +28,8 @@ class GPR(GaussianProcessRegressor):
         return self
 
     def predict_(self, X, return_std=False, return_cov=False):
-        """Predict using the Gaussian process regression model
-        This is copy from sklearn.gaussian_process.GaussianProcessRegressor
-        .predict, but the data validation part is removed since it is designed
-        for vector input
+        """ Copy from sklearn but remove the check_array part since the graphs
+        input is not valid in that function.
         """
         if return_std and return_cov:
             raise RuntimeError(
@@ -88,29 +86,9 @@ class GPR(GaussianProcessRegressor):
             else:
                 return y_mean
 
-    def predict(self, X, return_std=False, return_cov=False, memory_save=True,
-                n_memory_save=1000):
-        if return_cov or not memory_save:
-            return self.predict_(X, return_std=return_std,
-                                 return_cov=return_cov)
-        else:
-            N = X.shape[0]
-            y_mean = np.array([])
-            y_std = np.array([])
-            for i in range(math.ceil(N / n_memory_save)):
-                X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
-                if return_std:
-                    y_mean_, y_std_ = self.predict_(
-                        X_, return_std=return_std, return_cov=return_cov)
-                    y_std = np.r_[y_std, y_std_]
-                else:
-                    y_mean_ = self.predict_(
-                        X_, return_std=return_std, return_cov=return_cov)
-                y_mean = np.r_[y_mean, y_mean_]
-            if return_std:
-                return y_mean, y_std
-            else:
-                return y_mean
+    def predict(self, X, return_std=False, return_cov=False):
+        return _predict(super().predict, X, return_std=return_std,
+                        return_cov=return_cov)
 
     def predict_loocv(self, X, y, return_std=False):  # return loocv prediction
         if not hasattr(self, 'kernel_'):
