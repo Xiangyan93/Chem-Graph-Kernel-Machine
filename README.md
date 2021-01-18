@@ -16,5 +16,5 @@ graphdot
 git clone -b feature/start_probability https://gitlab.com/XIangyanSJTU/graphdot.git
 ```
 ## Usages
-1. Executable files are in directory [run](https://github.com/Xiangyan93/ChemML/tree/main/run).
-2. Notebook examples are in directory [notebook](https://github.com/Xiangyan93/ChemML/tree/main/notebook)
+1. Executable files are in directory [run](https://github.com/Xiangyan93/ChemML/tree/3.0/run).
+2. Notebook examples are in directory [notebook](https://github.com/Xiangyan93/ChemML/tree/3.0/notebook)
