@@ -53,7 +53,7 @@ class GPRLearner(KernelRegressionBaseLearner):
         y = self.test_Y
         y_pred, y_std = self.model.predict(x, return_std=True)
         return self.evaluate_df__(x, y, y_pred, self.test_id, y_std=y_std,
-                                  alpha=alpha, n_most_similar=5)
+                                  alpha=alpha, n_most_similar=None)
 
     def evaluate_train(self, alpha=None):
         x = self.train_X

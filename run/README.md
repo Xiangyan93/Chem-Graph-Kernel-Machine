@@ -1,5 +1,5 @@
 # ChemML Executable Files
-This directory contains the executable files for GPR-NMGK.
+This directory contains the executable files for GPR-nMGK.
 
 ## Single-Valued Property
 1. The datasets/critical-sim.txt contains the critical temperature and
