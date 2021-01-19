@@ -99,3 +99,10 @@ dependent on temperature.
         python3 preCalc2graph.py --result_dir st --gpr graphdot:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100 --consensus_config 10:1000:10:weight_uncertainty
         python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100 --consensus_config 10:1000:1:weight_uncertainty
         ```
+9. Active Learning
+    - Use supervised active learning
+        ```
+        python3 GPR_active.py --result_dir st --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100 --active_config supervised:nlargest:5:1:500:0:200:100
+        python3 preCalc2graph.py --result_dir st --gpr graphdot_nystrom:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
+        python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
+        ```

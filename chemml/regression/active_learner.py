@@ -12,9 +12,9 @@ class ActiveLearner:
 
     def __init__(self, train_X, train_Y, train_id, alpha, kernel_config,
                  learning_mode, add_mode, initial_size, add_size, max_size,
-                 search_size, pool_size, result_dir, Learner, test_X=None,
-                 test_Y=None, test_id=None, optimizer=None, stride=100,
-                 seed=0):
+                 search_size, pool_size, result_dir, Learner, model,
+                 test_X=None, test_Y=None, test_id=None, optimizer=None,
+                 stride=100, seed=0):
         '''
         search_size: Random chose samples from untrained samples. And are
                      predicted based on current model.
@@ -52,6 +52,7 @@ class ActiveLearner:
         if not os.path.exists(self.result_dir):
             os.mkdir(self.result_dir)
         self.Learner = Learner
+        self.model = model
         self.train_IDX = np.linspace(
             0,
             len(train_X) - 1,
@@ -101,15 +102,13 @@ class ActiveLearner:
         # print('%s' % (time.asctime(time.localtime(time.time()))))
         train_x, train_y, id, alpha = self.__get_train_X_y()
         self.learner = self.Learner(
+            self.model,
             train_x,
             train_y,
             id,
             self.test_X,
             self.test_Y,
             self.test_id,
-            self.kernel_config,
-            optimizer=self.optimizer,
-            alpha=alpha,
         )
         self.learner.train()
         return True
@@ -221,7 +220,7 @@ class ActiveLearner:
 
     def evaluate(self, train_output=True):
         # print('%s' % (time.asctime(time.localtime(time.time()))))
-        out, r2, ex_var, mse, mae = self.learner.evaluate_test()
+        out, r2, ex_var, mae, rmse, mse = self.learner.evaluate_test()
         print("R-square:%.3f\nMSE:%.5g\nexplained_variance:%.3f\n" %
               (r2, mse, ex_var))
         self.learning_log.loc[self.current_size] = (
@@ -237,7 +236,7 @@ class ActiveLearner:
         )
 
         if train_output:
-            out, r2, ex_var, mse, mae = self.learner.evaluate_train()
+            out, r2, ex_var, mae, rmse, mse = self.learner.evaluate_train()
             out.to_csv(
                 '%s/%i-train.log' % (self.result_dir, self.current_size),
                 sep='\t',
@@ -264,8 +263,8 @@ class ActiveLearner:
         store_dict.pop('learner', None)
         store_dict.pop('kernel_config', None)
         # store model
-        self.learner.model.save(self.result_dir)
-        self.learner.kernel_config.save(self.result_dir, self.learner.model)
+        self.learner.model.save(self.result_dir, overwrite=True)
+        # self.learner.kernel_config.save(self.result_dir, self.learner.model)
         pickle.dump(store_dict, open(f_checkpoint, 'wb'), protocol=4)
 
     @classmethod

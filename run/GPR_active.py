@@ -100,9 +100,9 @@ def main():
         print("model continued from checkpoint")
     else:
         # set optimizer
-        gpr, optimizer = set_gpr_optimizer_consensus(args.gpr)
+        gpr, optimizer = set_gpr_optimizer(args.gpr)
         # set Gaussian process regressor
-        Learner = set_gpr_learner(gpr)
+        model = set_gpr_model(gpr, kernel_config, optimizer, alpha)
         # set train_test
         mode, train_size, train_ratio, seed, dynamic_train_size = \
             set_mode_train_size_ratio_seed(args.train_test_config)
@@ -119,7 +119,7 @@ def main():
         activelearner = ActiveLearner(
             train_X, train_Y, train_id, alpha, kernel_config, learning_mode,
             add_mode, init_size, add_size, max_size, search_size, pool_size,
-            args.result_dir, Learner,
+            args.result_dir, GPRLearner, model,
             test_X=test_X, test_Y=test_Y, test_id=test_id,
             optimizer=optimizer, seed=seed, stride=stride
         )
