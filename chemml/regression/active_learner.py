@@ -5,83 +5,6 @@ import pandas as pd
 from collections import defaultdict
 from sklearn.cluster import KMeans
 from sklearn.manifold import SpectralEmbedding
-from sklearn.metrics import (
-    explained_variance_score,
-    mean_squared_error,
-    mean_absolute_error,
-    r2_score,
-)
-
-
-class BaseLearner:
-    def __init__(self, train_X, train_Y, train_id, test_X, test_Y,
-                 test_id, kernel_config, optimizer=None, alpha=0.01):
-        self.train_X = train_X
-        self.train_Y = train_Y
-        self.train_id = train_id
-        self.test_X = test_X
-        self.test_Y = test_Y
-        self.test_id = test_id
-        self.kernel_config = kernel_config
-        self.kernel = kernel_config.kernel
-        self.optimizer = optimizer
-        self.alpha = alpha
-
-    def evaluate_df(self, x, y, id, y_pred, y_std, kernel=None,
-                    debug=False, alpha=None):
-        r2 = r2_score(y, y_pred, multioutput='raw_values')
-        ex_var = explained_variance_score(y, y_pred, multioutput='raw_values')
-        mse = mean_squared_error(y, y_pred, multioutput='raw_values')
-        mae = mean_absolute_error(y, y_pred, multioutput='raw_values')
-        out = pd.DataFrame({
-            '#target': y,
-            'predict': y_pred,
-            'uncertainty': y_std,
-            'abs_dev': abs(y - y_pred),
-            'rel_dev': abs((y - y_pred) / y)}
-        )
-        if alpha is not None:
-            out.loc[:, 'alpha'] = alpha
-        out.loc[:, 'id'] = id
-
-        if debug:
-            n = 5
-            similar_info = []
-            K = kernel(x, self.train_X)
-            kindex = np.argsort(-K)[:, :min(n, len(self.train_X))]
-            for i, index in enumerate(kindex):
-                def round5(x):
-                    return ',%.5f' % x
-                k = list(map(round5, K[i][index]))
-                id = list(map(str, self.train_id[index].tolist()))
-                info = ';'.join(list(map(str.__add__, id, k)))
-                similar_info.append(info)
-            out.loc[:, 'similar_mols'] = similar_info
-        return r2, ex_var, mse, mae, out.sort_values(by='abs_dev', ascending=False)
-
-    def evaluate_test(self, debug=True, alpha=None):
-        x = self.test_X
-        y = self.test_Y
-        y_pred, y_std = self.model.predict(x, return_std=True)
-        return self.evaluate_df(x, y, self.test_id, y_pred, y_std,
-                                kernel=self.model.kernel, debug=debug,
-                                alpha=alpha)
-
-    def evaluate_train(self, debug=False, alpha=None):
-        x = self.train_X
-        y = self.train_Y
-        y_pred, y_std = self.model.predict(x, return_std=True)
-        return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
-                                kernel=self.model.kernel, debug=debug,
-                                alpha=alpha)
-
-    def evaluate_loocv(self, debug=True, alpha=None):
-        x = self.train_X
-        y = self.train_Y
-        y_pred, y_std = self.model.predict_loocv(x, y, return_std=True)
-        return self.evaluate_df(x, y, self.train_id, y_pred, y_std,
-                                kernel=self.model.kernel, debug=debug,
-                                alpha=alpha)
 
 
 class ActiveLearner:
@@ -89,9 +12,9 @@ class ActiveLearner:
 
     def __init__(self, train_X, train_Y, train_id, alpha, kernel_config,
                  learning_mode, add_mode, initial_size, add_size, max_size,
-                 search_size, pool_size, result_dir, Learner, test_X=None,
-                 test_Y=None, test_id=None, optimizer=None, stride=100,
-                 seed=0):
+                 search_size, pool_size, result_dir, Learner, model,
+                 test_X=None, test_Y=None, test_id=None, optimizer=None,
+                 stride=100, seed=0):
         '''
         search_size: Random chose samples from untrained samples. And are
                      predicted based on current model.
@@ -129,6 +52,7 @@ class ActiveLearner:
         if not os.path.exists(self.result_dir):
             os.mkdir(self.result_dir)
         self.Learner = Learner
+        self.model = model
         self.train_IDX = np.linspace(
             0,
             len(train_X) - 1,
@@ -178,15 +102,13 @@ class ActiveLearner:
         # print('%s' % (time.asctime(time.localtime(time.time()))))
         train_x, train_y, id, alpha = self.__get_train_X_y()
         self.learner = self.Learner(
+            self.model,
             train_x,
             train_y,
             id,
             self.test_X,
             self.test_Y,
             self.test_id,
-            self.kernel_config,
-            optimizer=self.optimizer,
-            alpha=alpha,
         )
         self.learner.train()
         return True
@@ -296,9 +218,9 @@ class ActiveLearner:
                        self.add_size)]  # find min-in-cluster-distance associated idx
         return add_idx
 
-    def evaluate(self, train_output=True, debug=True):
+    def evaluate(self, train_output=True):
         # print('%s' % (time.asctime(time.localtime(time.time()))))
-        r2, ex_var, mse, mae, out = self.learner.evaluate_test(debug=debug)
+        out, r2, ex_var, mae, rmse, mse = self.learner.evaluate_test()
         print("R-square:%.3f\nMSE:%.5g\nexplained_variance:%.3f\n" %
               (r2, mse, ex_var))
         self.learning_log.loc[self.current_size] = (
@@ -314,7 +236,7 @@ class ActiveLearner:
         )
 
         if train_output:
-            r2, ex_var, mse, mae, out = self.learner.evaluate_train(debug=debug)
+            out, r2, ex_var, mae, rmse, mse = self.learner.evaluate_train()
             out.to_csv(
                 '%s/%i-train.log' % (self.result_dir, self.current_size),
                 sep='\t',
@@ -341,8 +263,8 @@ class ActiveLearner:
         store_dict.pop('learner', None)
         store_dict.pop('kernel_config', None)
         # store model
-        self.learner.model.save(self.result_dir)
-        self.learner.kernel_config.save(self.result_dir, self.learner.model)
+        self.learner.model.save(self.result_dir, overwrite=True)
+        # self.learner.kernel_config.save(self.result_dir, self.learner.model)
         pickle.dump(store_dict, open(f_checkpoint, 'wb'), protocol=4)
 
     @classmethod

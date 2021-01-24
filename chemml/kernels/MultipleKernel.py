@@ -2,10 +2,6 @@ import copy
 import numpy as np
 
 
-def _get_uniX(X):
-    return np.sort(np.unique(X))
-
-
 class MultipleKernel:
     def __init__(self, kernel_list, composition, combined_rule='product'):
         self.kernel_list = kernel_list
@@ -19,8 +15,16 @@ class MultipleKernel:
     def get_X_list(self, X):
         def f(c):
             return X[:, c]
+        X = self._format_X(X)
         X_list = list(map(f, self.composition))
         return X_list
+
+    @staticmethod
+    def _format_X(X):
+        if X.ndim == 1:
+            return X.reshape(1, X.size)  # .tolist()
+        else:
+            return X
 
     def __call__(self, X, Y=None, eval_gradient=False):
         X_list = self.get_X_list(X)
@@ -127,7 +131,7 @@ class MultipleKernel:
             composition=self.composition,
             combined_rule=self.combined_rule,
         )
-
+    '''
     def PreCalculate(self, X, result_dir):
         # save in several files with id tag.
         X_list = self.get_X_list(X)
@@ -142,9 +146,9 @@ class MultipleKernel:
         for i, kernel in enumerate(self.kernel_list):
             Xi = X_list[i]
             if hasattr(kernel, 'get_uniX'):
-                graphs += kernel.get_uniX(Xi)
+                graphs += kernel.get_unique_graph(Xi)
         return _get_uniX(graphs)
-
+    '''
     def load(self, result_dir):
         for i, kernel in enumerate(self.kernel_list):
             if hasattr(kernel, 'PreCalculate'):

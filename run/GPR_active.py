@@ -3,21 +3,8 @@ import os
 import sys
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
-from chemml.learner import ActiveLearner
-from run.GPR import *
-
-
-def set_active_config(active_config):
-    learning_mode, add_mode, init_size, add_size, max_size, search_size, \
-    pool_size, stride = active_config.split(':')
-    init_size = int(init_size) if init_size else 0
-    add_size = int(add_size) if add_size else 0
-    max_size = int(max_size) if max_size else 0
-    search_size = int(search_size) if search_size else 0
-    pool_size = int(pool_size) if pool_size else 0
-    stride = int(stride) if stride else 0
-    return learning_mode, add_mode, init_size, add_size, max_size, \
-           search_size, pool_size, stride
+from run.tools import *
+from chemml.regression.active_learner import ActiveLearner
 
 
 def main():
@@ -42,11 +29,11 @@ def main():
     )
     parser.add_argument(
         '--kernel', type=str,
-        help='format: kernel:Normalized?:alpha.\n'
+        help='format: kernel:alpha.\n'
              'examples:\n'
-             'graph:True:0.01\n'
-             'graph:False:10.0\n'
-             'preCalc::0.01\n'
+             'graph:0.01\n'
+             'graph:10.0\n'
+             'preCalc:0.01\n'
              'For preCalc kernel, run KernelCalc.py first.'
     )
     parser.add_argument(
@@ -54,8 +41,8 @@ def main():
     )
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
-        'format: single_graph:multi_graph:targets\n'
-        'examples: inchi::tt\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tt\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
@@ -85,28 +72,23 @@ def main():
         help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '--load_K', action='store_true',
-        help='read existed K.pkl',
-    )
-    parser.add_argument(
         '--continued', action='store_true',
         help='whether continue training'
     )
     args = parser.parse_args()
 
     # set args
-    kernel, normalized, alpha = set_kernel_normalized_alpha(args.kernel)
-    single_graph, multi_graph, properties = \
+    kernel, alpha = set_kernel_alpha(args.kernel)
+    single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
     learning_mode, add_mode, init_size, add_size, max_size, search_size, \
     pool_size, stride = set_active_config(args.active_config)
     # set kernel_config
     kernel_config = set_kernel_config(
-        args.result_dir, kernel, normalized,
-        single_graph, multi_graph,
-        add_f, add_p,
-        json.loads(open(args.json_hyper, 'r').readline())
+        kernel, add_f, add_p,
+        single_graph, multi_graph, args.json_hyper,
+        args.result_dir,
     )
 
     if args.continued:
@@ -120,9 +102,9 @@ def main():
         # set optimizer
         gpr, optimizer = set_gpr_optimizer(args.gpr)
         # set Gaussian process regressor
-        Learner = set_learner(gpr)
+        model = set_gpr_model(gpr, kernel_config, optimizer, alpha)
         # set train_test
-        mode, train_size, train_ratio, seed = \
+        mode, train_size, train_ratio, seed, dynamic_train_size = \
             set_mode_train_size_ratio_seed(args.train_test_config)
         # read input
         params = {
@@ -134,12 +116,10 @@ def main():
         test_id = read_input(
             args.result_dir, args.input, kernel_config, properties, params
         )
-        if optimizer is None:
-            pre_calculate(kernel_config, df, args.result_dir, args.load_K)
         activelearner = ActiveLearner(
             train_X, train_Y, train_id, alpha, kernel_config, learning_mode,
             add_mode, init_size, add_size, max_size, search_size, pool_size,
-            args.result_dir, Learner,
+            args.result_dir, GPRLearner, model,
             test_X=test_X, test_Y=test_Y, test_id=test_id,
             optimizer=optimizer, seed=seed, stride=stride
         )
