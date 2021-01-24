@@ -13,7 +13,7 @@ pip install tqdm=4.50.0
 Part of the revision haven't been merged into graphdot yet, please use the 
 graphdot
 ```
-git clone -b feature/start_probability https://gitlab.com/XIangyanSJTU/graphdot.git
+git clone -b feature/start_probability https://gitlab.com/XiangyanSJTU/graphdot.git
 ```
 ## Usages
 1. Executable files are in directory [run](https://github.com/Xiangyan93/ChemML/tree/3.0/run).

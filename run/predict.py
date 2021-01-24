@@ -59,6 +59,10 @@ def main():
         'format: n_sample_core\n'
         'examples: 2000\n'
     )
+    parser.add_argument(
+        '-n', '--ntasks', type=int, default=cpu_count(),
+        help='The cpu numbers for parallel computing.'
+    )
     args = parser.parse_args()
 
     gpr, _ = set_gpr_optimizer(args.gpr)
@@ -87,7 +91,8 @@ def main():
     # read model
     model.load(args.result_dir)
     # read input
-    df = get_df(args.input, None, kernel_config.single_graph, kernel_config.multi_graph, [])
+    df = get_df(args.input, None, kernel_config.single_graph,
+                kernel_config.multi_graph, [], n_process=args.ntasks)
     X, _, _ = get_XYid_from_df(df, kernel_config, properties=None)
     for i in range(len(kernel_config.single_graph)+len(kernel_config.multi_graph)):
         unify_datatype(X[:, i].ravel(), model.X_train_[:, i].ravel())
