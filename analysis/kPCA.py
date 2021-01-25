@@ -20,7 +20,7 @@ def main():
     )
     parser.add_argument(
         '--kernel', type=str, default='default',
-        help='The kernel.pkl file.',
+        help='graph or preCalc.',
     )
     parser.add_argument(
         '-i', '--input', type=str, help='Input data in csv format.'
