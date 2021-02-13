@@ -1,5 +1,5 @@
 # Data sets
-Two example data sets are given here. Critical temperature (critical-sim.txt) 
+Two example data sets are provided here. Critical temperature (critical-sim.txt) 
 and VLE density and surface tension (slab-sim.txt). These data are obtained
 from high-throughput molecular dynamics simulation.
 
