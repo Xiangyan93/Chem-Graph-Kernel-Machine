@@ -260,11 +260,11 @@ class LRAGPR(GPR):
             std = np.sqrt(
                 np.maximum(Kzz - (Kzx @ self.Kinv @ Kzx.T).diagonal(), 0)
             )
-            return (ymean, std * self.y_std)
+            return (ymean, std)
         elif return_cov is True:
             Kzz = self._gramian(Z)
             cov = np.maximum(Kzz - (Kzx @ self.Kinv @ Kzx.T).todense(), 0)
-            return (ymean, cov * self.y_std**2)
+            return (ymean, cov)
         else:
             return ymean
 
