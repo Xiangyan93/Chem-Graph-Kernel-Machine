@@ -8,6 +8,10 @@ from sklearn.metrics import (
     mean_squared_error,
     mean_absolute_error,
     r2_score,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
 )
 
 
@@ -72,15 +76,24 @@ class RegressionBaseLearner(BaseLearner):
 
 
 class ClassificationBaseLearner(BaseLearner):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model = self.model_
+
     @staticmethod
     def evaluate_df(y, y_pred, id):
-        accuracy = (np.asarray(y) == np.asarray(y_pred)).sum() / len(y)
+        print(y, y_pred)
+        accuracy = accuracy_score(y, y_pred)
+        print(accuracy)
+        precision = precision_score(y, y_pred, average='micro')
+        recall = recall_score(y, y_pred, average='micro')
+        f1 = f1_score(y, y_pred, average='micro')
         df_out = pd.DataFrame({
             '#target': y,
             'predict': y_pred,
             'id': id
         })
-        return df_out, accuracy
+        return df_out, accuracy, precision, recall, f1
 
 
 class KernelRegressionBaseLearner(RegressionBaseLearner):
@@ -94,18 +107,20 @@ class KernelRegressionBaseLearner(RegressionBaseLearner):
                 for i in range(math.ceil(N / n_memory_save)):
                     X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
                     similar_info.extend(
-                        self.get_similar_info(X_, n_most_similar))
+                        self.get_similar_info(self, X_, n_most_similar))
             else:
-                similar_info = self.get_similar_info(X, n_most_similar)
+                similar_info = self.get_similar_info(self, X, n_most_similar)
 
             df_out.loc[:, 'similar_mols'] = similar_info
         return df_out, r2, ex_var, mae, rmse, mse
 
+    @staticmethod
     def get_similar_info(self, X, n_most_similar):
         K = self.model_.kernel_(X, self.train_X)
         assert (K.shape == (len(X), len(self.train_X)))
         similar_info = []
-        kindex = self.get_most_similar_graphs(K, n=n_most_similar)
+        kindex = KernelRegressionBaseLearner.get_most_similar_graphs(
+            K, n=n_most_similar)
         for i, index in enumerate(kindex):
             def round5(x):
                 return ',%.5f' % x
@@ -119,3 +134,24 @@ class KernelRegressionBaseLearner(RegressionBaseLearner):
     @staticmethod
     def get_most_similar_graphs(K, n=5):
         return np.argsort(-K)[:, :min(n, K.shape[1])]
+
+
+class KernelClassificationBaseLearner(ClassificationBaseLearner):
+    def evaluate_df_(self, X, y, y_pred, id, n_most_similar=None,
+                     memory_save=True, n_memory_save=1000):
+        df_out, accuracy, precision, recall, f1 = self.evaluate_df(y, y_pred, id)
+        if n_most_similar is not None:
+            if memory_save:
+                similar_info = []
+                N = X.shape[0]
+                for i in range(math.ceil(N / n_memory_save)):
+                    X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
+                    similar_info.extend(
+                        KernelRegressionBaseLearner.get_similar_info(
+                            self, X_, n_most_similar))
+            else:
+                similar_info = KernelRegressionBaseLearner.get_similar_info(
+                    self, X, n_most_similar)
+
+            df_out.loc[:, 'similar_mols'] = similar_info
+        return df_out, accuracy, precision, recall, f1

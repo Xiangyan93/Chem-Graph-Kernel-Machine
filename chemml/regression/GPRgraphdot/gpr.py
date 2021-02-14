@@ -222,7 +222,7 @@ class LRAGPR(GPR):
         self.Fxc = self.Kxc @ self.Kcc_rsqrt
         self.Kinv = lr.dot(self.Fxc, rcond=self.beta, mode='clamp').inverse()
         self.Ky = self.Kinv @ self.y
-
+        print(self.Ky.shape)
         return self
 
     def predict_(self, Z, return_std=False, return_cov=False):

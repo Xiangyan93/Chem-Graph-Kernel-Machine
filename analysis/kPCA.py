@@ -63,9 +63,10 @@ def main():
     )
     transformer = KernelPCA(n_components=2, kernel=kernel_config.kernel)
     embed = transformer.fit_transform(train_X)
-    df_out['embed_X'] = embed[:, 0]
-    df_out['embed_Y'] = embed[:, 1]
-    df_out.to_csv('%s_embed_kPCA.log' % properties[0], sep=' ', index=False)
+    df = df[df_out.keys()]
+    df['embed_X'] = embed[:, 0]
+    df['embed_Y'] = embed[:, 1]
+    df.to_csv('%s_embed_kPCA.log' % properties[0], sep=' ', index=False)
 
 
 if __name__ == '__main__':

@@ -17,7 +17,8 @@ from graphdot.microkernel import (
 from graphdot.microprobability import (
     Additive as Additive_p,
     Constant,
-    UniformProbability
+    UniformProbability,
+    AssignProbability
 )
 from chemml.kernels.KernelConfig import KernelConfig
 from chemml.kernels.MultipleKernel import *
@@ -365,6 +366,8 @@ class GraphKernelConfig(KernelConfig):
                 return UniformProbability(microk[1], microk[2])
             elif microk[0] == 'Const_p':
                 return Constant(microk[1], microk[2])
+            elif microk[0] == 'Assign_p':
+                return AssignProbability(microk[1], microk[2])
             else:
                 raise Exception('unknown microkernel type')
 

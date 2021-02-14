@@ -4,6 +4,7 @@
 import os
 
 CWD = os.path.dirname(os.path.abspath(__file__))
+import warnings
 import re
 import networkx as nx
 import pandas as pd
@@ -78,8 +79,8 @@ def get_atom_ring_stereo(mol, atom, ring_idx, depth=5,
             ij = (i, j)
             ij = (min(ij), max(ij))
             if i in ring_idx and j in ring_idx:
-                # in RDKit, the orientation information may saved in ring bond for
-                # multi-ring molecules. The information is saved.
+                # in RDKit, the orientation information may saved in ring bond
+                # for multi-ring molecules. The information is saved.
                 bonds_in_ring.append(bond_orientation_dict.get(ij))
             else:
                 bonds_out_ring.append(bond_orientation_dict.get(ij))
@@ -189,22 +190,15 @@ def get_chiral_tag(mol, atom, depth=5):
         return 1
 
 
-def get_group_id(atom, rule):
-    if rule == 'element':
-        return [atom.GetAtomicNum()]
-    else:
-        return [0]
-
-
 class rdkit_config:
     def __init__(self, bond_type='order',
                  set_morgan_identifier=True, morgan_radius=3,
-                 set_elemental_mode=False,
                  set_ring_membership=True,
                  set_ring_stereo=True, depth=5,
-                 set_hydrogen=False,
-                 set_group=False, set_group_rule='element',
-                 reaction_center=None,
+                 set_elemental_mode=False,
+                 set_hydrogen_explicit=False,
+                 reaction_center=None, reactant_or_product='reactant',
+                 concentration=1.0,
                  set_TPSA=False):
         self.bond_type = bond_type
         self.set_morgan_identifier = set_morgan_identifier
@@ -213,29 +207,21 @@ class rdkit_config:
         self.set_ring_membership = set_ring_membership
         self.set_ring_stereo = set_ring_stereo
         self.depth = depth
-        self.set_hydrogen = set_hydrogen
-        self.set_group = set_group
-        self.set_group_rule = set_group_rule
+        self.set_hydrogen_explicit = set_hydrogen_explicit
         self.reaction_center = reaction_center
+        self.reactant_or_product = reactant_or_product
+        self.concentration = concentration
         self.set_TPSA = set_TPSA
         if self.set_elemental_mode:
             # read elemental modes.
             self.emode = pd.read_csv(os.path.join(CWD, 'emodes.dat'), sep='\s+')
-        if self.set_group:
-            self.group_dict = {
-                1: 'group_an1', 5: 'group_an5', 6: 'group_an6', 7: 'group_an7',
-                8: 'group_an8', 9: 'group_an9', 14: 'group_an14',
-                15: 'group_an15',
-                16: 'group_an16', 17: 'group_an17', 35: 'group_an35',
-                53: 'group_an53'
-            }
 
     @staticmethod
     def get_list_hash(l):
         return hash(','.join(list(map(str, np.sort(l)))))
 
     def preprocess(self, mol):
-        if self.set_hydrogen:
+        if self.set_hydrogen_explicit:
             mol = Chem.AddHs(mol)
 
         if self.set_morgan_identifier:
@@ -285,6 +271,7 @@ class rdkit_config:
         node['Chiral'] = get_chiral_tag(mol, atom)
         node['InRing'] = atom.IsInRing()
         node['SingleAtom'] = True if mol.GetNumAtoms() == 1 else False
+        node['Concentration'] = self.concentration / mol.GetNumAtoms()
         if self.set_elemental_mode:
             emode = self.emode
             node['ElementalMode1'] = emode[emode.an == an].em1.ravel()[0]
@@ -293,18 +280,24 @@ class rdkit_config:
         if self.set_morgan_identifier:
             node['MorganHash'] = self.atomidx_hash_dict[atom.GetIdx()]
 
-        if self.set_group:
-            node['GroupID'] = get_group_id(atom, self.set_group_rule)
-            for key, value in self.group_dict.items():
-                node[value] = True if key in node['GroupID'] else False
-
         if self.reaction_center is not None:
-            node['GroupReaction'] = True if atom.GetPropsAsDict().get(
-                'molAtomMapNumber') in self.reaction_center else False
+            if atom.GetPropsAsDict().get('molAtomMapNumber') in \
+                    self.reaction_center:
+                if self.reactant_or_product == 'reactant':
+                    node['ReactingCenter'] = 1.0
+                elif self.reactant_or_product == 'product':
+                    node['ReactingCenter'] = - 1.0
+                else:
+                    raise RuntimeError(
+                        f'You need to sepcify reactant or product '
+                        f'{self.reactant_or_product}')
+            else:
+                node['ReactingCenter'] = 0.0
 
         # set ring information
         if self.set_ring_membership:
-            node['RingSize_list'] = np.asarray(self.ringlist_atom[atom.GetIdx()])
+            node['RingSize_list'] = np.asarray(
+                self.ringlist_atom[atom.GetIdx()])
             node['RingSize_hash'] = self.get_list_hash(node['RingSize_list'])
             if self.ringlist_atom[atom.GetIdx()] == [0]:
                 node['Ring_count'] = 0
@@ -326,7 +319,8 @@ class rdkit_config:
         if self.set_ring_stereo:
             edge['RingStereo'] = 0.
         if self.set_ring_membership:
-            edge['RingSize_list'] = np.asarray(self.ringlist_bond[bond.GetIdx()])
+            edge['RingSize_list'] = np.asarray(
+                self.ringlist_bond[bond.GetIdx()])
             edge['RingSize_hash'] = self.get_list_hash(edge['RingSize_list'])
             if self.ringlist_bond[bond.GetIdx()] == [0]:
                 edge['Ring_count'] = 0
@@ -337,8 +331,10 @@ class rdkit_config:
                              usehash=True, sum=True):
         if len(mol.GetAtoms()) == 1:
             for depth_ in range(1, depth+1):
-                graph.nodes[0][attribute + '_list_%i' % depth_] = np.asarray([0])
-                graph.nodes[1][attribute + '_list_%i' % depth_] = np.asarray([0])
+                graph.nodes[0][attribute + '_list_%i' % depth_] = \
+                    np.asarray([0])
+                graph.nodes[1][attribute + '_list_%i' % depth_] = \
+                    np.asarray([0])
                 if count:
                     graph.nodes[0][attribute + '_count_%i' % depth_] = 1
                     graph.nodes[1][attribute + '_count_%i' % depth_] = 1
@@ -355,29 +351,38 @@ class rdkit_config:
                 for depth_ in range(1, depth+1):
                     neighbors = AE.get_nth_neighbors(depth_)
                     if neighbors:
-                        graph.nodes[i][attribute + '_list_%i' % depth_] = np.asarray([
-                            graph.nodes[a.GetIdx()][attribute] for a in neighbors])
+                        graph.nodes[i][attribute + '_list_%i' % depth_] = \
+                            np.asarray([graph.nodes[a.GetIdx()][attribute]
+                                        for a in neighbors])
                     else:
-                        graph.nodes[i][attribute + '_list_%i' % depth_] = np.asarray([0])
+                        graph.nodes[i][attribute + '_list_%i' % depth_] = \
+                            np.asarray([0])
                     if count:
                         graph.nodes[i][attribute + '_count_%i' % depth_] = \
                             len(graph.nodes[i][attribute + '_list_%i' % depth_])
                     if usehash:
                         graph.nodes[i][attribute + '_hash_%i' % depth_] = \
-                            self.get_list_hash(graph.nodes[i][attribute + '_list_%i' % depth_])
+                            self.get_list_hash(
+                                graph.nodes[i][attribute + '_list_%i' % depth_])
                     if sum:
                         graph.nodes[i][attribute + '_sum_%i' % depth_] = \
-                            np.sum(graph.nodes[i][attribute + '_list_%i' % depth_])
+                            np.sum(graph.nodes[i]
+                                   [attribute + '_list_%i' % depth_])
 
 
 def _from_rdkit(cls, mol, rdkit_config):
-    if rdkit_config.set_hydrogen:
+    if rdkit_config.set_hydrogen_explicit:
         mol = Chem.AddHs(mol)
     g = nx.Graph()
     # For single heavy-atom molecules, such as water, methane and metalic ion.
     # A ghost atom is created and bond to it, because there must be at least
     # two nodes and one edge in graph kernel.
     if mol.GetNumAtoms() == 1:
+        '''
+        warnings.warn('Single heavy-atom molecule detected: %s. A Ghost atom '
+                      'is created since there must be at least one edge for a'
+                      'graph in GraphDot.' % Chem.MolToSmiles(mol))
+        '''
         g.add_node(0)
         g.add_node(1)
         rdkit_config.set_node(g.nodes[0], mol.GetAtomWithIdx(0), mol)

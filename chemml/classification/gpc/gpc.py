@@ -1,8 +1,8 @@
-from sklearn.gaussian_process._gpc import *
+from sklearn.gaussian_process._gpc import GaussianProcessClassifier as GPC
 import os
 import pickle
 
-
+'''
 class GPC(GaussianProcessClassifier):
     def save(self, dir):
         f_model = os.path.join(dir, 'model.pkl')
@@ -26,3 +26,4 @@ class GPC(GaussianProcessClassifier):
         model.kernel_ = kernel_
         model.__dict__.update(**store_dict)
         return model
+'''

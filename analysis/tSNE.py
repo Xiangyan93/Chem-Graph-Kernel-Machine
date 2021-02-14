@@ -67,9 +67,10 @@ def main():
     K = d[:, None] * R * d[None, :]
     D = np.sqrt(np.maximum(0, 2-2 * K**2))
     embed = TSNE(n_components=2).fit_transform(D)
-    df_out['embed_X'] = embed[:, 0]
-    df_out['embed_Y'] = embed[:, 1]
-    df_out.to_csv('%s_embed_tSNE.log' % properties[0], sep=' ', index=False)
+    df = df[df_out.keys()]
+    df['embed_X'] = embed[:, 0]
+    df['embed_Y'] = embed[:, 1]
+    df.to_csv('%s_embed_tSNE.log' % properties[0], sep=' ', index=False)
 
 
 if __name__ == '__main__':

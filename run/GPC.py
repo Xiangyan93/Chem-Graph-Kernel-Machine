@@ -39,20 +39,20 @@ def main():
     parser.add_argument(
         '--input_config', type=str, help='Columns in input data.\n'
         'format: single_graph:multi_graph:reaction_graph:targets\n'
-        'examples: inchi:::tt\n'
+        'examples: SMILES:::toxicity\n'
     )
     parser.add_argument(
         '--add_features', type=str, default=None,
         help='Additional vector features with RBF kernel.\n' 
              'examples:\n'
-             'red_T:0.1\n'
+             'Tred:0.1\n'
              'T,P:100,500'
     )
     parser.add_argument(
         '--train_test_config', type=str, help=
-        'format: mode:train_size:train_ratio:seed:(dynamic train size)\n'
+        'format: mode:train_size:train_ratio:seed\n'
         'examples:\n'
-        # 'loocv:::0\n'
+        'loocv:::0\n'
         'train_test:1000::0\n'
         'train_test::0.8:0\n'
         # 'dynamic::0.8:0:500'
@@ -62,8 +62,8 @@ def main():
         help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '--load_model', action='store_true',
-        help='read existed model.pkl',
+        '-n', '--n_jobs', type=int, default=cpu_count(),
+        help='The cpu numbers for parallel computing.'
     )
     args = parser.parse_args()
 
@@ -73,11 +73,8 @@ def main():
     single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
-    mode, train_size, train_ratio, seed, dynamic_train_size = \
+    mode, train_size, train_ratio, seed, _ = \
         set_mode_train_size_ratio_seed(args.train_test_config)
-
-    # set Gaussian process classifier
-    Learner = set_gpc_learner(gpc)
 
     # set kernel_config
     kernel_config = set_kernel_config(
@@ -86,11 +83,15 @@ def main():
         args.result_dir,
     )
 
+    # set Gaussian process classifier
+    model = set_gpc_model(gpc, kernel_config, optimizer, n_jobs=args.n_jobs)
+
     # read input
     params = {
         'train_size': train_size,
         'train_ratio': train_ratio,
         'seed': seed,
+        'byclass': True
     }
     if mode == 'loocv' or mode == 'lomocv':
         params['train_size'] = None
@@ -112,12 +113,9 @@ def main():
     }
     gpr_params = {
         'mode': mode,
-        'optimizer': optimizer,
-        'Learner': Learner,
-        'dynamic_train_size': dynamic_train_size
+        'model': model,
     }
-    gpc_run(data, args.result_dir, kernel_config, gpr_params,
-            load_model=args.load_model, tag=seed)
+    gpc_run(data, args.result_dir, kernel_config, gpr_params, tag=seed)
 
 
 if __name__ == '__main__':

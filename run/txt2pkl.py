@@ -26,7 +26,7 @@ def main():
                                          'examples: inchi:::tt\n'
     )
     parser.add_argument(
-        '-n', '--ntasks', type=int, default=cpu_count(),
+        '-n', '--n_jobs', type=int, default=cpu_count(),
         help='The cpu numbers for parallel computing.'
     )
     args = parser.parse_args()
@@ -42,7 +42,7 @@ def main():
     # set kernel_config
     get_df(args.input,
            os.path.join(result_dir, '%s.pkl' % ','.join(properties)),
-           single_graph, multi_graph, reaction_graph, n_process=args.ntasks)
+           single_graph, multi_graph, reaction_graph, n_process=args.n_jobs)
 
 
 if __name__ == '__main__':

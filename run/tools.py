@@ -3,14 +3,19 @@ import json
 import pickle
 from tqdm import tqdm
 tqdm.pandas()
+import networkx as nx
+from joblib import Parallel, delayed
+from sklearn.utils.fixes import _joblib_parallel_args
 from rdkit import Chem
 from rdkit.Chem import rdChemReactions
 from chemml.regression.gpr_learner import GPRLearner
+from chemml.classification.learner import ClassificationLearner
+from chemml.classification.gpc.gpc import GPC
 from chemml.regression.consensus import ConsensusRegressor
 from chemml.regression.GPRgraphdot.gpr import LRAGPR
 from chemml.graph.hashgraph import HashGraph
 from chemml.graph.from_rdkit import rdkit_config
-from chemml.graph.substructure import AtomEnvironment
+from chemml.graph.reaction import *
 from chemml.kernels.ConvKernel import *
 
 
@@ -98,26 +103,20 @@ def set_gpr_model(gpr, kernel_config, optimizer, alpha):
             alpha=alpha,
             normalize_y=True)
     else:
-        raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
+        raise RuntimeError(f'Unknown GaussianProcessRegressor: {gpr}')
     return model
 
 
-def set_gpc_learner(gpc):
+def set_gpc_model(gpc, kernel_config, optimizer, n_jobs):
     if gpc == 'sklearn':
-        from chemml.classification.gpc.learner import Learner
+        model = GPC(
+            kernel=kernel_config.kernel,
+            optimizer=optimizer,
+            n_jobs=n_jobs
+        )
     else:
-        raise Exception('Unknown GaussianProcessClassifier: %s' % gpc)
-    return Learner
-
-
-def set_gpr(gpr):
-    if gpr == 'graphdot':
-        from chemml.regression.GPRgraphdot.gpr import GPR
-    elif gpr == 'sklearn':
-        from chemml.regression.GPRsklearn.gpr import GPR
-    else:
-        raise Exception('Unknown GaussianProcessRegressor: %s' % gpr)
-    return GPR
+        raise RuntimeError(f'Unknown GaussianProcessClassifier: {gpc}')
+    return model
 
 
 def set_consensus_config(consensus_config):
@@ -128,6 +127,7 @@ def set_consensus_config(consensus_config):
             consensus_config.split(':')
         return True, int(n_estimators), int(n_sample_per_model), int(n_jobs), \
                consensus_rule
+
 
 def set_active_config(active_config):
     learning_mode, add_mode, init_size, add_size, max_size, search_size, \
@@ -164,20 +164,29 @@ def set_kernel_config(kernel, add_features, add_hyperparameters,
 
 
 def read_input(result_dir, input, kernel_config, properties, params):
-    def df_filter(df, train_size=None, train_ratio=None, bygroup=False, seed=0):
+    def df_filter(df, train_size=None, train_ratio=None, bygroup=False,
+                  byclass=False, seed=0):
+        np.random.seed(seed)
         if 'IsTrain' in df:
             return df[df.IsTrain == True], df[df.IsTrain == False]
-        np.random.seed(seed)
-        if bygroup:
-            gname = 'group_id'
+        elif byclass:
+            assert (train_ratio is not None)
+            df_train = []
+            for group in df.groupby(properties):
+                df_train.append(group[1].sample(frac=train_ratio))
+            df_train = pd.concat(df_train)
+            df_test = df[~df.index.isin(df_train.index)]
         else:
-            gname = 'id'
-        unique_ids = df[gname].unique()
-        if train_size is None:
-            train_size = int(unique_ids.size * train_ratio)
-        ids = np.random.choice(unique_ids, train_size, replace=False)
-        df_train = df[df[gname].isin(ids)]
-        df_test = df[~df[gname].isin(ids)]
+            if bygroup:
+                gname = 'group_id'
+            else:
+                gname = 'id'
+            unique_ids = df[gname].unique()
+            if train_size is None:
+                train_size = int(unique_ids.size * train_ratio)
+            ids = np.random.choice(unique_ids, train_size, replace=False)
+            df_train = df[df[gname].isin(ids)]
+            df_test = df[~df[gname].isin(ids)]
         return df_train, df_test
 
     if params is None:
@@ -185,6 +194,7 @@ def read_input(result_dir, input, kernel_config, properties, params):
             'train_size': None,
             'train_ratio': 1.0,
             'seed': 0,
+            'byclass': False
         }
     print('***\tStart: Reading input.\t***')
     if not os.path.exists(result_dir):
@@ -203,7 +213,8 @@ def read_input(result_dir, input, kernel_config, properties, params):
         train_size=params['train_size'],
         train_ratio=params['train_ratio'],
         seed=params['seed'],
-        bygroup=kernel_config.add_features is not None
+        bygroup=kernel_config.add_features is not None,
+        byclass=params['byclass']
     )
     # get X, Y of train and test sets
     train_X, train_Y, train_id = get_XYid_from_df(
@@ -262,7 +273,7 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
             learner.model.load(result_dir)
         else:
             learner.train()
-            learner.model.save(result_dir)
+            learner.model.save(result_dir, overwrite=True)
             kernel_config.save(result_dir, learner.model_)
         out, r2, ex_var, mae, rmse, mse = learner.evaluate_loocv()
         print('LOOCV:')
@@ -338,7 +349,8 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
     else:
         raise RuntimeError(f'Unknown mode{mode}')
 
-def gpc_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
+
+def gpc_run(data, result_dir, kernel_config, params, tag=0):
     df = data['df']
     df_train = data['df_train']
     train_X = data['train_X']
@@ -347,10 +359,8 @@ def gpc_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
     test_X = data['test_X']
     test_Y = data['test_Y']
     test_id = data['test_id']
-    optimizer = params['optimizer']
     mode = params['mode']
-    Learner = params['Learner']
-    dynamic_train_size = params['dynamic_train_size']
+    model = params['model']
 
     print('***\tStart: hyperparameters optimization.\t***')
     if mode == 'loocv':  # directly calculate the LOOCV
@@ -360,20 +370,28 @@ def gpc_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
         # to be done
         exit(0)
     else:
-        learner = Learner(train_X, train_Y, train_id, test_X, test_Y,
-                          test_id, kernel_config, optimizer=optimizer)
+        learner = ClassificationLearner(model, train_X, train_Y, train_id, test_X, test_Y,
+                                        test_id)
         learner.train()
-        learner.model.save(result_dir)
-        learner.kernel_config.save(result_dir, learner.model)
+        # learner.model.save(result_dir)
+        # learner.kernel_config.save(result_dir, learner.model)
         print('***\tEnd: hyperparameters optimization.\t***\n')
-        out, correct_ratio = learner.evaluate_train()
-        print('Training set:')
-        print('correct_ratio: %.3f' % correct_ratio)
-        out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
-                   float_format='%15.10f')
-        out, correct_ratio = learner.evaluate_test()
+        predict_train = True
+        if predict_train:
+            out, accuracy, precision, recall, f1 = learner.evaluate_train()
+            print('Training set:')
+            print('accuracy: %.3f' % accuracy)
+            print('precision: %.3f' % precision)
+            print('recall: %.3f' % recall)
+            print('f1: %.3f' % f1)
+            out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
+                       float_format='%15.10f')
+        out, accuracy, precision, recall, f1 = learner.evaluate_test()
         print('Test set:')
-        print('correct_ratio: %.3f' % correct_ratio)
+        print('accuracy: %.3f' % accuracy)
+        print('precision: %.3f' % precision)
+        print('recall: %.3f' % recall)
+        print('f1: %.3f' % f1)
         out.to_csv('%s/test-%i.log' % (result_dir, tag), sep='\t', index=False,
                    float_format='%15.10f')
 
@@ -382,102 +400,149 @@ def _get_uniX(X):
     return np.sort(np.unique(X))
 
 
+def _pure2sg(inchi_or_smiles, HASH):
+    """ Transform SMILES (or InChI) into Graph
+    
+    Parameters
+    ----------
+    inchi_or_smiles : SMILES (or InChI) of input molecule.
+    HASH : hash string.
+
+    Returns
+    -------
+    Graph used in GraphDot.
+    """
+    return HashGraph.from_inchi_or_smiles(inchi_or_smiles, HASH)
+
+
+def _mixture2sg(mixture, HASH):
+    inchi_or_smiles = mixture[::2]
+    proportion = mixture[1::2]
+    _config = list(map(lambda x: rdkit_config(concentration=x), proportion))
+    graphs = list(map(lambda x: HashGraph.from_inchi_or_smiles,
+                      inchi_or_smiles,
+                      ['1'] * len(inchi_or_smiles),
+                      _config))
+    g = graphs[0].to_networkx()
+    for _g in graphs[1:]:
+        g = nx.disjoint_union(g, _g.to_networkx())
+    g = HashGraph.from_networkx(g)
+    g.HASH = HASH
+    return g
+
+
+def _mixture2mg(mixture, HASH):
+    """ Transform a list, [SMILES1, n1, SMILES2, n2...] into
+        [Graph1, n1, graph2, n2...]
+
+    Parameters
+    ----------
+    mixture : a list contain SMILES (or InChI) and its proportion of input
+        mixture.
+    HASH : hash string prefix.
+
+    Returns
+    -------
+    The SMILES (or InChI) are transformed into graphs used in GraphDot.
+    """
+    hashes = [str(HASH) + '_%d' % i for i in range(int(len(mixture) / 2))]
+    mixture[::2] = list(map(HashGraph.from_inchi_or_smiles, mixture[::2],
+                            [rdkit_config()] * int(len(mixture) / 2),
+                            hashes))
+    return mixture
+
+
+def _reaction_agents2sg(reaction_smarts, HASH):
+    return HashGraph.agent_from_reaction_smarts(reaction_smarts, HASH)
+
+
+def _reaction_agents2mg(reaction_smarts, HASH):
+    try:
+        agents = []
+        rxn = reaction_from_smarts(reaction_smarts)
+        for i, mol in enumerate(rxn.GetAgents()):
+            Chem.SanitizeMol(mol)
+            hash_ = HASH + '_%d' % i
+            agents += [HashGraph.from_rdkit(mol, hash_), 1.0]
+        return agents
+    except:
+        return 'Parsing Error'
+
+
+def _reaction2sg(reaction_smarts, HASH):
+    return HashGraph.from_reaction_smarts(reaction_smarts, HASH)
+
+
+def _reaction2mg(reaction_smarts, HASH):
+    try:
+        reaction = []
+        rxn = reaction_from_smarts(reaction_smarts)
+        ReactingAtoms = getReactingAtoms(rxn, depth=1)
+        for i, reactant in enumerate(rxn.GetReactants()):
+            Chem.SanitizeMol(reactant)
+            hash_ = HASH + '_r%d' % i
+            config_ = rdkit_config(reaction_center=ReactingAtoms)
+            reaction += [HashGraph.from_rdkit(reactant, hash_, config_),
+                         1.0]
+            if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
+                print('Reactants error and return Parsing Error for reaction: '
+                      '%s', reaction_smarts)
+        for i, product in enumerate(rxn.GetProducts()):
+            Chem.SanitizeMol(product)
+            hash_ = HASH + '_p%d' % i
+            config_ = rdkit_config(reaction_center=ReactingAtoms)
+            reaction += [HashGraph.from_rdkit(product, hash_, config_),
+                         -1.0]
+            if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
+                print('Products error and return Parsing Error for reaction: '
+                      '%s', reaction_smarts)
+        return reaction
+    except:
+        return 'Parsing Error'
+
+
 def single2graph(args_kwargs):
+    """ Function used for parallel graph transformation. This function cannot be
+        pickled if put in get_df
+    """
     df, sg = args_kwargs
     if len(np.unique(df[sg])) > 0.5 * len(df[sg]):
         return df.progress_apply(
             lambda x: HashGraph.from_inchi_or_smiles(
-                x[sg], rdkit_config(), str(x['group_id'])), axis=1)
+                x[sg], str(x['group_id'])), axis=1)
     else:
         graphs = []
         gids = []
         for g in df.groupby('group_id'):
             assert (len(g[1][sg].unique()) == 1)
             graphs.append(HashGraph.from_inchi_or_smiles(
-                g[1][sg].tolist()[0], rdkit_config(), str(g[0])))
+                g[1][sg].tolist()[0], str(g[0])))
             gids.append(g[0])
         idx = np.searchsorted(gids, df['group_id'])
-        return np.asarray(graphs)[idx]
-
-
-def multi_graph_transform(line, hash):
-    hashs = [str(hash) + '_%d' % i for i in range(int(len(line) / 2))]
-    line[::2] = list(map(HashGraph.from_inchi_or_smiles, line[::2],
-                         [rdkit_config()] * int(len(line) / 2),
-                         hashs))
-    return line
+    return np.asarray(graphs)[idx]
 
 
 def multi2graph(args_kwargs):
+    """ Function used for parallel graph transformation. This function cannot be
+        pickled if put in get_df
+    """
     df, mg = args_kwargs
     if len(np.unique(df[mg])) > 0.5 * len(df[mg]):
         return df.progress_apply(
-            lambda x: multi_graph_transform(
+            lambda x: _mixture2mg(
                 x[mg], str(x['group_id'])), axis=1)
     else:
         graphs = []
         gids = []
         for g in df.groupby('group_id'):
-            graphs.append(multi_graph_transform(g[1][mg][0], g[0]))
+            graphs.append(_mixture2mg(g[1][mg][0], g[0]))
             gids.append(g[0])
         idx = np.searchsorted(gids, df['group_id'])
         return np.asarray(graphs)[idx]
 
 
-def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
-    def reaction2agent(reaction_smarts, hash):
-        agents = []
-        rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
-        # print(reaction_smarts)
-        for i, mol in enumerate(rxn.GetAgents()):
-            Chem.SanitizeMol(mol)
-            hash_ = hash + '_%d' % i
-            config_ = rdkit_config()
-            agents += [HashGraph.from_rdkit(mol, config_, hash_), 1.0]
-        return agents
-
-    def reaction2rp(reaction_smarts, hash):
-        reaction = []
-        rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
-
-        # rxn.Initialize()
-        def getAtomMapDict(mols):
-            AtomMapDict = dict()
-            for mol in mols:
-                Chem.SanitizeMol(mol)
-                for atom in mol.GetAtoms():
-                    AMN = atom.GetPropsAsDict().get('molAtomMapNumber')
-                    if AMN is not None:
-                        AtomMapDict[AMN] = AtomEnvironment(
-                            mol, atom, depth=1)
-            return AtomMapDict
-
-        def getReactingAtoms(rxn):
-            ReactingAtoms = []
-            reactantAtomMap = getAtomMapDict(rxn.GetReactants())
-            productAtomMap = getAtomMapDict(rxn.GetProducts())
-            for id, AE in reactantAtomMap.items():
-                if AE != productAtomMap.get(id):
-                    ReactingAtoms.append(id)
-            return ReactingAtoms
-
-        ReactingAtoms = getReactingAtoms(rxn)
-        for i, reactant in enumerate(rxn.GetReactants()):
-            Chem.SanitizeMol(reactant)
-            hash_ = hash + '_r%d' % i
-            config_ = rdkit_config(reaction_center=ReactingAtoms)
-            reaction += [HashGraph.from_rdkit(reactant, config_, hash_), 1.0]
-            if True not in reaction[-2].nodes.to_pandas()['group_reaction']:
-                raise Exception('Reactants error:', reaction_smarts)
-        for i, product in enumerate(rxn.GetProducts()):
-            Chem.SanitizeMol(product)
-            hash_ = hash + '_p%d' % i
-            config_ = rdkit_config(reaction_center=ReactingAtoms)
-            reaction += [HashGraph.from_rdkit(product, config_, hash_), -1.0]
-            if True not in reaction[-2].nodes.to_pandas()['group_reaction']:
-                raise Exception('Products error:', reaction_smarts)
-        return reaction
-
+def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
+           parallel='Parallel'):
     if pkl is not None and os.path.exists(pkl):
         print('reading existing pkl file: %s' % pkl)
         df = pd.read_pickle(pkl)
@@ -493,33 +558,90 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1):
             df.update(g[1])
         df['id'] = df['id'].astype(int)
         df['group_id'] = df['group_id'].astype(int)
-        df_parts = np.array_split(df, n_process)
         # transform single graph
         for sg in single_graph:
             print('Transforming molecules into graphs. (pure compounds)')
-            with Pool(processes=n_process) as pool:
-                result_parts = pool.map(
-                    single2graph, [(df_part, sg) for df_part in df_parts])
-            df[sg] = np.concatenate(result_parts)
-            unify_datatype(df[sg])
+            if parallel == 'pool':
+                df_parts = np.array_split(df, n_process)
+                with Pool(processes=n_process) as pool:
+                    result_parts = pool.map(
+                        single2graph, [(df_part, sg) for df_part in df_parts])
+                df[sg + '_sg'] = np.concatenate(result_parts)
+            else:
+                df[sg + '_sg'] = Parallel(
+                    n_jobs=n_process, verbose=True,
+                    **_joblib_parallel_args(prefer='processes'))(
+                    delayed(_pure2sg)(
+                        df.iloc[i][sg], df.iloc[i]['group_id'].astype(str))
+                    for i in df.index)
+            unify_datatype(df[sg + '_sg'])
         # transform multi graph
         for mg in multi_graph:
             print('Transforming molecules into graphs. (mixtures)')
-            with Pool(processes=n_process) as pool:
-                result_parts = pool.map(
-                    multi2graph, [(df_part, mg) for df_part in df_parts])
-            df[mg] = np.concatenate(result_parts)
+            if parallel == 'pool':
+                df_parts = np.array_split(df, n_process)
+                with Pool(processes=n_process) as pool:
+                    result_parts = pool.map(
+                        multi2graph, [(df_part, mg) for df_part in df_parts])
+                df[mg] = np.concatenate(result_parts)
+            else:
+                df[mg + '_sg'] = Parallel(
+                    n_jobs=n_process, verbose=True,
+                    **_joblib_parallel_args(prefer='processes'))(
+                    delayed(_mixture2sg)(
+                        df.iloc[i][mg], df.iloc[i]['group_id'].astype(str))
+                    for i in df.index)
+                df[mg] = Parallel(n_jobs=n_process, verbose=True,
+                                  **_joblib_parallel_args(prefer='processes'))(
+                    delayed(_mixture2mg)(
+                        df.iloc[i][mg], df.iloc[i]['group_id'].astype(str))
+                    for i in df.index)
+                unify_datatype(df[mg + '_sg'])
             unify_datatype(df[mg])
         # transform reaction graph
         for rg in reaction_graph:
-            print('Transforming reagents into graphs.')
-            df[rg + '_agents'] = df.progress_apply(
-                lambda x: reaction2agent(x[rg], str(x['group_id'])), axis=1)
-            unify_datatype(df[rg + '_agents'])
-            print('Transforming chemical reactions into graphs.')
-            df[rg] = df.progress_apply(
-                lambda x: reaction2rp(x[rg], str(x['group_id'])), axis=1)
-            unify_datatype(df[rg])
+            print('Transforming reagents into single graphs.')
+            df[rg + '_agents_sg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction_agents2sg)(
+                    df.iloc[i][rg],
+                    df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            df = df[~df[rg + '_agents_sg'].isin(['Parsing Error'])].\
+                reset_index().drop(columns='index')
+            unify_datatype(df[rg + '_agents_sg'])
+            print('Transforming reagents into multi graphs.')
+            df[rg + '_agents_mg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction_agents2mg)(df.iloc[i][rg],
+                                             df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            df = df[df[rg + '_agents_mg'] != 'Parsing Error'].\
+                reset_index().drop(columns='index')
+            unify_datatype(df[rg + '_agents_mg'])
+            print('Transforming chemical reactions into single graphs.')
+            df[rg + '_sg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction2sg)(df.iloc[i][rg],
+                                      df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            df = df[~df[rg + '_sg'].isin(['Parsing Error'])].\
+                reset_index().drop(columns='index')
+            unify_datatype(df[rg + '_sg'])
+            print('Transforming chemical reactions into multi graphs.')
+            df[rg + '_mg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction2mg)(df.iloc[i][rg],
+                                      df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            # df = df[~df[rg + '_mg'].isin(['Parsing Error'])]
+            df = df[df[rg + '_mg'] != 'Parsing Error'].\
+                reset_index().drop(columns='index')
+            unify_datatype(df[rg + '_mg'])
         if pkl is not None:
             df.to_pickle(pkl)
     return df
