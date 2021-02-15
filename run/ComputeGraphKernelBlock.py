@@ -54,6 +54,7 @@ def main():
                 os.path.join(args.result_dir, '%s.pkl' % ','.join(properties)),
                 single_graph, multi_graph, reaction_graph)
     X, group_id = get_Xgroupid_from_df(df, single_graph, multi_graph)
+    print('There are %s samples in total.' % len(X))
     # set block config
     block_length, block_x_id, block_y_id = set_block_config(args.block_config)
     assert (block_x_id <= block_y_id)
