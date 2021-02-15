@@ -152,15 +152,34 @@ three types.
       
 # Kernel Computation in Blocks
 1. For large data sets, it is convenient to calculate the kernel matrix in blocks 
-and then concatenate them.
-   - A example is given for chemical reaction kernel. The following commands
-   are equivalent to the Step 3 in Chemical Reaction Classification.
+and then concatenate them. A example is given for chemical reaction kernel.
+The following commands are equivalent to the Step 3 in Chemical Reaction Classification.
+
+2. Compute a sub-block of graph kernel matrix
+    - Kernel matrix of reaction
         ```
         python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg:::reaction_type --block_config 1500:0,0 --json_hyper ../hyperparameters/reaction.json
         python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg:::reaction_type --block_config 1500:0,1 --json_hyper ../hyperparameters/reaction.json
         python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg:::reaction_type --block_config 1500:1,1 --json_hyper ../hyperparameters/reaction.json
-        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg:::reaction_type --block_config 1500:0,0 --json_hyper ../hyperparameters/reaction.json
-        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg:::reaction_type --block_config 1500:0,1 --json_hyper ../hyperparameters/reaction.json
-        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg:::reaction_type --block_config 1500:1,1 --json_hyper ../hyperparameters/reaction.json
+        ```
+      
+    - Kernel matrix of reagents
+        ```
+        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,0 --json_hyper ../hyperparameters/TMG.json
+        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,1 --json_hyper ../hyperparameters/TMG.json
+        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_agents_sg:::reaction_type --block_config 1500:1,1 --json_hyper ../hyperparameters/TMG.json
+        ```
+      
+3. Compute a sub-block of hybrid kernel matrix
+    - Hybrid kernel matrix of reaction and reagents
+        ```
+        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg,reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,0
+        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg,reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,1
+        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/reaction_classification.txt --input_config reaction_smarts_sg,reaction_smarts_agents_sg:::reaction_type --block_config 1500:1,1
+        ```
+
+4. Compute the final kernel matrix
+    - Concatenate all the blocks of kernel matrix
+        ```
         python3 ConcatBlockKernels.py --result_dir rxn --block_config 1500:2,2
         ```

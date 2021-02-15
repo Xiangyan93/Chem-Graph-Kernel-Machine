@@ -21,19 +21,14 @@ def main():
         '-i', '--input', type=str, help='Input data in csv format.'
     )
     parser.add_argument(
-        '--input_config', type=str,
-        help='Columns in input data. Only one multi graph can be assigned.\n'
-             'format: single_graph:multi_graph:targets\n'
-             'examples: inchi::tt\n'
+        '--input_config', type=str, help='Columns in input data.\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tc\n'
     )
     parser.add_argument(
         '--block_config', type=str, help='Block parameters\n'
                                          'format: block_length:x_id,y_id\n'
                                          'examples: 10000:0,0\n'
-    )
-    parser.add_argument(
-        '--json_hyper', type=str, default=None,
-        help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
         '-n', '--n_jobs', type=int, default=1,

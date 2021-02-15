@@ -21,11 +21,9 @@ def main():
         '-i', '--input', type=str, help='Input data in csv format.'
     )
     parser.add_argument(
-        '--input_config', type=str,
-        help='Columns in input data. Only one column contain graphs can be '
-             'assigned.\n'
-             'format: single_graph:multi_graph:targets\n'
-             'examples: inchi::tt\n'
+        '--input_config', type=str, help='Columns in input data.\n'
+        'format: single_graph:multi_graph:reaction_graph:targets\n'
+        'examples: inchi:::tc\n'
     )
     parser.add_argument(
         '--block_config', type=str, help='Block parameters\n'
@@ -49,7 +47,7 @@ def main():
         single_graph, multi_graph, args.json_hyper,
         args.result_dir,
     )
-    # set kernel_config
+    # set X group_id
     df = get_df(args.input,
                 os.path.join(args.result_dir, '%s.pkl' % ','.join(properties)),
                 single_graph, multi_graph, reaction_graph)
@@ -58,6 +56,7 @@ def main():
     # set block config
     block_length, block_x_id, block_y_id = set_block_config(args.block_config)
     assert (block_x_id <= block_y_id)
+    assert (len(X) / block_length > block_y_id)
     x0, x1 = block_x_id * block_length, (block_x_id + 1) * block_length
     y0, y1 = block_y_id * block_length, (block_y_id + 1) * block_length
     X, Y = X[x0:x1], X[y0:y1]
