@@ -10,7 +10,7 @@ from run.tools import *
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description='Gaussian process classification using graph kernel',
+        description='Support vector machine classification using graph kernel',
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
@@ -18,19 +18,18 @@ def main():
         help='The output directory.',
     )
     parser.add_argument(
-        '--gpc', type=str, default="sklearn:none",
-        help='The GaussianProcessClassifier, optimizer.\n'
-             'format: classifier:optimizer\n'
+        '--svc', type=str, default="sklearn",
+        help='The SVMClassifier.\n'
+             'format: classifier\n'
              'examples:\n'
-             'sklearn:fmin_l_bfgs_b\n'
-             'sklearn:None'
+             'sklearn'
     )
     parser.add_argument(
         '--kernel', type=str,
-        help='format: kernel.\n'
+        help='format: kernel:C.\n'
              'examples:\n'
-             'graph\n'
-             'preCalc\n'
+             'graph:1.0\n'
+             'preCalc:1.0\n'
              'For preCalc kernel, run KernelCalc.py first.'
     )
     parser.add_argument(
@@ -61,15 +60,11 @@ def main():
         '--json_hyper', type=str, default=None,
         help='Reading hyperparameter file.\n'
     )
-    parser.add_argument(
-        '-n', '--n_jobs', type=int, default=cpu_count(),
-        help='The cpu numbers for parallel computing.'
-    )
     args = parser.parse_args()
 
     # set args
-    gpc, optimizer = set_gpc_optimizer(args.gpc)
-    kernel = args.kernel
+    svc = args.svc
+    kernel, C = set_kernel_alpha(args.kernel)
     single_graph, multi_graph, reaction_graph, properties = \
         set_graph_property(args.input_config)
     add_f, add_p = set_add_feature_hyperparameters(args.add_features)
@@ -84,9 +79,7 @@ def main():
     )
 
     # set Gaussian process classifier
-    if kernel == 'graph':
-        assert (args.n_jobs == 1)
-    model = set_gpc_model(gpc, kernel_config, optimizer, n_jobs=args.n_jobs)
+    model = set_svc_model(svc, kernel_config, C=C)
 
     # read input
     params = {

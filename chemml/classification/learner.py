@@ -21,7 +21,7 @@ class ClassificationLearner(KernelClassificationBaseLearner):
         elif self.model.__class__ == SVC:
             self.model.fit(train_X, train_y)
             self.model.X_id_ = train_id
-            print('hyperparameter: ', self.model.kernel_.hyperparameters)
+            print('hyperparameter: ', self.model.kernel.hyperparameters)
         else:
             raise RuntimeError(f'Unknown classifier {self.model}')
 

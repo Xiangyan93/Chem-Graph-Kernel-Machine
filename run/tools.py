@@ -11,6 +11,7 @@ from rdkit.Chem import rdChemReactions
 from chemml.regression.gpr_learner import GPRLearner
 from chemml.classification.learner import ClassificationLearner
 from chemml.classification.gpc.gpc import GPC
+from chemml.classification.svm.svm import SVC
 from chemml.regression.consensus import ConsensusRegressor
 from chemml.regression.GPRgraphdot.gpr import LRAGPR
 from chemml.graph.hashgraph import HashGraph
@@ -116,6 +117,17 @@ def set_gpc_model(gpc, kernel_config, optimizer, n_jobs):
         )
     else:
         raise RuntimeError(f'Unknown GaussianProcessClassifier: {gpc}')
+    return model
+
+
+def set_svc_model(svc, kernel_config, C):
+    if svc == 'sklearn':
+        model = SVC(
+            kernel=kernel_config.kernel,
+            C=C
+        )
+    else:
+        raise RuntimeError(f'Unknown SVMClassifier: {svc}')
     return model
 
 

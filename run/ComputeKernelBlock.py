@@ -36,7 +36,7 @@ def main():
         help='Reading hyperparameter file.\n'
     )
     parser.add_argument(
-        '-n', '--ntasks', type=int, default=cpu_count(),
+        '-n', '--n_jobs', type=int, default=1,
         help='The cpu numbers for parallel computing.'
     )
     args = parser.parse_args()
@@ -109,7 +109,7 @@ def main():
             graph = dict_xy['graph_X']
             K_graph = dict_xy['K_graph']
         assert (False not in (K_graph - K_graph.T < 1e-5))
-        K.append(ConvolutionKernel()(X, Y, n_process=args.ntasks,
+        K.append(ConvolutionKernel()(X, Y, n_process=args.n_jobs,
                                      graph=graph, K_graph=K_graph,
                                      theta=dict_xy['theta']))
         group_id_X.append(group_id[x0:x1])
