@@ -87,7 +87,7 @@ def main():
     assert (False not in (Y == np.sort(Y)))
     if block_x_id == block_y_id:
         assert (False not in (X == Y))
-        assert (False not in (K - K.T < 1e-5))
+        assert (False not in (K - K.T < 1e-2))
     # output
     kernel_pkl = os.path.join(args.result_dir, 'graph_kernel_%s_%d_%d.pkl' %
                               (graph_column, block_x_id, block_y_id))
