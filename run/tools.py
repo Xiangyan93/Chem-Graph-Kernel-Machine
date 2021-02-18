@@ -335,7 +335,8 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
             print('mae: %.5f' % mae)
             print('rmse: %.5f' % rmse)
             print('mse: %.5f' % mse)
-            out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
+            out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t',
+                       index=False,
                        float_format='%15.10f')
         out, r2, ex_var, mae, rmse, mse = learner.evaluate_test()
         print('Test set:')
@@ -382,7 +383,8 @@ def gpc_run(data, result_dir, kernel_config, params, tag=0):
         # to be done
         exit(0)
     else:
-        learner = ClassificationLearner(model, train_X, train_Y, train_id, test_X, test_Y,
+        learner = ClassificationLearner(model, train_X, train_Y, train_id,
+                                        test_X, test_Y,
                                         test_id)
         learner.train()
         # learner.model.save(result_dir)
@@ -396,7 +398,8 @@ def gpc_run(data, result_dir, kernel_config, params, tag=0):
             print('precision: %.3f' % precision)
             print('recall: %.3f' % recall)
             print('f1: %.3f' % f1)
-            out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t', index=False,
+            out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t',
+                       index=False,
                        float_format='%15.10f')
         out, accuracy, precision, recall, f1 = learner.evaluate_test()
         print('Test set:')
@@ -469,16 +472,47 @@ def _reaction_agents2sg(reaction_smarts, HASH):
 
 
 def _reaction_agents2mg(reaction_smarts, HASH):
-    try:
-        agents = []
-        rxn = reaction_from_smarts(reaction_smarts)
-        for i, mol in enumerate(rxn.GetAgents()):
-            Chem.SanitizeMol(mol)
-            hash_ = HASH + '_%d' % i
-            agents += [HashGraph.from_rdkit(mol, hash_), 1.0]
-        return agents
-    except:
-        return 'Parsing Error'
+    agents = []
+    rxn = reaction_from_smarts(reaction_smarts)
+    for i, mol in enumerate(rxn.GetAgents()):
+        Chem.SanitizeMol(mol)
+        hash_ = HASH + '_%d' % i
+        agents += [HashGraph.from_rdkit(mol, hash_), 1.0]
+    return agents
+
+
+def _reaction_reactants2sg(reaction_smarts, HASH):
+    return HashGraph.reactant_from_reaction_smarts(reaction_smarts, HASH)
+
+
+def _reaction_reactants2mg(reaction_smarts, HASH):
+    reactants = []
+    rxn = reaction_from_smarts(reaction_smarts)
+    ReactingAtoms = getReactingAtoms(rxn, depth=1)
+    _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                 reactant_or_product='reactant')
+    for i, mol in enumerate(rxn.GetReactants()):
+        Chem.SanitizeMol(mol)
+        hash_ = HASH + '_%d' % i
+        reactants += [HashGraph.from_rdkit(mol, hash_, _rdkit_config), 1.0]
+    return reactants
+
+
+def _reaction_products2sg(reaction_smarts, HASH):
+    return HashGraph.product_from_reaction_smarts(reaction_smarts, HASH)
+
+
+def _reaction_products2mg(reaction_smarts, HASH):
+    products = []
+    rxn = reaction_from_smarts(reaction_smarts)
+    ReactingAtoms = getReactingAtoms(rxn, depth=1)
+    _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                 reactant_or_product='reactant')
+    for i, mol in enumerate(rxn.GetProducts()):
+        Chem.SanitizeMol(mol)
+        hash_ = HASH + '_%d' % i
+        products += [HashGraph.from_rdkit(mol, hash_, _rdkit_config), 1.0]
+    return products
 
 
 def _reaction2sg(reaction_smarts, HASH):
@@ -486,31 +520,28 @@ def _reaction2sg(reaction_smarts, HASH):
 
 
 def _reaction2mg(reaction_smarts, HASH):
-    try:
-        reaction = []
-        rxn = reaction_from_smarts(reaction_smarts)
-        ReactingAtoms = getReactingAtoms(rxn, depth=1)
-        for i, reactant in enumerate(rxn.GetReactants()):
-            Chem.SanitizeMol(reactant)
-            hash_ = HASH + '_r%d' % i
-            config_ = rdkit_config(reaction_center=ReactingAtoms)
-            reaction += [HashGraph.from_rdkit(reactant, hash_, config_),
-                         1.0]
-            if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
-                print('Reactants error and return Parsing Error for reaction: '
-                      '%s', reaction_smarts)
-        for i, product in enumerate(rxn.GetProducts()):
-            Chem.SanitizeMol(product)
-            hash_ = HASH + '_p%d' % i
-            config_ = rdkit_config(reaction_center=ReactingAtoms)
-            reaction += [HashGraph.from_rdkit(product, hash_, config_),
-                         -1.0]
-            if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
-                print('Products error and return Parsing Error for reaction: '
-                      '%s', reaction_smarts)
-        return reaction
-    except:
-        return 'Parsing Error'
+    reaction = []
+    rxn = reaction_from_smarts(reaction_smarts)
+    ReactingAtoms = getReactingAtoms(rxn, depth=1)
+    for i, reactant in enumerate(rxn.GetReactants()):
+        Chem.SanitizeMol(reactant)
+        hash_ = HASH + '_r%d' % i
+        config_ = rdkit_config(reaction_center=ReactingAtoms)
+        reaction += [HashGraph.from_rdkit(reactant, hash_, config_),
+                     1.0]
+        if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
+            print('Reactants error and return Parsing Error for reaction: '
+                  '%s', reaction_smarts)
+    for i, product in enumerate(rxn.GetProducts()):
+        Chem.SanitizeMol(product)
+        hash_ = HASH + '_p%d' % i
+        config_ = rdkit_config(reaction_center=ReactingAtoms)
+        reaction += [HashGraph.from_rdkit(product, hash_, config_),
+                     -1.0]
+        if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
+            print('Products error and return Parsing Error for reaction: '
+                  '%s', reaction_smarts)
+    return reaction
 
 
 def single2graph(args_kwargs):
@@ -620,9 +651,12 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg],
                     df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
-            df = df[~df[rg + '_agents_sg'].isin(['Parsing Error'])].\
-                reset_index().drop(columns='index')
+            # print('%d / %d reactions are removed due to Parsing Error.' %
+            #      ((df[rg + '_agents_sg'].isin(['Parsing Error'])).sum(), len(df)))
+            # df = df[~df[rg + '_agents_sg'].isin(['Parsing Error'])].\
+            #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_agents_sg'])
+
             print('Transforming reagents into multi graphs.')
             df[rg + '_agents_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -630,9 +664,12 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                 delayed(_reaction_agents2mg)(df.iloc[i][rg],
                                              df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
-            df = df[df[rg + '_agents_mg'] != 'Parsing Error'].\
-                reset_index().drop(columns='index')
+            # print('%d / %d reactions are removed due to Parsing Error.' %
+            #      ((df[rg + '_agents_mg'] == 'Parsing Error').sum(), len(df)))
+            # df = df[df[rg + '_agents_mg'] != 'Parsing Error'].\
+            #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_agents_mg'])
+
             print('Transforming chemical reactions into single graphs.')
             df[rg + '_sg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -640,9 +677,12 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                 delayed(_reaction2sg)(df.iloc[i][rg],
                                       df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
-            df = df[~df[rg + '_sg'].isin(['Parsing Error'])].\
-                reset_index().drop(columns='index')
+            # print('%d / %d reactions are removed due to Parsing Error.' %
+            #      ((df[rg + '_sg'].isin(['Parsing Error'])).sum(), len(df)))
+            # df = df[~df[rg + '_sg'].isin(['Parsing Error'])].\
+            #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_sg'])
+
             print('Transforming chemical reactions into multi graphs.')
             df[rg + '_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -650,10 +690,48 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                 delayed(_reaction2mg)(df.iloc[i][rg],
                                       df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
-            # df = df[~df[rg + '_mg'].isin(['Parsing Error'])]
-            df = df[df[rg + '_mg'] != 'Parsing Error'].\
-                reset_index().drop(columns='index')
+            # print('%d / %d reactions are removed due to Parsing Error.' %
+            #      ((df[rg + '_mg'] == 'Parsing Error').sum(), len(df)))
+            # df = df[df[rg + '_mg'] != 'Parsing Error'].\
+            #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_mg'])
+
+            print('Transforming reactants into single graphs.')
+            df[rg + '_reactants_sg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction_reactants2sg)(
+                    df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            unify_datatype(df[rg + '_reactants_sg'])
+
+            print('Transforming reactants into multi graphs.')
+            df[rg + '_reactants_mg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction_reactants2mg)(
+                    df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            unify_datatype(df[rg + '_reactants_mg'])
+
+            print('Transforming products into single graphs.')
+            df[rg + '_products_sg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction_products2sg)(
+                    df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            unify_datatype(df[rg + '_products_sg'])
+
+            print('Transforming products into multi graphs.')
+            df[rg + '_products_mg'] = Parallel(
+                n_jobs=n_process, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_reaction_products2mg)(
+                    df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            unify_datatype(df[rg + '_products_mg'])
+
         if pkl is not None:
             df.to_pickle(pkl)
     return df

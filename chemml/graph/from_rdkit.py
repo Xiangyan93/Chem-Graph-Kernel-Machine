@@ -454,7 +454,3 @@ def _from_rdkit(cls, mol, rdkit_config):
     #rdkit_config.set_node_propogation(g, mol, 'FirstNeighbors', depth=4)
     #rdkit_config.set_node_propogation(g, mol, 'Aromatic', depth=4)
     return _from_networkx(cls, g)
-
-
-def _from_rdkit_reaction(cls, rxn, rdkit_config):
-    pass

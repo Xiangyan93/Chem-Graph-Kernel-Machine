@@ -84,55 +84,85 @@ class HashGraph(Graph):
     @classmethod
     def agent_from_reaction_smarts(cls, reaction_smarts, HASH,
                                    _rdkit_config=rdkit_config()):
-        try:
-            rxn = reaction_from_smarts(reaction_smarts)
-            for agent in rxn.GetAgents():
-                Chem.SanitizeMol(agent)
+        rxn = reaction_from_smarts(reaction_smarts)
+        for agent in rxn.GetAgents():
+            Chem.SanitizeMol(agent)
 
-            if len(rxn.GetAgents()) == 0:
-                return HashGraph.from_smiles('[He]', HASH, _rdkit_config)
+        if len(rxn.GetAgents()) == 0:
+            return HashGraph.from_smiles('[He]', HASH, _rdkit_config)
 
-            agents = HashGraph.from_rdkit(
-                rxn.GetAgents()[0], '1', _rdkit_config).to_networkx()
-            for mol in rxn.GetAgents()[1:]:
-                g = HashGraph.from_rdkit(mol, '1', _rdkit_config).to_networkx()
-                agents = nx.disjoint_union(agents, g)
-            g = _from_networkx(cls, agents)
-            g.hash = HASH
-        except:
-            return 'Parsing Error'
+        agents = HashGraph.from_rdkit(
+            rxn.GetAgents()[0], '1', _rdkit_config).to_networkx()
+        for mol in rxn.GetAgents()[1:]:
+            g = HashGraph.from_rdkit(mol, '1', _rdkit_config).to_networkx()
+            agents = nx.disjoint_union(agents, g)
+        g = _from_networkx(cls, agents)
+        g.hash = HASH
         return g
 
     @classmethod
     def from_reaction_smarts(cls, reaction_smarts, HASH):
-        try:
-            rxn = reaction_from_smarts(reaction_smarts)
-            ReactingAtoms = getReactingAtoms(rxn, depth=1)
+        rxn = reaction_from_smarts(reaction_smarts)
+        ReactingAtoms = getReactingAtoms(rxn, depth=1)
 
-            _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
-                                         reactant_or_product='reactant')
-            reaction = HashGraph.from_rdkit(
-                rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
-            for reactant in rxn.GetReactants()[1:]:
-                g = HashGraph.from_rdkit(reactant, '1', _rdkit_config).\
-                    to_networkx()
-                reaction = nx.disjoint_union(reaction, g)
+        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                     reactant_or_product='reactant')
+        reaction = HashGraph.from_rdkit(
+            rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
+        for reactant in rxn.GetReactants()[1:]:
+            g = HashGraph.from_rdkit(reactant, '1', _rdkit_config).\
+                to_networkx()
+            reaction = nx.disjoint_union(reaction, g)
 
-            _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
-                                         reactant_or_product='product')
-            for product in rxn.GetProducts():
-                g = HashGraph.from_rdkit(product, '1', _rdkit_config).\
-                    to_networkx()
-                reaction = nx.disjoint_union(reaction, g)
+        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                     reactant_or_product='product')
+        for product in rxn.GetProducts():
+            g = HashGraph.from_rdkit(product, '1', _rdkit_config).\
+                to_networkx()
+            reaction = nx.disjoint_union(reaction, g)
 
-            g = _from_networkx(cls, reaction)
-            g.hash = HASH
-        except:
-            return 'Parsing Error'
+        g = _from_networkx(cls, reaction)
+        g.hash = HASH
         if g.nodes.to_pandas()['ReactingCenter'].max() <= 0:
             raise RuntimeError(f'No reacting atoms are found in reactants:　'
                                f'{reaction_smarts}')
         if g.nodes.to_pandas()['ReactingCenter'].min() >= 0:
             raise RuntimeError(f'No reacting atoms are found in products:　'
                                f'{reaction_smarts}')
+        return g
+
+    @classmethod
+    def reactant_from_reaction_smarts(cls, reaction_smarts, HASH):
+        rxn = reaction_from_smarts(reaction_smarts)
+        ReactingAtoms = getReactingAtoms(rxn, depth=1)
+
+        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                     reactant_or_product='reactant')
+        reaction = HashGraph.from_rdkit(
+            rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
+        for reactant in rxn.GetReactants()[1:]:
+            g = HashGraph.from_rdkit(reactant, '1', _rdkit_config).\
+                to_networkx()
+            reaction = nx.disjoint_union(reaction, g)
+
+        g = _from_networkx(cls, reaction)
+        g.hash = HASH
+        return g
+
+    @classmethod
+    def product_from_reaction_smarts(cls, reaction_smarts, HASH):
+        rxn = reaction_from_smarts(reaction_smarts)
+        ReactingAtoms = getReactingAtoms(rxn, depth=1)
+
+        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                     reactant_or_product='reactant')
+        reaction = HashGraph.from_rdkit(
+            rxn.GetProducts()[0], '1', _rdkit_config).to_networkx()
+        for product in rxn.GetProducts()[1:]:
+            g = HashGraph.from_rdkit(product, '1', _rdkit_config).\
+                to_networkx()
+            reaction = nx.disjoint_union(reaction, g)
+
+        g = _from_networkx(cls, reaction)
+        g.hash = HASH
         return g
