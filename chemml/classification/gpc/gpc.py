@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from sklearn.gaussian_process._gpc import GaussianProcessClassifier as GPC
 import os
 import pickle

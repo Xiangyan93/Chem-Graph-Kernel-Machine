@@ -2,29 +2,26 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-
-CWD = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(CWD, '../..'))
 import pandas as pd
 from rxnmapper import RXNMapper
-
-rxn_mapper = RXNMapper()
 from tqdm import tqdm
-
-tqdm.pandas()
-from chemml.graph.reaction import *
+from joblib import Parallel, delayed
+from sklearn.utils.fixes import _joblib_parallel_args
+CWD = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(CWD, '../..'))
+from chemml.graph.molecule.reaction import *
 
 
 def parse_reaction(reaction_smarts):
     try:
-        reaction_from_smarts(reaction_smarts)
+        RxnFromSmarts(reaction_smarts)
         return True
     except:
         return False
 
 
 def remap_reaction(reaction_smarts, confidence=0.0):
-    unmapped_reaction_smarts = get_unmapped_reaction(reaction_smarts)
+    unmapped_reaction_smarts = GetUnmappedReactionSmarts(reaction_smarts)
     try:
         result = rxn_mapper.get_attention_guided_atom_maps(
             [unmapped_reaction_smarts])
@@ -34,21 +31,6 @@ def remap_reaction(reaction_smarts, confidence=0.0):
             return 'Unconfident Mapping'
     except:
         return 'Mapping Error'
-    '''
-    try:
-        unmapped_reaction_smarts = get_unmapped_reaction(reaction_smarts)
-    except:
-        return 'RDKit Parsing Error'
-    try:
-        result = rxn_mapper.get_attention_guided_atom_maps(
-            [unmapped_reaction_smarts])
-        if result[0]['confidence'] > confidence:
-            return result[0]['mapped_rxn']
-        else:
-            return 'Unconfident Mapping'
-    except:
-        return 'Mapping Error'
-    '''
 
 
 def main():
@@ -74,6 +56,10 @@ def main():
              'examples:\n'
              'rxnmapper:0.95'
     )
+    parser.add_argument(
+        '-n', '--n_jobs', type=int, default=1,
+        help='The cpu numbers for parallel computing.'
+    )
     args = parser.parse_args()
     df = pd.read_csv(args.input, sep='\s+')
     # Delete repeated reactions.
@@ -82,24 +68,38 @@ def main():
         dfs.append(g[1].sample(1))
     df_ = pd.concat(dfs)
     print('%d reactions are repeated.' % (len(df) - len(df_)))
-    df = df_
+    df = df_.sort_index().reset_index().drop(columns=['index'])
 
+    print('\nFinding parsing error reactions')
     # Delete parsing error reactions, using RDKit.
-    df['error'] = ~df[args.reaction].progress_apply(parse_reaction)
+    # df['error'] = ~df[args.reaction].progress_apply(parse_reaction)
+    df['error'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(parse_reaction)(df.iloc[i][args.reaction])
+        for i in df.index)
+    df['error'] = ~df['error']
     n_parse_error = df['error'].value_counts().get(True)
     if n_parse_error is not None:
         print('%d reactions cannot be correctly parsed by RDKit. Saved in '
               'parse_error.csv' % n_parse_error)
         df[df['error'] == True].to_csv('parse_error.csv', sep=' ', index=False)
-        df = df[df['error'] == False].copy()
+        df = df[df['error'] == False]. \
+            copy().sort_index().reset_index().drop(columns=['index'])
 
     # Delete trivial reactions.
-    df['error'] = df[args.reaction].progress_apply(Is_trivial_reaction)
+    print('\nFinding trivial reactions.')
+    df['error'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(IsTrivialReaction)(df.iloc[i][args.reaction])
+        for i in df.index)
     n_trivial = df['error'].value_counts().get(True)
     if n_trivial is not None:
         print('%d reactions are trivial. Saved in trivial.csv' % n_trivial)
         df[df['error'] == True].to_csv('trivial.csv', sep=' ', index=False)
-        df = df[df['error'] == False].copy()
+        df = df[df['error'] == False]. \
+            copy().sort_index().reset_index().drop(columns=['index'])
 
     if args.mapping:
         mapping_rule, confidence = args.mapping_config.split(':')
@@ -117,8 +117,11 @@ def main():
         else:
             raise RuntimeError(f'Unknown mapping algorithm: {mapping_rule}')
     print('The sanitized reactions are saved in reaction.csv')
+    df.drop(columns=['error'])
     df.to_csv('reaction.csv', sep=' ', index=False)
 
 
 if __name__ == '__main__':
+    rxn_mapper = RXNMapper()
+    tqdm.pandas()
     main()

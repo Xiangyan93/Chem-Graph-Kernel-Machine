@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from treelib import Tree
 
 
@@ -134,3 +136,65 @@ class AtomEnvironment(MolecularTree):
             if depth == n:
                 neighbors.append(node.data)
         return neighbors
+
+
+class UnmappedFragment:
+    @staticmethod
+    def tree_grow(mol, tree):
+        depth = 10
+        for _ in range(depth):
+            for node in tree.all_nodes():
+                if not node.is_leaf():
+                    continue
+                for atom in node.data.GetNeighbors():
+                    if getAtomMapNumber(atom) != -1:
+                        continue
+                    tree_id = tree._identifier
+                    if atom.GetIdx() != node.predecessor(tree_id=tree_id):
+                        order = mol.GetBondBetweenAtoms(
+                            atom.GetIdx(),
+                            node.data.GetIdx()
+                        ).GetBondTypeAsDouble()
+                        identifier = atom.GetIdx()
+                        while tree.get_node(identifier) is not None:
+                            identifier += len(mol.GetAtoms())
+                        tree.create_node(
+                            tag=[atom.GetAtomicNum(), order,
+                                 getAtomMapNumber(atom)],
+                            identifier=identifier,
+                            data=atom,
+                            parent=node.identifier
+                        )
+        if tree.depth() > depth:
+            raise RuntimeError('It seems you are dealing with a reaction with '
+                               'a huge unmapped fragment that connected to the '
+                               'reaction center.')
+        return tree
+
+    def __init__(self, mol, atom0, atom1):
+        self.mol = mol
+        tree = Tree()
+        tree.create_node(
+            tag=[atom0.GetAtomicNum(), 0., getAtomMapNumber(atom0)],
+            identifier=atom0.GetIdx(),
+            data=atom0
+        )
+        order = mol.GetBondBetweenAtoms(
+            atom0.GetIdx(),
+            atom1.GetIdx()
+        ).GetBondTypeAsDouble()
+        tree.create_node(
+            tag=[atom1.GetAtomicNum(), order, getAtomMapNumber(atom1)],
+            identifier=atom1.GetIdx(),
+            data=atom1,
+            parent=atom0.GetIdx()
+        )
+        self.tree = self.tree_grow(mol, tree)
+
+    def get_atoms_idx(self):
+        atoms_idx = []
+        expand_tree = self.tree.expand_tree(mode=Tree.WIDTH, reverse=True)
+        for identifier in expand_tree:
+            if not self.tree.get_node(identifier).is_root():
+                atoms_idx.append(identifier)
+        return atoms_idx

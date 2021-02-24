@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import sys
 CWD = os.path.dirname(os.path.abspath(__file__))

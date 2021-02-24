@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import pickle
 from chemml.kernels.KernelConfig import KernelConfig

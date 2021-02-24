@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from sklearn.gaussian_process.kernels import (
     ConstantKernel,
     RBF

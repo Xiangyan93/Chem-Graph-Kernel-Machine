@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from chemml.base_learner import KernelRegressionBaseLearner
 from chemml.regression.consensus import ConsensusRegressor
 from chemml.regression.GPRgraphdot.gpr import GPR as GPRgraphdot

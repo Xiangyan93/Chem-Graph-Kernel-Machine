@@ -1,7 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import json
 from tqdm import tqdm
-tqdm.pandas()
 from graphdot.kernel.marginalized import MarginalizedGraphKernel
 from graphdot.util.pretty_tuple import pretty_tuple
 from graphdot.kernel.fix import Normalization

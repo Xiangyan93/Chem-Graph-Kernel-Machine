@@ -1,14 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 CWD = os.path.dirname(os.path.abspath(__file__))
 import pandas as pd
-from rdkit.Chem import AllChem as Chem
 from graphdot import Graph
-from graphdot.graph.reorder import rcm
-from rdkit.Chem import rdChemReactions
 from graphdot.graph._from_networkx import _from_networkx
 import networkx as nx
 from chemml.graph.from_rdkit import _from_rdkit, rdkit_config
-from .reaction import *
+from chemml.graph.molecule.reaction import *
 
 
 class HashGraph(Graph):
@@ -84,7 +83,7 @@ class HashGraph(Graph):
     @classmethod
     def agent_from_reaction_smarts(cls, reaction_smarts, HASH,
                                    _rdkit_config=rdkit_config()):
-        rxn = reaction_from_smarts(reaction_smarts)
+        rxn = RxnFromSmarts(reaction_smarts)
         for agent in rxn.GetAgents():
             Chem.SanitizeMol(agent)
 
@@ -102,7 +101,7 @@ class HashGraph(Graph):
 
     @classmethod
     def from_reaction_smarts(cls, reaction_smarts, HASH):
-        rxn = reaction_from_smarts(reaction_smarts)
+        rxn = RxnFromSmarts(reaction_smarts)
         ReactingAtoms = getReactingAtoms(rxn, depth=1)
 
         _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
@@ -133,7 +132,7 @@ class HashGraph(Graph):
 
     @classmethod
     def reactant_from_reaction_smarts(cls, reaction_smarts, HASH):
-        rxn = reaction_from_smarts(reaction_smarts)
+        rxn = RxnFromSmarts(reaction_smarts)
         ReactingAtoms = getReactingAtoms(rxn, depth=1)
 
         _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
@@ -151,7 +150,7 @@ class HashGraph(Graph):
 
     @classmethod
     def product_from_reaction_smarts(cls, reaction_smarts, HASH):
-        rxn = reaction_from_smarts(reaction_smarts)
+        rxn = RxnFromSmarts(reaction_smarts)
         ReactingAtoms = getReactingAtoms(rxn, depth=1)
 
         _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,

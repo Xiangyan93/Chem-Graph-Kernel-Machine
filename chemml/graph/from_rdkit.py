@@ -4,7 +4,6 @@
 import os
 
 CWD = os.path.dirname(os.path.abspath(__file__))
-import warnings
 import re
 import networkx as nx
 import pandas as pd
@@ -12,7 +11,7 @@ import numpy as np
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors
 from graphdot.graph._from_networkx import _from_networkx
-from .substructure import (
+from chemml.graph.molecule.substructure import (
     FunctionalGroup,
     AtomEnvironment
 )
@@ -271,7 +270,10 @@ class rdkit_config:
         node['Chiral'] = get_chiral_tag(mol, atom)
         node['InRing'] = atom.IsInRing()
         node['SingleAtom'] = True if mol.GetNumAtoms() == 1 else False
-        node['Concentration'] = self.concentration / mol.GetNumAtoms()
+        if mol.GetNumAtoms() == 1:
+            node['Concentration'] = self.concentration / 2
+        else:
+            node['Concentration'] = self.concentration / mol.GetNumAtoms()
         if self.set_elemental_mode:
             emode = self.emode
             node['ElementalMode1'] = emode[emode.an == an].em1.ravel()[0]

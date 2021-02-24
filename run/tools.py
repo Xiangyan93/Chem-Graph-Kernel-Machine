@@ -1,22 +1,18 @@
 import os
 import json
-import pickle
 from tqdm import tqdm
 tqdm.pandas()
 import networkx as nx
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
 from rdkit import Chem
-from rdkit.Chem import rdChemReactions
 from chemml.regression.gpr_learner import GPRLearner
 from chemml.classification.learner import ClassificationLearner
 from chemml.classification.gpc.gpc import GPC
 from chemml.classification.svm.svm import SVC
-from chemml.regression.consensus import ConsensusRegressor
-from chemml.regression.GPRgraphdot.gpr import LRAGPR
 from chemml.graph.hashgraph import HashGraph
 from chemml.graph.from_rdkit import rdkit_config
-from chemml.graph.reaction import *
+from chemml.graph.molecule.reaction import *
 from chemml.kernels.ConvKernel import *
 
 
@@ -473,7 +469,7 @@ def _reaction_agents2sg(reaction_smarts, HASH):
 
 def _reaction_agents2mg(reaction_smarts, HASH):
     agents = []
-    rxn = reaction_from_smarts(reaction_smarts)
+    rxn = RxnFromSmarts(reaction_smarts)
     for i, mol in enumerate(rxn.GetAgents()):
         Chem.SanitizeMol(mol)
         hash_ = HASH + '_%d' % i
@@ -487,7 +483,7 @@ def _reaction_reactants2sg(reaction_smarts, HASH):
 
 def _reaction_reactants2mg(reaction_smarts, HASH):
     reactants = []
-    rxn = reaction_from_smarts(reaction_smarts)
+    rxn = RxnFromSmarts(reaction_smarts)
     ReactingAtoms = getReactingAtoms(rxn, depth=1)
     _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
                                  reactant_or_product='reactant')
@@ -504,7 +500,7 @@ def _reaction_products2sg(reaction_smarts, HASH):
 
 def _reaction_products2mg(reaction_smarts, HASH):
     products = []
-    rxn = reaction_from_smarts(reaction_smarts)
+    rxn = RxnFromSmarts(reaction_smarts)
     ReactingAtoms = getReactingAtoms(rxn, depth=1)
     _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
                                  reactant_or_product='reactant')
@@ -521,7 +517,7 @@ def _reaction2sg(reaction_smarts, HASH):
 
 def _reaction2mg(reaction_smarts, HASH):
     reaction = []
-    rxn = reaction_from_smarts(reaction_smarts)
+    rxn = RxnFromSmarts(reaction_smarts)
     ReactingAtoms = getReactingAtoms(rxn, depth=1)
     for i, reactant in enumerate(rxn.GetReactants()):
         Chem.SanitizeMol(reactant)
