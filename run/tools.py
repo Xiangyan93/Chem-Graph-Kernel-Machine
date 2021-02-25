@@ -1,7 +1,6 @@
 import os
 import json
 from tqdm import tqdm
-tqdm.pandas()
 import networkx as nx
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args

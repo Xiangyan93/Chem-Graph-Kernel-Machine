@@ -11,6 +11,7 @@ import numpy as np
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors
 from graphdot.graph._from_networkx import _from_networkx
+from chemml.graph.molecule.smiles import *
 from chemml.graph.molecule.substructure import (
     FunctionalGroup,
     AtomEnvironment
@@ -198,6 +199,7 @@ class rdkit_config:
                  set_hydrogen_explicit=False,
                  reaction_center=None, reactant_or_product='reactant',
                  concentration=1.0,
+                 IsSanitized=True,
                  set_TPSA=False):
         self.bond_type = bond_type
         self.set_morgan_identifier = set_morgan_identifier
@@ -210,6 +212,7 @@ class rdkit_config:
         self.reaction_center = reaction_center
         self.reactant_or_product = reactant_or_product
         self.concentration = concentration
+        self.IsSanitized = IsSanitized
         self.set_TPSA = set_TPSA
         if self.set_elemental_mode:
             # read elemental modes.
@@ -263,8 +266,12 @@ class rdkit_config:
     def set_node(self, node, atom, mol):
         an = atom.GetAtomicNum()
         node['AtomicNumber'] = an
-        node['Charge'] = atom.GetFormalCharge()
-        node['Hcount'] = atom.GetTotalNumHs()
+        if self.IsSanitized:
+            node['Charge'] = atom.GetFormalCharge()
+            node['Hcount'] = atom.GetTotalNumHs()
+        else:
+            node['Charge'] = get_Charge_from_atom_smarts(atom.GetSmarts())
+            node['Hcount'] = get_Hcount_from_atom_smarts(atom.GetSmarts())
         node['Hybridization'] = atom.GetHybridization()
         node['Aromatic'] = atom.GetIsAromatic()
         node['Chiral'] = get_chiral_tag(mol, atom)
@@ -349,7 +356,8 @@ class rdkit_config:
         else:
             for i, atom in enumerate(mol.GetAtoms()):
                 assert (attribute in graph.nodes[i])
-                AE = AtomEnvironment(mol, atom, depth=depth)
+                AE = AtomEnvironment(mol, atom, depth=depth,
+                                     IsSanitized=self.IsSanitized)
                 for depth_ in range(1, depth+1):
                     neighbors = AE.get_nth_neighbors(depth_)
                     if neighbors:

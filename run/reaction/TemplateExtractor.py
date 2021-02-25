@@ -11,6 +11,20 @@ sys.path.append(os.path.join(CWD, '../..'))
 from chemml.graph.molecule.RxnTemplate import *
 
 
+def rxn2reactants(rxn):
+    reactants = rxn.GetReactants()
+    for mol in reactants:
+        RemoveAtomMap(mol)
+    return '.'.join(list(map(Chem.MolToSmiles, reactants)))
+
+
+def rxn2products(rxn):
+    products = rxn.GetProducts()
+    for mol in products:
+        RemoveAtomMap(mol)
+    return '.'.join(list(map(Chem.MolToSmiles, products)))
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(
@@ -36,7 +50,33 @@ def main():
         **_joblib_parallel_args(prefer='processes'))(
         delayed(ExtractReactionTemplate)(df.iloc[i][args.reaction])
         for i in df.index)
-    df.to_csv('reaction.csv', sep=' ', index=False)
+    print('\nCounting the number of reactants')
+    df['rxn'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(RxnFromSmarts)(df.iloc[i][args.reaction])
+        for i in df.index)
+    df['reactants'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(rxn2reactants)(df.iloc[i]['rxn'])
+        for i in df.index)
+    df['products'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(rxn2products)(df.iloc[i]['rxn'])
+        for i in df.index)
+    df['N_reactants'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(lambda x: len(x.GetReactants()))(df.iloc[i]['rxn'])
+        for i in df.index)
+    df['N_products'] = Parallel(
+        n_jobs=args.n_jobs, verbose=True,
+        **_joblib_parallel_args(prefer='processes'))(
+        delayed(lambda x: len(x.GetProducts()))(df.iloc[i]['rxn'])
+        for i in df.index)
+    df.drop(columns=['rxn']).to_csv('reaction.csv', sep=' ', index=False)
 
 
 if __name__ == '__main__':

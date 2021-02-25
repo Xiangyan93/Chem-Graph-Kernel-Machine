@@ -131,6 +131,41 @@ class HashGraph(Graph):
         return g
 
     @classmethod
+    def from_reaction_template(cls, template_smarts, HASH):
+        rxn = Chem.ReactionFromSmarts(template_smarts)
+        ReactingAtoms = getReactingAtoms(rxn, depth=1, IsTemplate=True)
+
+        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                     reactant_or_product='reactant',
+                                     IsSanitized=False,
+                                     set_morgan_identifier=False)
+        reaction = HashGraph.from_rdkit(
+            rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
+        for reactant in rxn.GetReactants()[1:]:
+            g = HashGraph.from_rdkit(reactant, '1', _rdkit_config). \
+                to_networkx()
+            reaction = nx.disjoint_union(reaction, g)
+
+        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+                                     reactant_or_product='product',
+                                     IsSanitized=False,
+                                     set_morgan_identifier=False)
+        for product in rxn.GetProducts():
+            g = HashGraph.from_rdkit(product, '1', _rdkit_config). \
+                to_networkx()
+            reaction = nx.disjoint_union(reaction, g)
+
+        g = _from_networkx(cls, reaction)
+        g.hash = HASH
+        if g.nodes.to_pandas()['ReactingCenter'].max() <= 0:
+            raise RuntimeError(f'No reacting atoms are found in reactants:　'
+                               f'{template_smarts}')
+        if g.nodes.to_pandas()['ReactingCenter'].min() >= 0:
+            raise RuntimeError(f'No reacting atoms are found in products:　'
+                               f'{template_smarts}')
+        return g
+
+    @classmethod
     def reactant_from_reaction_smarts(cls, reaction_smarts, HASH):
         rxn = RxnFromSmarts(reaction_smarts)
         ReactingAtoms = getReactingAtoms(rxn, depth=1)

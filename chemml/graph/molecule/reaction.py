@@ -11,14 +11,19 @@ correction_dict ={
 }
 
 
-def getAtomMapDict(mols, depth=1):
+def getAtomMapDict(mols, depth=1, IsTemplate=False):
     AtomMapDict = dict()
     for mol in mols:
         for atom in mol.GetAtoms():
             AMN = atom.GetPropsAsDict().get('molAtomMapNumber')
             if AMN is not None:
-                AtomMapDict[AMN] = AtomEnvironment(
-                    mol, atom, depth=depth)
+                if not IsTemplate:
+                    AtomMapDict[AMN] = AtomEnvironment(
+                        mol, atom, depth=depth, order_by_labeling=True)
+                else:
+                    AtomMapDict[AMN] = AtomEnvironment(
+                        mol, atom, depth=depth, order_by_labeling=True,
+                        IsSanitized=False)
     return AtomMapDict
 
 
@@ -33,10 +38,12 @@ def getAtomMapList(mols):
     return AtomMapList
 
 
-def getReactingAtoms(rxn, depth=1):
+def getReactingAtoms(rxn, depth=1, IsTemplate=False):
     ReactingAtoms = []
-    reactantAtomMap = getAtomMapDict(rxn.GetReactants(), depth=depth)
-    productAtomMap = getAtomMapDict(rxn.GetProducts(), depth=depth)
+    reactantAtomMap = getAtomMapDict(rxn.GetReactants(), depth=depth,
+                                     IsTemplate=IsTemplate)
+    productAtomMap = getAtomMapDict(rxn.GetProducts(), depth=depth,
+                                    IsTemplate=IsTemplate)
     for idx, AEr in reactantAtomMap.items():
         AEp = productAtomMap.get(idx)
         if AEp is None:
@@ -44,7 +51,8 @@ def getReactingAtoms(rxn, depth=1):
         atom_r = AEr.tree.all_nodes()[0].data
         atom_p = AEp.tree.all_nodes()[0].data
         if AEr != AEp or \
-                atom_r.GetTotalNumHs() != atom_p.GetTotalNumHs() or \
+                (not IsTemplate and atom_r.GetTotalNumHs() != atom_p.GetTotalNumHs()) or \
+                (IsTemplate and atom_r.GetNumExplicitHs() != atom_p.GetNumExplicitHs()) or \
                 atom_r.GetFormalCharge() != atom_p.GetFormalCharge():
             ReactingAtoms.append(idx)
     return ReactingAtoms
@@ -75,7 +83,7 @@ def SanitizeRxn(rxn):
     for agent in rxn.GetAgents():
         Chem.SanitizeMol(agent)
 
-    # Only perserve map number that exists both in reactants and products.
+    # Delete map number that exists only in reactants or products.
     reactantsAtomMapList = getAtomMapList(rxn.GetReactants())
     productsAtomMapList = getAtomMapList(rxn.GetProducts())
     for reactant in rxn.GetReactants():
@@ -105,21 +113,23 @@ def RxnFromSmarts(reaction_smarts):
     -------
     RDKit reaction object
     """
-    # Change all Ba into ionic format.
+    # Change some ions into ionic format.
     # print(reaction_smarts, '\n')
-    def sub_ion(rs, ion):
+    def sub_ion(rs, ion, charge):
         if re.search('(^|\.|>>)\[%s:\d{1,2}]' % ion, rs) and \
                 re.search('(^|\.|>>)\[%s\+2:\d{1,2}]' % ion, rs):
-            rs = re.sub('^\[%s:' % ion, '[%s+2:' % ion, rs)
-            rs = re.sub('\.\[%s:' % ion, '.[%s+2:' % ion, rs)
-            rs = re.sub('>>\[%s:' % ion, '>>[%s+2:' % ion, rs)
+            rs = re.sub('^\[%s:' % ion, '[%s%s:' % (ion, charge), rs)
+            rs = re.sub('\.\[%s:' % ion, '.[%s%s:' % (ion, charge), rs)
+            rs = re.sub('>>\[%s:' % ion, '>>[%s%s:' % (ion, charge), rs)
         return rs
-    reaction_smarts = sub_ion(reaction_smarts, 'Ca')
-    reaction_smarts = sub_ion(reaction_smarts, 'Mg')
-    reaction_smarts = sub_ion(reaction_smarts, 'Ba')
+    reaction_smarts = sub_ion(reaction_smarts, 'Ca', charge='+2')
+    reaction_smarts = sub_ion(reaction_smarts, 'Mg', charge='+2')
+    reaction_smarts = sub_ion(reaction_smarts, 'Ba', charge='+2')
+    reaction_smarts = sub_ion(reaction_smarts, 'Sr', charge='+2')
+    reaction_smarts = sub_ion(reaction_smarts, 'Al', charge='+2')
 
     # print(reaction_smarts, '\n')
-    rxn = rdChemReactions.ReactionFromSmarts(reaction_smarts)
+    rxn = Chem.ReactionFromSmarts(reaction_smarts)
     SanitizeRxn(rxn)
     ReactingAtoms = getReactingAtoms(rxn, depth=1)
     for reactant in rxn.GetReactants():

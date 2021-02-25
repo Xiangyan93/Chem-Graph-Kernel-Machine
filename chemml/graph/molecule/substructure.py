@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from treelib import Tree
+from .smiles import *
 
 
 def getAtomMapNumber(atom):
@@ -8,8 +9,26 @@ def getAtomMapNumber(atom):
 
 
 class MolecularTree:
-    @staticmethod
-    def tree_grow(mol, tree, depth=5):
+    def __init__(self, order_by_labeling=False, IsSanitized=True):
+        self.order_by_labeling = order_by_labeling
+        self.IsSanitized = IsSanitized
+
+    def get_tag(self, atom, order):
+        if self.IsSanitized:
+            tag = [atom.GetAtomicNum(),
+                   atom.GetFormalCharge(),
+                   atom.GetTotalNumHs(),
+                   order]
+        else:
+            tag = [atom.GetAtomicNum(),
+                   get_Charge_from_atom_smarts(atom.GetSmarts()),
+                   get_Hcount_from_atom_smarts(atom.GetSmarts()),
+                   order]
+        if self.order_by_labeling:
+            tag.append(getAtomMapNumber(atom))
+        return tag
+
+    def tree_grow(self, mol, tree, depth=5):
         for _ in range(depth):
             for node in tree.all_nodes():
                 if not node.is_leaf():
@@ -25,8 +44,7 @@ class MolecularTree:
                         while tree.get_node(identifier) is not None:
                             identifier += len(mol.GetAtoms())
                         tree.create_node(
-                            tag=[atom.GetAtomicNum(), order,
-                                 getAtomMapNumber(atom)],
+                            tag=self.get_tag(atom, order),
                             identifier=identifier,
                             data=atom,
                             parent=node.identifier
@@ -83,11 +101,13 @@ class FunctionalGroup(MolecularTree):
 
     """
 
-    def __init__(self, mol, atom0, atom1, depth=5):
+    def __init__(self, mol, atom0, atom1, depth=5, order_by_labeling=False,
+                 IsSanitized=True):
+        super().__init__(order_by_labeling, IsSanitized)
         self.mol = mol
         tree = Tree()
         tree.create_node(
-            tag=[atom0.GetAtomicNum(), 0., getAtomMapNumber(atom0)],
+            tag=self.get_tag(atom0, 0.),
             identifier=atom0.GetIdx(),
             data=atom0
         )
@@ -96,7 +116,7 @@ class FunctionalGroup(MolecularTree):
             atom1.GetIdx()
         ).GetBondTypeAsDouble()
         tree.create_node(
-            tag=[atom1.GetAtomicNum(), order, getAtomMapNumber(atom1)],
+            tag=self.get_tag(atom1, order),
             identifier=atom1.GetIdx(),
             data=atom1,
             parent=atom0.GetIdx()
@@ -118,13 +138,15 @@ class FunctionalGroup(MolecularTree):
 
 
 class AtomEnvironment(MolecularTree):
-    def __init__(self, mol, atom, depth=1):
+    def __init__(self, mol, atom, depth=1, order_by_labeling=False,
+                 IsSanitized=True):
+        super().__init__(order_by_labeling, IsSanitized)
         self.mol = mol
         tree = Tree()
         tree.create_node(
-            tag=[atom.GetAtomicNum(), 0., getAtomMapNumber(atom)],
+            tag=self.get_tag(atom, 0.),
             identifier=atom.GetIdx(),
-            data = atom
+            data=atom
         )
         self.tree = self.tree_grow(mol, tree, depth=depth)
 
@@ -138,9 +160,30 @@ class AtomEnvironment(MolecularTree):
         return neighbors
 
 
-class UnmappedFragment:
-    @staticmethod
-    def tree_grow(mol, tree):
+class UnmappedFragment(MolecularTree):
+    def __init__(self, mol, atom0, atom1, order_by_labeling=False,
+                 IsSanitized=True):
+        super().__init__(order_by_labeling, IsSanitized)
+        self.mol = mol
+        tree = Tree()
+        tree.create_node(
+            tag=self.get_tag(atom0, 0.),
+            identifier=atom0.GetIdx(),
+            data=atom0
+        )
+        order = mol.GetBondBetweenAtoms(
+            atom0.GetIdx(),
+            atom1.GetIdx()
+        ).GetBondTypeAsDouble()
+        tree.create_node(
+            tag=self.get_tag(atom1, order),
+            identifier=atom1.GetIdx(),
+            data=atom1,
+            parent=atom0.GetIdx()
+        )
+        self.tree = self.tree_grow(mol, tree)
+
+    def tree_grow(self, mol, tree):
         depth = 10
         for _ in range(depth):
             for node in tree.all_nodes():
@@ -159,8 +202,7 @@ class UnmappedFragment:
                         while tree.get_node(identifier) is not None:
                             identifier += len(mol.GetAtoms())
                         tree.create_node(
-                            tag=[atom.GetAtomicNum(), order,
-                                 getAtomMapNumber(atom)],
+                            tag=self.get_tag(atom, order),
                             identifier=identifier,
                             data=atom,
                             parent=node.identifier
@@ -170,26 +212,6 @@ class UnmappedFragment:
                                'a huge unmapped fragment that connected to the '
                                'reaction center.')
         return tree
-
-    def __init__(self, mol, atom0, atom1):
-        self.mol = mol
-        tree = Tree()
-        tree.create_node(
-            tag=[atom0.GetAtomicNum(), 0., getAtomMapNumber(atom0)],
-            identifier=atom0.GetIdx(),
-            data=atom0
-        )
-        order = mol.GetBondBetweenAtoms(
-            atom0.GetIdx(),
-            atom1.GetIdx()
-        ).GetBondTypeAsDouble()
-        tree.create_node(
-            tag=[atom1.GetAtomicNum(), order, getAtomMapNumber(atom1)],
-            identifier=atom1.GetIdx(),
-            data=atom1,
-            parent=atom0.GetIdx()
-        )
-        self.tree = self.tree_grow(mol, tree)
 
     def get_atoms_idx(self):
         atoms_idx = []

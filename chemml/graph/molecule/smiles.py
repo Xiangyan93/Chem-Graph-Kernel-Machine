@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from rdkit.Chem import AllChem as Chem
+import re
 
 
 def smiles2inchi(smiles):
@@ -31,3 +32,24 @@ def CombineMols(mols):
     for m in mols[1:]:
         mol = Chem.CombineMols(mol, m)
     return mol
+
+
+def get_Hcount_from_atom_smarts(atom_smarts):
+    s = re.search('&H[0-9]+(:|&|])', atom_smarts)
+    if s is None:
+        return 0
+    else:
+        return int(s[0][2:-1])
+
+
+def get_Charge_from_atom_smarts(atom_smarts):
+    s = re.search('&(\+|-)\d{0,1}(:|&|])', atom_smarts)
+    if s is None:
+        return 0
+    else:
+        s = s[0][1:-1]
+        if s == '-':
+            s = '-1'
+        if s == '+':
+            s = '+1'
+        return int(s)

@@ -83,7 +83,8 @@ def main():
     if n_parse_error is not None:
         print('%d reactions cannot be correctly parsed by RDKit. Saved in '
               'parse_error.csv' % n_parse_error)
-        df[df['error'] == True].to_csv('parse_error.csv', sep=' ', index=False)
+        df[df['error'] == True].copy().drop(columns=['error']).\
+            to_csv('parse_error.csv', sep=' ', index=False)
         df = df[df['error'] == False]. \
             copy().sort_index().reset_index().drop(columns=['index'])
 
@@ -97,7 +98,8 @@ def main():
     n_trivial = df['error'].value_counts().get(True)
     if n_trivial is not None:
         print('%d reactions are trivial. Saved in trivial.csv' % n_trivial)
-        df[df['error'] == True].to_csv('trivial.csv', sep=' ', index=False)
+        df[df['error'] == True].copy().drop(columns=['error']).\
+            to_csv('trivial.csv', sep=' ', index=False)
         df = df[df['error'] == False]. \
             copy().sort_index().reset_index().drop(columns=['index'])
 
@@ -117,8 +119,7 @@ def main():
         else:
             raise RuntimeError(f'Unknown mapping algorithm: {mapping_rule}')
     print('The sanitized reactions are saved in reaction.csv')
-    df.drop(columns=['error'])
-    df.to_csv('reaction.csv', sep=' ', index=False)
+    df.drop(columns=['error']).to_csv('reaction.csv', sep=' ', index=False)
 
 
 if __name__ == '__main__':

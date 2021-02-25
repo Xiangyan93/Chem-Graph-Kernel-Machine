@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import re
+from itertools import permutations
+import numpy as np
 from .reaction import *
 from .smiles import *
 
@@ -21,8 +23,10 @@ def ExtractReactionTemplate(reaction_smarts, validate=True):
         products, changed_atom_tags, radius=1, category='products'
     )
     rxn_string = '{}>>{}'.format(reactant_fragments, product_fragments)
+    # print(rxn_string)
+    rxn_string = canonicalize_template(rxn_string)
+    # print(rxn_string)
     template = Chem.ReactionFromSmarts(rxn_string)
-
     if validate:
         # Make sure that applying the extracted template on the reactants could
         # obtain the products. Notice that you may get more than 1 products
@@ -37,15 +41,71 @@ def ExtractReactionTemplate(reaction_smarts, validate=True):
         reactants = list(map(Chem.MolFromSmiles, SMILES_r))
         map(RemoveAtomMap, products)
         SMILES_p = Chem.MolToSmiles(CombineMols(products))
-        template_products = template.RunReactants(reactants)
-        SMILES_template_p = [Chem.MolToSmiles(CombineMols(products))
-                             for products in template_products]
+        SMILES_template_p = []
+        for reactants_ in list(permutations(reactants, len(reactants))):
+            template_products = template.RunReactants(reactants_)
+            SMILES_template_p += [Chem.MolToSmiles(CombineMols(products))
+                                  for products in template_products]
         if not SMILES_p in SMILES_template_p:
             print(reaction_smarts)
             print(SMILES_r)
             print(SMILES_p, SMILES_template_p)
         assert (SMILES_p in SMILES_template_p)
     return rxn_string
+
+
+def canonicalize_template(reaction_tempate):
+    template = Chem.ReactionFromSmarts(reaction_tempate)
+    # sort labeled atoms in reactant based on atomic environment
+    atoms = []
+    AEs = []
+    for reactant in template.GetReactants():
+        for atom in reactant.GetAtoms():
+            map_number = atom.GetPropsAsDict().get('molAtomMapNumber')
+            if map_number is not None:
+                AE = AtomEnvironment(reactant, atom, depth=10,
+                                     IsSanitized=False)
+                AEs.append(AE)
+                atoms.append(atom)
+    atoms = np.asarray(atoms)[np.argsort(AEs)]
+    # relabel molAtomMapNumber from 1 to N based on atom order.
+    atoms_map_change_dict = dict()
+    label = 1
+    for atom in atoms:
+        map_number = atom.GetPropsAsDict()['molAtomMapNumber']
+        assert (str(map_number) not in atoms_map_change_dict)
+        atoms_map_change_dict[str(map_number)] = str(label)
+        # atom.SetAtomMapNum(label)
+        label += 1
+    # sort labeled atoms in product but not in reactant.
+    atoms = []
+    AEs = []
+    for product in template.GetProducts():
+        for atom in product.GetAtoms():
+            map_number = atom.GetPropsAsDict().get('molAtomMapNumber')
+            if map_number is not None and \
+                    str(map_number) not in atoms_map_change_dict:
+                AE = AtomEnvironment(product, atom, depth=10,
+                                     IsSanitized=False)
+                AEs.append(AE)
+                atoms.append(atom)
+    atoms = np.asarray(atoms)[np.argsort(AEs)]
+    for atom in atoms:
+        map_number = atom.GetPropsAsDict()['molAtomMapNumber']
+        atoms_map_change_dict[str(map_number)] = str(label)
+        # atom.SetAtomMapNum(label)
+        label += 1
+    # replace AtomMapNum
+    rep = dict((re.escape(":" + k + "]"), ":" + v + "]") for k, v in
+               atoms_map_change_dict.items())
+    pattern = re.compile("|".join(rep.keys()))
+    can_template = pattern.sub(lambda x: rep[re.escape(x.group(0))],
+                               reaction_tempate)
+    # reorder molecules
+    r, p = can_template.split('>>')
+    r = '(' + ').('.join(sorted(r[1:-1].split(').('))) + ')'
+    p = '(' + ').('.join(sorted(p[1:-1].split(').('))) + ')'
+    return r + '>>' + p
 
 
 def get_fragments_for_changed_atoms(mols, changed_atom_tags, radius=0,
@@ -77,6 +137,7 @@ def get_fragments_for_changed_atoms(mols, changed_atom_tags, radius=0,
                 if symbol != atom.GetSmarts():
                     symbol_replacements.append((atom.GetIdx(), symbol))
                 continue
+
         # print('stage1: ', atoms_to_use, symbol_replacements)
         # Check neighbors (any atom) and special groups in reactants
         # Inactive when set radius=0
@@ -88,7 +149,6 @@ def get_fragments_for_changed_atoms(mols, changed_atom_tags, radius=0,
                 symbol_replacements=symbol_replacements
             )
         # print('stage2: ', atoms_to_use, symbol_replacements)
-
         '''
         # Add all unlabeled atoms that connected to the reaction center
         for atom in mol.GetAtoms():
@@ -183,7 +243,7 @@ def get_special_groups(mol, SUPER_GENERAL_TEMPLATES=False):
     each tuple contains the AtomIdx's for a special group of atoms which should
     be included in a fragment all together. This should only be done for the
     reactants, otherwise the products might end up with mapping mismatches'''
-
+    return []
     if SUPER_GENERAL_TEMPLATES:
         return []
 
@@ -251,7 +311,7 @@ def expand_atoms_to_use_atom(mol, atoms_to_use, atom, groups=[],
     for group in groups:
         if int(atom.GetIdx()) in group:  # int correction
             if verbose:
-                print('added group centered at {}'.format(atom_idx))
+                print('added group centered at {}'.format(atom.GetIdx()))
             # Add the whole list, redundancies don't matter
             atoms_to_use.extend(list(group))
             found_in_group = True
@@ -263,8 +323,8 @@ def expand_atoms_to_use_atom(mol, atoms_to_use, atom, groups=[],
 
     # Include this atom
     atoms_to_use.append(atom.GetIdx())
-    #symbol = get_detailed_smarts(atom)
-    #if symbol != atom.GetSmarts():
+    # symbol = get_detailed_smarts(atom)
+    # if symbol != atom.GetSmarts():
     #    symbol_replacements.append((atom.GetIdx(), symbol))
     # Look for replacements
     symbol_replacements.append(
@@ -273,7 +333,8 @@ def expand_atoms_to_use_atom(mol, atoms_to_use, atom, groups=[],
     return atoms_to_use, symbol_replacements
 
 
-def convert_atom_to_wildcard(atom, verbose=False, SUPER_GENERAL_TEMPLATES=False):
+def convert_atom_to_wildcard(atom, verbose=False,
+                             SUPER_GENERAL_TEMPLATES=False):
     '''This function takes an RDKit atom and turns it into a wildcard
     using hard-coded generalization rules. This function should be used
     when candidate atoms are used to extend the reaction core for higher
@@ -321,7 +382,6 @@ def convert_atom_to_wildcard(atom, verbose=False, SUPER_GENERAL_TEMPLATES=False)
         if symbol != atom.GetSmarts():
             print('Improved generality of atom SMARTS {} -> {}'.format(
                 atom.GetSmarts(), symbol))
-
     return symbol
 
 
