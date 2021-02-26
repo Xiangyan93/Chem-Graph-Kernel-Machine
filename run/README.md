@@ -1,4 +1,4 @@
-# ChemML Executable Files
+# Executable Files
 This directory contains the executable files for GPR-nMGK. The input file 
 should be formatted as [datasets](https://github.com/Xiangyan93/ChemML/tree/main/run/datasets). 
 Both SMILES or InChI string are valid input of molecules.
