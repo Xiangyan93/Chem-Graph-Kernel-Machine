@@ -580,7 +580,7 @@ def multi2graph(args_kwargs):
 
 
 def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
-           parallel='Parallel'):
+           parallel='Parallel', set_group_id=False):
     if pkl is not None and os.path.exists(pkl):
         print('reading existing pkl file: %s' % pkl)
         df = pd.read_pickle(pkl)
@@ -589,13 +589,16 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
         # set id and group_id
         if 'id' not in df:
             df['id'] = df.index
-        groups = df.groupby(single_graph + multi_graph + reaction_graph)
-        df['group_id'] = 0
-        for i, g in enumerate(groups):
-            g[1]['group_id'] = i
-            df.update(g[1])
         df['id'] = df['id'].astype(int)
-        df['group_id'] = df['group_id'].astype(int)
+        if set_group_id:
+            groups = df.groupby(single_graph + multi_graph + reaction_graph)
+            df['group_id'] = 0
+            for i, g in enumerate(groups):
+                g[1]['group_id'] = i
+                df.update(g[1])
+            df['group_id'] = df['group_id'].astype(int)
+        else:
+            df['group_id'] = df['id']
         # transform single graph
         for sg in single_graph:
             print('Transforming molecules into graphs. (pure compounds)')
@@ -646,12 +649,8 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg],
                     df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
-            # print('%d / %d reactions are removed due to Parsing Error.' %
-            #      ((df[rg + '_agents_sg'].isin(['Parsing Error'])).sum(), len(df)))
-            # df = df[~df[rg + '_agents_sg'].isin(['Parsing Error'])].\
-            #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_agents_sg'])
-
+            """
             print('Transforming reagents into multi graphs.')
             df[rg + '_agents_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -664,7 +663,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
             # df = df[df[rg + '_agents_mg'] != 'Parsing Error'].\
             #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_agents_mg'])
-
+            """
             print('Transforming chemical reactions into single graphs.')
             df[rg + '_sg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -672,12 +671,8 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                 delayed(_reaction2sg)(df.iloc[i][rg],
                                       df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
-            # print('%d / %d reactions are removed due to Parsing Error.' %
-            #      ((df[rg + '_sg'].isin(['Parsing Error'])).sum(), len(df)))
-            # df = df[~df[rg + '_sg'].isin(['Parsing Error'])].\
-            #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_sg'])
-
+            """
             print('Transforming chemical reactions into multi graphs.')
             df[rg + '_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -690,7 +685,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
             # df = df[df[rg + '_mg'] != 'Parsing Error'].\
             #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_mg'])
-
+            """
             print('Transforming reactants into single graphs.')
             df[rg + '_reactants_sg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -699,7 +694,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_reactants_sg'])
-
+            """
             print('Transforming reactants into multi graphs.')
             df[rg + '_reactants_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -708,7 +703,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_reactants_mg'])
-
+            """
             print('Transforming products into single graphs.')
             df[rg + '_products_sg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -717,7 +712,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_products_sg'])
-
+            """
             print('Transforming products into multi graphs.')
             df[rg + '_products_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -726,7 +721,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_products_mg'])
-
+            """
         if pkl is not None:
             df.to_pickle(pkl)
     return df

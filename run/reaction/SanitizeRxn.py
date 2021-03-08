@@ -3,8 +3,7 @@
 import os
 import sys
 import pandas as pd
-from rxnmapper import RXNMapper
-from tqdm import tqdm
+# from rxnmapper import RXNMapper
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -14,12 +13,12 @@ from chemml.graph.molecule.reaction import *
 
 def parse_reaction(reaction_smarts):
     try:
-        RxnFromSmarts(reaction_smarts)
+        RxnFromSmarts(reaction_smarts, Assign=False, canonical=False)
         return True
     except:
         return False
 
-
+"""
 def remap_reaction(reaction_smarts, confidence=0.0):
     unmapped_reaction_smarts = GetUnmappedReactionSmarts(reaction_smarts)
     try:
@@ -31,7 +30,7 @@ def remap_reaction(reaction_smarts, confidence=0.0):
             return 'Unconfident Mapping'
     except:
         return 'Mapping Error'
-
+"""
 
 def main():
     import argparse
@@ -118,11 +117,10 @@ def main():
                                              'Unconfident Mapping'])]
         else:
             raise RuntimeError(f'Unknown mapping algorithm: {mapping_rule}')
-    print('The sanitized reactions are saved in reaction.csv')
-    df.drop(columns=['error']).to_csv('reaction.csv', sep=' ', index=False)
+    print('The sanitized reactions are saved in sanitize.csv')
+    df.drop(columns=['error']).to_csv('sanitize.csv', sep=' ', index=False)
 
 
 if __name__ == '__main__':
-    rxn_mapper = RXNMapper()
-    tqdm.pandas()
+    # rxn_mapper = RXNMapper()
     main()

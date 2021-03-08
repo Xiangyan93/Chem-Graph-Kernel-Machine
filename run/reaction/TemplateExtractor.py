@@ -3,7 +3,6 @@
 import os
 import sys
 import pandas as pd
-from tqdm import tqdm
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -80,5 +79,4 @@ def main():
 
 
 if __name__ == '__main__':
-    tqdm.pandas()
     main()

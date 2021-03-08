@@ -8,7 +8,7 @@ from .smiles import *
 
 
 def ExtractReactionTemplate(reaction_smarts, validate=True):
-    rxn = RxnFromSmarts(reaction_smarts)
+    rxn = RxnFromSmarts(reaction_smarts, Assign=False, canonical=False)
     reactants = rxn.GetReactants()
     products = rxn.GetProducts()
     ReactingAtoms = getReactingAtoms(rxn, depth=1)
@@ -27,6 +27,7 @@ def ExtractReactionTemplate(reaction_smarts, validate=True):
     rxn_string = canonicalize_template(rxn_string)
     # print(rxn_string)
     template = Chem.ReactionFromSmarts(rxn_string)
+    # template = Chem.ReactionFromSmarts(Chem.ReactionToSmiles(template))
     if validate:
         # Make sure that applying the extracted template on the reactants could
         # obtain the products. Notice that you may get more than 1 products
@@ -55,6 +56,16 @@ def ExtractReactionTemplate(reaction_smarts, validate=True):
 
 
 def canonicalize_template(reaction_tempate):
+    template = RxnFromSmarts(reaction_tempate, Assign=True, canonical=True,
+                             IsTemplate=True)
+    reactant_fragments = get_fragments_from_template(template.GetReactants())
+    product_fragments = get_fragments_from_template(template.GetProducts())
+    # reorder molecules
+    reactant_fragments = '(' + ').('.join(sorted(reactant_fragments[1:-1].split(').('))) + ')'
+    product_fragments = '(' + ').('.join(sorted(product_fragments[1:-1].split(').('))) + ')'
+    template_string = '{}>>{}'.format(reactant_fragments, product_fragments)
+    return template_string
+    """
     template = Chem.ReactionFromSmarts(reaction_tempate)
     # sort labeled atoms in reactant based on atomic environment
     atoms = []
@@ -95,6 +106,7 @@ def canonicalize_template(reaction_tempate):
         atoms_map_change_dict[str(map_number)] = str(label)
         # atom.SetAtomMapNum(label)
         label += 1
+
     # replace AtomMapNum
     rep = dict((re.escape(":" + k + "]"), ":" + v + "]") for k, v in
                atoms_map_change_dict.items())
@@ -106,6 +118,22 @@ def canonicalize_template(reaction_tempate):
     r = '(' + ').('.join(sorted(r[1:-1].split(').('))) + ')'
     p = '(' + ').('.join(sorted(p[1:-1].split(').('))) + ')'
     return r + '>>' + p
+    """
+
+
+def get_fragments_from_template(mols, USE_STEREOCHEMISTRY=True):
+    fragments = ''
+    for mol in mols:
+        atoms_to_use = [atom.GetIdx() for atom in mol.GetAtoms()]
+        symbols = [atom.GetSmarts().replace('&', ';')
+                   for atom in mol.GetAtoms()]
+        fragments += '(' + Chem.MolFragmentToSmiles(
+            mol, atoms_to_use,
+            atomSymbols=symbols,
+            allHsExplicit=True,
+            isomericSmiles=USE_STEREOCHEMISTRY,
+            allBondsExplicit=True) + ').'
+    return fragments[:-1]
 
 
 def get_fragments_for_changed_atoms(mols, changed_atom_tags, radius=0,
@@ -129,6 +157,7 @@ def get_fragments_for_changed_atoms(mols, changed_atom_tags, radius=0,
 
         # Build list of atoms to use
         atoms_to_use = []
+
         for atom in mol.GetAtoms():
             # Check self (only tagged atoms)
             if str(getAtomMapNumber(atom)) in changed_atom_tags:
@@ -333,43 +362,40 @@ def expand_atoms_to_use_atom(mol, atoms_to_use, atom, groups=[],
     return atoms_to_use, symbol_replacements
 
 
-def convert_atom_to_wildcard(atom, verbose=False,
-                             SUPER_GENERAL_TEMPLATES=False):
+def convert_atom_to_wildcard(atom, verbose=False):
     '''This function takes an RDKit atom and turns it into a wildcard
-    using hard-coded generalization rules. This function should be used
+    using heuristic generalization rules. This function should be used
     when candidate atoms are used to extend the reaction core for higher
     generalizability'''
-    if SUPER_GENERAL_TEMPLATES:
-        if ':' in atom.GetSmarts():
-            # Fully generalize atom-mappped neighbors because they are aren't a leaving group
-            label = re.search('\:[0-9]+\]', atom.GetSmarts())
-            return '[*{}'.format(label.group())
 
-    if not SUPER_GENERAL_TEMPLATES:
+    # Is this a terminal atom? We can tell if the degree is one
+    if atom.GetDegree() == 1:
+        symbol = '[' + atom.GetSymbol() + ';D1;H{}'.format(atom.GetTotalNumHs())
+        if atom.GetFormalCharge() != 0:
+            charges = re.search('([-+]+[1-9]?)', atom.GetSmarts())
+            symbol = symbol.replace(';D1', ';{};D1'.format(charges.group()))
 
-        # Is this a terminal atom? We can tell if the degree is one
-        if atom.GetDegree() == 1:
-            return atom.GetSmarts()
-
-    # Initialize
-    symbol = '['
-
-    # Add atom primitive (don't use COMPLETE wildcards)
-    if atom.GetAtomicNum() != 6:
-        symbol += '#{};'.format(atom.GetAtomicNum())
-    elif atom.GetIsAromatic():
-        symbol += 'c;'
     else:
-        symbol += 'C;'
+        # Initialize
+        symbol = '['
 
-    if not SUPER_GENERAL_TEMPLATES:
+        # Add atom primitive - atomic num and aromaticity (don't use COMPLETE wildcards)
+        if atom.GetAtomicNum() != 6:
+            symbol += '#{};'.format(atom.GetAtomicNum())
+            if atom.GetIsAromatic():
+                symbol += 'a;'
+        elif atom.GetIsAromatic():
+            symbol += 'c;'
+        else:
+            symbol += 'C;'
+
         # Charge is important
         if atom.GetFormalCharge() != 0:
             charges = re.search('([-+]+[1-9]?)', atom.GetSmarts())
             if charges: symbol += charges.group() + ';'
 
-    # Strip extra semicolon
-    if symbol[-1] == ';': symbol = symbol[:-1]
+        # Strip extra semicolon
+        if symbol[-1] == ';': symbol = symbol[:-1]
 
     # Close with label or with bracket
     label = re.search('\:[0-9]+\]', atom.GetSmarts())
@@ -382,6 +408,7 @@ def convert_atom_to_wildcard(atom, verbose=False,
         if symbol != atom.GetSmarts():
             print('Improved generality of atom SMARTS {} -> {}'.format(
                 atom.GetSmarts(), symbol))
+
     return symbol
 
 

@@ -39,7 +39,7 @@ class HashGraph(Graph):
     @classmethod
     def from_inchi(cls, inchi, HASH, _rdkit_config=rdkit_config()):
         mol = Chem.MolFromInchi(inchi)
-        g = cls.from_rdkit(mol, _rdkit_config, HASH)
+        g = cls.from_rdkit(mol, HASH, _rdkit_config)
         return g
 
     @classmethod

@@ -276,11 +276,12 @@ class rdkit_config:
         node['Aromatic'] = atom.GetIsAromatic()
         node['Chiral'] = get_chiral_tag(mol, atom)
         node['InRing'] = atom.IsInRing()
-        node['SingleAtom'] = True if mol.GetNumAtoms() == 1 else False
         if mol.GetNumAtoms() == 1:
             node['Concentration'] = self.concentration / 2
+            node['SingleAtom'] = True
         else:
             node['Concentration'] = self.concentration / mol.GetNumAtoms()
+            node['SingleAtom'] = False
         if self.set_elemental_mode:
             emode = self.emode
             node['ElementalMode1'] = emode[emode.an == an].em1.ravel()[0]
