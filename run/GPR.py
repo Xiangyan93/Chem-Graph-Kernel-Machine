@@ -105,6 +105,7 @@ def main():
         'train_size': train_size,
         'train_ratio': train_ratio,
         'seed': seed,
+        'byclass': False
     }
     if mode == 'loocv' or mode == 'lomocv' or mode == 'all':
         params['train_size'] = None

@@ -42,7 +42,7 @@ def main():
     # set kernel_config
     get_df(args.input,
            os.path.join(result_dir, '%s.pkl' % ','.join(properties)),
-           single_graph, multi_graph, reaction_graph, n_process=args.n_jobs)
+           single_graph, multi_graph, reaction_graph, n_jobs=args.n_jobs)
 
 
 if __name__ == '__main__':

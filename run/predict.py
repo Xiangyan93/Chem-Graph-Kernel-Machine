@@ -92,7 +92,7 @@ def main():
     model.load(args.result_dir)
     # read input
     df = get_df(args.input, None, kernel_config.single_graph,
-                kernel_config.multi_graph, [], n_process=args.ntasks)
+                kernel_config.multi_graph, [], n_jobs=args.ntasks)
     X, _, _ = get_XYid_from_df(df, kernel_config, properties=None)
     for i in range(len(kernel_config.single_graph)+len(kernel_config.multi_graph)):
         unify_datatype(X[:, i].ravel(), model.X_train_[:, i].ravel())

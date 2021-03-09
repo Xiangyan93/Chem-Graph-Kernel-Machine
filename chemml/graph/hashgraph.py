@@ -6,8 +6,8 @@ import pandas as pd
 from graphdot import Graph
 from graphdot.graph._from_networkx import _from_networkx
 import networkx as nx
+from rxntools.reaction import *
 from chemml.graph.from_rdkit import _from_rdkit, rdkit_config
-from chemml.graph.molecule.reaction import *
 
 
 class HashGraph(Graph):
@@ -83,16 +83,14 @@ class HashGraph(Graph):
     @classmethod
     def agent_from_reaction_smarts(cls, reaction_smarts, HASH,
                                    _rdkit_config=rdkit_config()):
-        rxn = RxnFromSmarts(reaction_smarts)
-        for agent in rxn.GetAgents():
-            Chem.SanitizeMol(agent)
+        cr = ChemicalReaction(reaction_smarts)
 
-        if len(rxn.GetAgents()) == 0:
+        if len(cr.agents) == 0:
             return HashGraph.from_smiles('[He]', HASH, _rdkit_config)
 
         agents = HashGraph.from_rdkit(
-            rxn.GetAgents()[0], '1', _rdkit_config).to_networkx()
-        for mol in rxn.GetAgents()[1:]:
+            cr.agents[0], '1', _rdkit_config).to_networkx()
+        for mol in cr.agents[1:]:
             g = HashGraph.from_rdkit(mol, '1', _rdkit_config).to_networkx()
             agents = nx.disjoint_union(agents, g)
         g = _from_networkx(cls, agents)
@@ -101,21 +99,20 @@ class HashGraph(Graph):
 
     @classmethod
     def from_reaction_smarts(cls, reaction_smarts, HASH):
-        rxn = RxnFromSmarts(reaction_smarts)
-        ReactingAtoms = getReactingAtoms(rxn, depth=1)
+        cr = ChemicalReaction(reaction_smarts)
 
-        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+        _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                      reactant_or_product='reactant')
         reaction = HashGraph.from_rdkit(
-            rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
-        for reactant in rxn.GetReactants()[1:]:
+            cr.reactants[0], '1', _rdkit_config).to_networkx()
+        for reactant in cr.reactants[1:]:
             g = HashGraph.from_rdkit(reactant, '1', _rdkit_config).\
                 to_networkx()
             reaction = nx.disjoint_union(reaction, g)
 
-        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+        _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                      reactant_or_product='product')
-        for product in rxn.GetProducts():
+        for product in cr.products:
             g = HashGraph.from_rdkit(product, '1', _rdkit_config).\
                 to_networkx()
             reaction = nx.disjoint_union(reaction, g)
@@ -131,32 +128,27 @@ class HashGraph(Graph):
         return g
 
     @classmethod
-    def from_reaction_template(cls, template_smarts, HASH):
-        rxn = Chem.ReactionFromSmarts(template_smarts)
-        ReactingAtoms = getReactingAtoms(rxn, depth=1, IsTemplate=True)
-
-        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+    def from_reaction_template(cls, template_smarts):
+        template = ReactionTemplate(template_smarts)
+        _rdkit_config = rdkit_config(reaction_center=template.ReactingAtomsMN,
                                      reactant_or_product='reactant',
                                      IsSanitized=False,
                                      set_morgan_identifier=False)
-        reaction = HashGraph.from_rdkit(
-            rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
-        for reactant in rxn.GetReactants()[1:]:
-            g = HashGraph.from_rdkit(reactant, '1', _rdkit_config). \
-                to_networkx()
+        reaction = Graph.from_rdkit(
+            template.reactants[0], _rdkit_config).to_networkx()
+        for reactant in template.reactants[1:]:
+            g = Graph.from_rdkit(reactant, _rdkit_config).to_networkx()
             reaction = nx.disjoint_union(reaction, g)
 
-        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+        _rdkit_config = rdkit_config(reaction_center=template.ReactingAtomsMN,
                                      reactant_or_product='product',
                                      IsSanitized=False,
                                      set_morgan_identifier=False)
-        for product in rxn.GetProducts():
-            g = HashGraph.from_rdkit(product, '1', _rdkit_config). \
-                to_networkx()
+        for product in template.products:
+            g = Graph.from_rdkit(product, _rdkit_config).to_networkx()
             reaction = nx.disjoint_union(reaction, g)
 
         g = _from_networkx(cls, reaction)
-        g.hash = HASH
         if g.nodes.to_pandas()['ReactingCenter'].max() <= 0:
             raise RuntimeError(f'No reacting atoms are found in reactants:　'
                                f'{template_smarts}')
@@ -167,14 +159,13 @@ class HashGraph(Graph):
 
     @classmethod
     def reactant_from_reaction_smarts(cls, reaction_smarts, HASH):
-        rxn = RxnFromSmarts(reaction_smarts)
-        ReactingAtoms = getReactingAtoms(rxn, depth=1)
+        cr = ChemicalReaction(reaction_smarts)
 
-        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+        _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                      reactant_or_product='reactant')
         reaction = HashGraph.from_rdkit(
-            rxn.GetReactants()[0], '1', _rdkit_config).to_networkx()
-        for reactant in rxn.GetReactants()[1:]:
+            cr.reactants[0], '1', _rdkit_config).to_networkx()
+        for reactant in cr.reactants[1:]:
             g = HashGraph.from_rdkit(reactant, '1', _rdkit_config).\
                 to_networkx()
             reaction = nx.disjoint_union(reaction, g)
@@ -185,14 +176,13 @@ class HashGraph(Graph):
 
     @classmethod
     def product_from_reaction_smarts(cls, reaction_smarts, HASH):
-        rxn = RxnFromSmarts(reaction_smarts)
-        ReactingAtoms = getReactingAtoms(rxn, depth=1)
+        cr = ChemicalReaction(reaction_smarts)
 
-        _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+        _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                      reactant_or_product='reactant')
         reaction = HashGraph.from_rdkit(
-            rxn.GetProducts()[0], '1', _rdkit_config).to_networkx()
-        for product in rxn.GetProducts()[1:]:
+            cr.products[0], '1', _rdkit_config).to_networkx()
+        for product in cr.products[1:]:
             g = HashGraph.from_rdkit(product, '1', _rdkit_config).\
                 to_networkx()
             reaction = nx.disjoint_union(reaction, g)

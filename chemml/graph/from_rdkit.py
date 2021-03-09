@@ -11,8 +11,8 @@ import numpy as np
 from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors
 from graphdot.graph._from_networkx import _from_networkx
-from chemml.graph.molecule.smiles import *
-from chemml.graph.molecule.substructure import (
+from rxntools.smiles import *
+from rxntools.substructure import (
     FunctionalGroup,
     AtomEnvironment
 )

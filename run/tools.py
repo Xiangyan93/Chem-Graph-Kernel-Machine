@@ -4,6 +4,7 @@ from tqdm import tqdm
 import networkx as nx
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
+from rxntools.reaction import *
 from rdkit import Chem
 from chemml.regression.gpr_learner import GPRLearner
 from chemml.classification.learner import ClassificationLearner
@@ -11,8 +12,9 @@ from chemml.classification.gpc.gpc import GPC
 from chemml.classification.svm.svm import SVC
 from chemml.graph.hashgraph import HashGraph
 from chemml.graph.from_rdkit import rdkit_config
-from chemml.graph.molecule.reaction import *
 from chemml.kernels.ConvKernel import *
+from chemml.regression.consensus import ConsensusRegressor
+from chemml.regression.GPRgraphdot.gpr import LRAGPR
 
 
 def set_graph_property(input_config):
@@ -396,9 +398,10 @@ def gpc_run(data, result_dir, kernel_config, params, tag=0):
             out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t',
                        index=False,
                        float_format='%15.10f')
-        out, accuracy, precision, recall, f1 = learner.evaluate_test()
+        out, accuracy, rocauc, precision, recall, f1 = learner.evaluate_test()
         print('Test set:')
         print('accuracy: %.3f' % accuracy)
+        print('ROC-AUC: %.3f' % rocauc )
         print('precision: %.3f' % precision)
         print('recall: %.3f' % recall)
         print('f1: %.3f' % f1)
@@ -468,8 +471,8 @@ def _reaction_agents2sg(reaction_smarts, HASH):
 
 def _reaction_agents2mg(reaction_smarts, HASH):
     agents = []
-    rxn = RxnFromSmarts(reaction_smarts)
-    for i, mol in enumerate(rxn.GetAgents()):
+    cr = ChemicalReaction(reaction_smarts)
+    for i, mol in enumerate(cr.agents):
         Chem.SanitizeMol(mol)
         hash_ = HASH + '_%d' % i
         agents += [HashGraph.from_rdkit(mol, hash_), 1.0]
@@ -482,11 +485,10 @@ def _reaction_reactants2sg(reaction_smarts, HASH):
 
 def _reaction_reactants2mg(reaction_smarts, HASH):
     reactants = []
-    rxn = RxnFromSmarts(reaction_smarts)
-    ReactingAtoms = getReactingAtoms(rxn, depth=1)
-    _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+    cr = ChemicalReaction(reaction_smarts)
+    _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                  reactant_or_product='reactant')
-    for i, mol in enumerate(rxn.GetReactants()):
+    for i, mol in enumerate(cr.reactants):
         Chem.SanitizeMol(mol)
         hash_ = HASH + '_%d' % i
         reactants += [HashGraph.from_rdkit(mol, hash_, _rdkit_config), 1.0]
@@ -499,11 +501,10 @@ def _reaction_products2sg(reaction_smarts, HASH):
 
 def _reaction_products2mg(reaction_smarts, HASH):
     products = []
-    rxn = RxnFromSmarts(reaction_smarts)
-    ReactingAtoms = getReactingAtoms(rxn, depth=1)
-    _rdkit_config = rdkit_config(reaction_center=ReactingAtoms,
+    cr = ChemicalReaction(reaction_smarts)
+    _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                  reactant_or_product='reactant')
-    for i, mol in enumerate(rxn.GetProducts()):
+    for i, mol in enumerate(cr.products):
         Chem.SanitizeMol(mol)
         hash_ = HASH + '_%d' % i
         products += [HashGraph.from_rdkit(mol, hash_, _rdkit_config), 1.0]
@@ -516,21 +517,20 @@ def _reaction2sg(reaction_smarts, HASH):
 
 def _reaction2mg(reaction_smarts, HASH):
     reaction = []
-    rxn = RxnFromSmarts(reaction_smarts)
-    ReactingAtoms = getReactingAtoms(rxn, depth=1)
-    for i, reactant in enumerate(rxn.GetReactants()):
+    cr = ChemicalReaction(reaction_smarts)
+    for i, reactant in enumerate(cr.reactants):
         Chem.SanitizeMol(reactant)
         hash_ = HASH + '_r%d' % i
-        config_ = rdkit_config(reaction_center=ReactingAtoms)
+        config_ = rdkit_config(reaction_center=cr.ReactingAtomsMN)
         reaction += [HashGraph.from_rdkit(reactant, hash_, config_),
                      1.0]
         if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
             print('Reactants error and return Parsing Error for reaction: '
                   '%s', reaction_smarts)
-    for i, product in enumerate(rxn.GetProducts()):
+    for i, product in enumerate(cr.products):
         Chem.SanitizeMol(product)
         hash_ = HASH + '_p%d' % i
-        config_ = rdkit_config(reaction_center=ReactingAtoms)
+        config_ = rdkit_config(reaction_center=cr.ReactingAtomsMN)
         reaction += [HashGraph.from_rdkit(product, hash_, config_),
                      -1.0]
         if reaction[-2].nodes.to_pandas()['ReactingCenter'].max() <= 0:
@@ -579,8 +579,8 @@ def multi2graph(args_kwargs):
         return np.asarray(graphs)[idx]
 
 
-def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
-           parallel='Parallel', set_group_id=False):
+def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_jobs=1,
+           set_group_id=False):
     if pkl is not None and os.path.exists(pkl):
         print('reading existing pkl file: %s' % pkl)
         df = pd.read_pickle(pkl)
@@ -602,48 +602,34 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
         # transform single graph
         for sg in single_graph:
             print('Transforming molecules into graphs. (pure compounds)')
-            if parallel == 'pool':
-                df_parts = np.array_split(df, n_process)
-                with Pool(processes=n_process) as pool:
-                    result_parts = pool.map(
-                        single2graph, [(df_part, sg) for df_part in df_parts])
-                df[sg + '_sg'] = np.concatenate(result_parts)
-            else:
-                df[sg + '_sg'] = Parallel(
-                    n_jobs=n_process, verbose=True,
-                    **_joblib_parallel_args(prefer='processes'))(
-                    delayed(_pure2sg)(
-                        df.iloc[i][sg], df.iloc[i]['group_id'].astype(str))
-                    for i in df.index)
-            unify_datatype(df[sg + '_sg'])
+            df[sg] = Parallel(
+                n_jobs=n_jobs, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_pure2sg)(
+                    df.iloc[i][sg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            unify_datatype(df[sg])
         # transform multi graph
         for mg in multi_graph:
             print('Transforming molecules into graphs. (mixtures)')
-            if parallel == 'pool':
-                df_parts = np.array_split(df, n_process)
-                with Pool(processes=n_process) as pool:
-                    result_parts = pool.map(
-                        multi2graph, [(df_part, mg) for df_part in df_parts])
-                df[mg] = np.concatenate(result_parts)
-            else:
-                df[mg + '_sg'] = Parallel(
-                    n_jobs=n_process, verbose=True,
-                    **_joblib_parallel_args(prefer='processes'))(
-                    delayed(_mixture2sg)(
-                        df.iloc[i][mg], df.iloc[i]['group_id'].astype(str))
-                    for i in df.index)
-                df[mg] = Parallel(n_jobs=n_process, verbose=True,
-                                  **_joblib_parallel_args(prefer='processes'))(
-                    delayed(_mixture2mg)(
-                        df.iloc[i][mg], df.iloc[i]['group_id'].astype(str))
-                    for i in df.index)
-                unify_datatype(df[mg + '_sg'])
+            df[mg] = Parallel(
+                n_jobs=n_jobs, verbose=True,
+                **_joblib_parallel_args(prefer='processes'))(
+                delayed(_mixture2sg)(
+                    df.iloc[i][mg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
+            df[mg + '_mg'] = Parallel(n_jobs=n_jobs, verbose=True,
+                              **_joblib_parallel_args(prefer='processes'))(
+                delayed(_mixture2mg)(
+                    df.iloc[i][mg], df.iloc[i]['group_id'].astype(str))
+                for i in df.index)
             unify_datatype(df[mg])
+            unify_datatype(df[mg + '_mg'])
         # transform reaction graph
         for rg in reaction_graph:
             print('Transforming reagents into single graphs.')
             df[rg + '_agents_sg'] = Parallel(
-                n_jobs=n_process, verbose=True,
+                n_jobs=n_jobs, verbose=True,
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(_reaction_agents2sg)(
                     df.iloc[i][rg],
@@ -666,7 +652,7 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
             """
             print('Transforming chemical reactions into single graphs.')
             df[rg + '_sg'] = Parallel(
-                n_jobs=n_process, verbose=True,
+                n_jobs=n_jobs, verbose=True,
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(_reaction2sg)(df.iloc[i][rg],
                                       df.iloc[i]['group_id'].astype(str))
@@ -685,16 +671,14 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
             # df = df[df[rg + '_mg'] != 'Parsing Error'].\
             #    reset_index().drop(columns='index')
             unify_datatype(df[rg + '_mg'])
-            """
             print('Transforming reactants into single graphs.')
             df[rg + '_reactants_sg'] = Parallel(
-                n_jobs=n_process, verbose=True,
+                n_jobs=n_jobs, verbose=True,
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(_reaction_reactants2sg)(
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_reactants_sg'])
-            """
             print('Transforming reactants into multi graphs.')
             df[rg + '_reactants_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
@@ -703,16 +687,14 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_process=1,
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_reactants_mg'])
-            """
             print('Transforming products into single graphs.')
             df[rg + '_products_sg'] = Parallel(
-                n_jobs=n_process, verbose=True,
+                n_jobs=n_jobs, verbose=True,
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(_reaction_products2sg)(
                     df.iloc[i][rg], df.iloc[i]['group_id'].astype(str))
                 for i in df.index)
             unify_datatype(df[rg + '_products_sg'])
-            """
             print('Transforming products into multi graphs.')
             df[rg + '_products_mg'] = Parallel(
                 n_jobs=n_process, verbose=True,
