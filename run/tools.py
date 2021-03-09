@@ -398,10 +398,10 @@ def gpc_run(data, result_dir, kernel_config, params, tag=0):
             out.to_csv('%s/train-%i.log' % (result_dir, tag), sep='\t',
                        index=False,
                        float_format='%15.10f')
-        out, accuracy, rocauc, precision, recall, f1 = learner.evaluate_test()
+        out, accuracy, precision, recall, f1 = learner.evaluate_test()
         print('Test set:')
         print('accuracy: %.3f' % accuracy)
-        print('ROC-AUC: %.3f' % rocauc )
+        # print('ROC-AUC: %.3f' % rocauc )
         print('precision: %.3f' % precision)
         print('recall: %.3f' % recall)
         print('f1: %.3f' % f1)

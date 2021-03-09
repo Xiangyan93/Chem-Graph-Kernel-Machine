@@ -86,7 +86,6 @@ class ClassificationBaseLearner(BaseLearner):
     @staticmethod
     def evaluate_df(y, y_pred, id):
         accuracy = accuracy_score(y, y_pred)
-        rocauc = roc_auc_score(y, y_pred)
         precision = precision_score(y, y_pred, average='micro')
         recall = recall_score(y, y_pred, average='micro')
         f1 = f1_score(y, y_pred, average='micro')
@@ -95,7 +94,7 @@ class ClassificationBaseLearner(BaseLearner):
             'predict': y_pred,
             'id': id
         })
-        return df_out, accuracy, rocauc, precision, recall, f1
+        return df_out, accuracy, precision, recall, f1
 
 
 class KernelRegressionBaseLearner(RegressionBaseLearner):
