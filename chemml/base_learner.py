@@ -86,9 +86,9 @@ class ClassificationBaseLearner(BaseLearner):
     @staticmethod
     def evaluate_df(y, y_pred, id):
         accuracy = accuracy_score(y, y_pred)
-        precision = precision_score(y, y_pred, average='micro')
-        recall = recall_score(y, y_pred, average='micro')
-        f1 = f1_score(y, y_pred, average='micro')
+        precision = precision_score(y, y_pred, average='macro')
+        recall = recall_score(y, y_pred, average='macro')
+        f1 = f1_score(y, y_pred, average='macro')
         df_out = pd.DataFrame({
             '#target': y,
             'predict': y_pred,
