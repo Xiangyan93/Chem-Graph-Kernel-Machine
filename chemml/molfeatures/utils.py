@@ -10,37 +10,37 @@ from rdkit.Chem import PandasTools
 
 def save_features(path: str, features: List[np.ndarray]) -> None:
     """
-    Saves features to a compressed :code:`.npz` file with array name "features".
+    Saves molfeatures to a compressed :code:`.npz` file with array name "molfeatures".
 
-    :param path: Path to a :code:`.npz` file where the features will be saved.
-    :param features: A list of 1D numpy arrays containing the features for molecules.
+    :param path: Path to a :code:`.npz` file where the molfeatures will be saved.
+    :param features: A list of 1D numpy arrays containing the molfeatures for molecules.
     """
     np.savez_compressed(path, features=features)
 
 
 def load_features(path: str) -> np.ndarray:
     """
-    Loads features saved in a variety of formats.
+    Loads molfeatures saved in a variety of formats.
 
     Supported formats:
 
-    * :code:`.npz` compressed (assumes features are saved with name "features")
+    * :code:`.npz` compressed (assumes molfeatures are saved with name "molfeatures")
     * .npy
-    * :code:`.csv` / :code:`.txt` (assumes comma-separated features with a header and with one line per molecule)
+    * :code:`.csv` / :code:`.txt` (assumes comma-separated molfeatures with a header and with one line per molecule)
     * :code:`.pkl` / :code:`.pckl` / :code:`.pickle` containing a sparse numpy array
 
     .. note::
 
        All formats assume that the SMILES loaded elsewhere in the code are in the same
-       order as the features loaded here.
+       order as the molfeatures loaded here.
 
-    :param path: Path to a file containing features.
-    :return: A 2D numpy array of size :code:`(num_molecules, features_size)` containing the features.
+    :param path: Path to a file containing molfeatures.
+    :return: A 2D numpy array of size :code:`(num_molecules, features_size)` containing the molfeatures.
     """
     extension = os.path.splitext(path)[1]
 
     if extension == '.npz':
-        features = np.load(path)['features']
+        features = np.load(path)['molfeatures']
     elif extension == '.npy':
         features = np.load(path)
     elif extension in ['.csv', '.txt']:

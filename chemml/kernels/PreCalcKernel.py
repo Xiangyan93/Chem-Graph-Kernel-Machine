@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pickle
-from chemml.kernels.KernelConfig import KernelConfig
+from chemml.kernels.BaseKernelConfig import BaseKernelConfig
 from chemml.kernels.MultipleKernel import *
 
 
@@ -173,7 +173,7 @@ class ConvolutionPreCalcKernel(PreCalcKernel):
 '''
 
 
-class PreCalcKernelConfig(KernelConfig):
+class PreCalcBaseKernelConfig(BaseKernelConfig):
     def __init__(self, f_kernel: str, N_RBF: int = 0,
                  sigma_RBF: np.ndarray = 1.0):
         super().__init__(N_RBF, sigma_RBF)

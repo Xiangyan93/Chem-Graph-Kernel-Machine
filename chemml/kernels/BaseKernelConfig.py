@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 
 
-class KernelConfig:
+class BaseKernelConfig:
     def __init__(self, N_RBF: int = 0, sigma_RBF: np.ndarray = 1.0):
-        assert (self.__class__ != KernelConfig)
+        assert (self.__class__ != BaseKernelConfig)
         self.N_RBF = N_RBF
         self.sigma_RBF = sigma_RBF
 
@@ -20,7 +20,7 @@ class KernelConfig:
             if self.sigma_RBF.__class__ == float:
                 self.sigma_RBF *= np.ones(self.N_RBF)
             if self.N_RBF != len(self.sigma_RBF):
-                raise Exception('features and hyperparameters must be the same '
+                raise Exception('molfeatures and hyperparameters must be the same '
                                 'length')
             add_kernel = ConstantKernel(1.0, (1e-3, 1e3)) * \
                          RBF(length_scale=self.sigma_RBF)

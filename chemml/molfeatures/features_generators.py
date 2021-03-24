@@ -14,10 +14,10 @@ FEATURES_GENERATOR_REGISTRY = {}
 
 def register_features_generator(features_generator_name: str) -> Callable[[FeaturesGenerator], FeaturesGenerator]:
     """
-    Creates a decorator which registers a features generator in a global dictionary to enable access by name.
+    Creates a decorator which registers a molfeatures generator in a global dictionary to enable access by name.
 
-    :param features_generator_name: The name to use to access the features generator.
-    :return: A decorator which will add a features generator to the registry using the specified name.
+    :param features_generator_name: The name to use to access the molfeatures generator.
+    :return: A decorator which will add a molfeatures generator to the registry using the specified name.
     """
     def decorator(features_generator: FeaturesGenerator) -> FeaturesGenerator:
         FEATURES_GENERATOR_REGISTRY[features_generator_name] = features_generator
@@ -28,20 +28,20 @@ def register_features_generator(features_generator_name: str) -> Callable[[Featu
 
 def get_features_generator(features_generator_name: str) -> FeaturesGenerator:
     """
-    Gets a registered features generator by name.
+    Gets a registered molfeatures generator by name.
 
-    :param features_generator_name: The name of the features generator.
-    :return: The desired features generator.
+    :param features_generator_name: The name of the molfeatures generator.
+    :return: The desired molfeatures generator.
     """
     if features_generator_name not in FEATURES_GENERATOR_REGISTRY:
         raise ValueError(f'Features generator "{features_generator_name}" could not be found. '
-                         f'If this generator relies on rdkit features, you may need to install descriptastorus.')
+                         f'If this generator relies on rdkit molfeatures, you may need to install descriptastorus.')
 
     return FEATURES_GENERATOR_REGISTRY[features_generator_name]
 
 
 def get_available_features_generators() -> List[str]:
-    """Returns a list of names of available features generators."""
+    """Returns a list of names of available molfeatures generators."""
     return list(FEATURES_GENERATOR_REGISTRY.keys())
 
 
@@ -95,10 +95,10 @@ try:
     @register_features_generator('rdkit_2d')
     def rdkit_2d_features_generator(mol: Molecule) -> np.ndarray:
         """
-        Generates RDKit 2D features for a molecule.
+        Generates RDKit 2D molfeatures for a molecule.
 
         :param mol: A molecule (i.e., either a SMILES or an RDKit molecule).
-        :return: A 1D numpy array containing the RDKit 2D features.
+        :return: A 1D numpy array containing the RDKit 2D molfeatures.
         """
         smiles = Chem.MolToSmiles(mol, isomericSmiles=True) if type(mol) != str else mol
         generator = rdDescriptors.RDKit2D()
@@ -109,10 +109,10 @@ try:
     @register_features_generator('rdkit_2d_normalized')
     def rdkit_2d_normalized_features_generator(mol: Molecule) -> np.ndarray:
         """
-        Generates RDKit 2D normalized features for a molecule.
+        Generates RDKit 2D normalized molfeatures for a molecule.
 
         :param mol: A molecule (i.e., either a SMILES or an RDKit molecule).
-        :return: A 1D numpy array containing the RDKit 2D normalized features.
+        :return: A 1D numpy array containing the RDKit 2D normalized molfeatures.
         """
         smiles = Chem.MolToSmiles(mol, isomericSmiles=True) if type(mol) != str else mol
         generator = rdNormalizedDescriptors.RDKit2DNormalized()
@@ -124,21 +124,21 @@ except ImportError:
     def rdkit_2d_features_generator(mol: Molecule) -> np.ndarray:
         """Mock implementation raising an ImportError if descriptastorus cannot be imported."""
         raise ImportError('Failed to import descriptastorus. Please install descriptastorus '
-                          '(https://github.com/bp-kelley/descriptastorus) to use RDKit 2D features.')
+                          '(https://github.com/bp-kelley/descriptastorus) to use RDKit 2D molfeatures.')
 
     @register_features_generator('rdkit_2d_normalized')
     def rdkit_2d_normalized_features_generator(mol: Molecule) -> np.ndarray:
         """Mock implementation raising an ImportError if descriptastorus cannot be imported."""
         raise ImportError('Failed to import descriptastorus. Please install descriptastorus '
-                          '(https://github.com/bp-kelley/descriptastorus) to use RDKit 2D normalized features.')
+                          '(https://github.com/bp-kelley/descriptastorus) to use RDKit 2D normalized molfeatures.')
 
 
 """
-Custom features generator template.
+Custom molfeatures generator template.
 
-Note: The name you use to register the features generator is the name
+Note: The name you use to register the molfeatures generator is the name
 you will specify on the command line when using the --features_generator <name> flag.
-Ex. python train.py ... --features_generator custom ...
+Ex. python ModelEvaluate.py ... --features_generator custom ...
 
 @register_features_generator('custom')
 def custom_features_generator(mol: Molecule) -> np.ndarray:
@@ -148,8 +148,8 @@ def custom_features_generator(mol: Molecule) -> np.ndarray:
     # If you want to use the RDKit molecule
     mol = Chem.MolFromSmiles(mol) if type(mol) == str else mol
 
-    # Replace this with code which generates features from the molecule
-    features = np.array([0, 0, 1])
+    # Replace this with code which generates molfeatures from the molecule
+    molfeatures = np.array([0, 0, 1])
 
-    return features
+    return molfeatures
 """

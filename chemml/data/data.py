@@ -16,7 +16,7 @@ import networkx as nx
 from graphdot.graph._from_networkx import _from_networkx
 
 # from .scaler import StandardScaler
-from chemml.features import get_features_generator, FeaturesGenerator
+from chemml.molfeatures import get_features_generator, FeaturesGenerator
 from chemml.graph.hashgraph import HashGraph
 from chemml.args import CommonArgs, KernelArgs, TrainArgs
 from .scaffold import scaffold_split
@@ -57,9 +57,9 @@ class SingleMolDatapoint:
             features_generator_ = get_features_generator(fg)
             self.molfeatures.append(
                 self.calc_molfeatures(self.mol, features_generator_))
-        # print(self.features[0])
+        # print(self.molfeatures[0])
         self.molfeatures = np.concatenate(self.molfeatures)
-        # Fix nans in features
+        # Fix nans in molfeatures
         replace_token = 0
         if self.molfeatures is not None:
             self.molfeatures = np.where(
@@ -71,7 +71,7 @@ class SingleMolDatapoint:
             molfeatures = features_generator(mol)
         # for H2
         elif mol is not None and mol.GetNumHeavyAtoms() == 0:
-            # not all features are equally long, so use methane as dummy
+            # not all molfeatures are equally long, so use methane as dummy
             # molecule to determine length
             molfeatures = np.zeros(
                 len(features_generator(Chem.MolFromSmiles('C'))))
@@ -132,7 +132,7 @@ class MultiMolDatapoint:
                      'single_graph', 'multi_graph'] = 'single_graph'):
         # read data point
         self.data = data
-        # features set None
+        # molfeatures set None
         self.molfeatures = None
         # set concentration
         if concentration is None:
@@ -256,7 +256,7 @@ class SubDataset:
         if targets.ndim == 1:
             targets = targets.reshape(1, -1)
         self.targets = targets
-        # set features
+        # set molfeatures
         if addfeatures is not None and addfeatures.ndim == 1:
             addfeatures = addfeatures.reshape(1, -1)
         self.addfeatures = addfeatures

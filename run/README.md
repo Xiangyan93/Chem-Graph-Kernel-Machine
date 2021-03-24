@@ -13,21 +13,21 @@ kernel.
 1. The file datasets/ThermoSIM/critical-sim.txt contains the critical temperature and
 critical density of molecules obtained from molecular dynamics (MD) simulation.
 
-2. Preparation
-    - Transfer the SMILES or inchi into graph object.
+2. Read Dataset.
+    - Read the dataset and save result in tc.
         ```
-        python3 txt2pkl.py --result_dir tc -i datasets/ThermoSIM/critical-sim.txt --input_config SMILES:::tc --n_jobs 6
+        python3 ReadData.py --save_dir tc --data_path datasets/ThermoSIM/critical-sim.txt --pure_columns smiles --target_columns tc --n_jobs 6
         ```
 3. Kernel Calculation
-    - For fixed hyperparameters, it is fast to calculate the kernel matrix first.
+    - Calculate the entire kernel matrix, and saved.
         ```
-        python3 KernelCalc.py --result_dir tc --input_config SMILES:::tc --json_hyper ../hyperparameters/tMGR.json
+        python3 KernelCalc.py --kernel graph --graph_hyperparameters ../hyperparameters/tMGR.json --save_dir tc --pure_columns smiles
         ```
 4. Performance evaluation
     - The training set ratio is 0.8. test-0.log are output. And
         You can set 1.0 to build a model using all data.
         ```
-        python3 GPR.py --result_dir tc --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::tc --train_test_config train_test::0.8:0
+        python3 ModelEvaluate.py --kernel_type preCalc --save_dir tc --pure_columns smiles --dataset_type regression --model_type gpr --split_type scaffold_balanced --split_sizes 0.8 0.2 --alpha 0.01 --metric mae rmse --num_folds 100 --evaluate_train
         ```
 5. Hyperparameters optimization
     - Step 2-4 can be done by 1 command, but it is 2-3 times slower since the 

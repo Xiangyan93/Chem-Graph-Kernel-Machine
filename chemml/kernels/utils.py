@@ -4,8 +4,8 @@ from typing import Dict, Iterator, List, Optional, Union, Literal
 import numpy as np
 from chemml.args import KernelArgs
 from chemml.data import Dataset
-from chemml.kernels.GraphKernel import GraphKernelConfig
-from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
+from chemml.kernels.GraphKernel import GraphBaseKernelConfig
+from chemml.kernels.PreCalcKernel import PreCalcBaseKernelConfig
 
 
 def get_kernel_info(args):
@@ -53,7 +53,7 @@ def set_kernel(args: KernelArgs, dataset: Dataset):
             'N_RBF': N_RBF,
             'sigma_RBF': np.concatenate(sigma_RBF),
         }
-        return GraphKernelConfig(**params).kernel
+        return GraphBaseKernelConfig(**params).kernel
     else:
         N_RBF = 0 if dataset.data[0].addfeatures is None \
             else dataset.data[0].addfeatures.shape[1]
@@ -65,4 +65,4 @@ def set_kernel(args: KernelArgs, dataset: Dataset):
             'N_RBF': N_RBF,
             'sigma_RBF': sigma_RBF,
         }
-        return PreCalcKernelConfig(**params).kernel
+        return PreCalcBaseKernelConfig(**params).kernel

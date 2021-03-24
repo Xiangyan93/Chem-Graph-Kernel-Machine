@@ -14,7 +14,7 @@ from chemml.evaluator import Evaluator
 def main(args: TrainArgs) -> None:
     dataset = Dataset.load(args.save_dir)
     dataset.kernel_type = args.kernel_type
-    evaluator = Evaluator(args, dataset).evaluate()
+    Evaluator(args, dataset).evaluate()
 
 
 if __name__ == '__main__':

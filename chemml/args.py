@@ -15,7 +15,7 @@ class CommonArgs(Tap):
     n_jobs: int = 1
     """The cpu numbers used for parallel computing."""
     data_path: str = None
-    """Path to data CSV file."""
+    """The Path of input data CSV file."""
     pure_columns: List[str] = None
     """
     For pure compounds.
@@ -40,17 +40,17 @@ class CommonArgs(Tap):
     """How the chemical reaction is represented."""
     feature_columns: List[str] = None
     """
-    Name of the columns containing additional features such as temperature, 
+    Name of the columns containing additional molfeatures such as temperature, 
     pressuer.
     """
     features_generator: List[str] = None
-    """Method(s) of generating additional features."""
+    """Method(s) of generating additional molfeatures."""
     target_columns: List[str] = None
     """
     Name of the columns containing target values.
     """
     unique_reading: bool = False
-    """Finding unique input strings first, then read the data."""
+    """Find unique input strings first, then read the data."""
     def __init__(self, *args, **kwargs):
         super(CommonArgs, self).__init__(*args, **kwargs)
 
@@ -61,13 +61,13 @@ class KernelArgs(CommonArgs):
     graph_hyperparameters: List[str] = None
     """hyperparameters file for graph kernel."""
     molfeatures_hyperparameters: float = 1.0
-    """hyperparameters for molecular features."""
+    """hyperparameters for molecular molfeatures."""
     molfeatures_normalize: bool = False
-    """Nomralize the molecular features."""
+    """Nomralize the molecular molfeatures."""
     addfeatures_hyperparameters: float = 1.0
-    """hyperparameters for additional features."""
+    """hyperparameters for additional molfeatures."""
     addfeatures_normalize: bool = False
-    """omral the additonal features."""
+    """omral the additonal molfeatures."""
 
 
 class TrainArgs(KernelArgs):

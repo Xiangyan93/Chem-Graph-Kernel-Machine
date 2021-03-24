@@ -22,7 +22,7 @@ from graphdot.microprobability import (
     UniformProbability,
     AssignProbability
 )
-from chemml.kernels.KernelConfig import KernelConfig
+from chemml.kernels.BaseKernelConfig import BaseKernelConfig
 from chemml.kernels.MultipleKernel import *
 from chemml.kernels.ConvKernel import *
 
@@ -244,32 +244,6 @@ class MGK(MarginalizedGraphKernel):
             backend=self.backend
         )
 
-"""
-class ConvolutionKernel:
-    def __init__(self, kernel):
-        self.kernel = kernel
-
-    def __call__(self, X, Y=None):
-        
-
-    @staticmethod
-    def _format_X(X):
-        if X.__class__ == np.ndarray:
-            return X.ravel()  # .tolist()
-        else:
-            return X
-
-    @staticmethod
-    def get_graph(X, Y=None):
-        graphs = []
-        for x in X:
-            graphs += ConvolutionKernel.x2graph(x)
-        if Y is not None:
-            for y in Y:
-                graphs += ConvolutionKernel.x2graph(y)
-        return np.sort(np.unique(graphs))
-"""
-
 
 class ConvolutionGraphKernel(MGK):
     def __call__(self, X, Y=None, eval_gradient=False, *args, **kwargs):
@@ -300,7 +274,7 @@ class ConvolutionGraphKernel(MGK):
         return graph, K_graph, K_gradient_graph
 
 
-class GraphKernelConfig(KernelConfig):
+class GraphBaseKernelConfig(BaseKernelConfig):
     def __init__(self, N_MGK: int, N_conv_MGK: int,
                  graph_hyperparameters: List[Dict],
                  unique: bool = False,
