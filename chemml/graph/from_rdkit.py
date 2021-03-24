@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """Adaptor for RDKit's Molecule objects"""
 import os
-
 CWD = os.path.dirname(os.path.abspath(__file__))
+from typing import Dict, List, Tuple, Optional
 import re
 import networkx as nx
 import pandas as pd
@@ -18,7 +18,7 @@ from rxntools.substructure import (
 )
 
 
-def get_bond_orientation_dict(mol):
+def get_bond_orientation_dict(mol: Chem.Mol) -> Dict[Tuple[int, int], int]:
     bond_orientation_dict = {}
     mb = Chem.MolToMolBlock(mol, includeStereo=True, kekulize=False)
     for info in re.findall(r'^\s+\d+\s+\d+\s+\d+\s+\d+$', mb, re.MULTILINE):
@@ -29,8 +29,12 @@ def get_bond_orientation_dict(mol):
     return bond_orientation_dict
 
 
-def get_atom_ring_stereo(mol, atom, ring_idx, depth=5,
-                         bond_orientation_dict=None):
+def get_atom_ring_stereo(
+        mol: Chem.Mol,
+        atom: Chem.Atom,
+        ring_idx : Tuple[int],
+        depth: int = 5,
+        bond_orientation_dict: Optional[Dict[Tuple[int, int], int]] = None):
     """Return an atom is upward or downward refer to a ring plane.
 
     For atom in a ring. If it has 4 bonds. Two of them are included in the
@@ -144,7 +148,7 @@ def get_atom_ring_stereo(mol, atom, ring_idx, depth=5,
         return 0
 
 
-def IsSymmetric(mol, ij, depth=2):
+def IsSymmetric(mol: Chem.Mol, ij: Tuple[int, int], depth: int = 2) -> bool:
     atom0 = mol.GetAtomWithIdx(ij[0])
     atom1 = mol.GetAtomWithIdx(ij[1])
     fg_1 = FunctionalGroup(mol, atom0, atom1, depth)

@@ -40,7 +40,6 @@ class PreCalcKernel:
     @theta.setter
     def theta(self, value):
         self.exptheta = np.exp(value)
-        return True
 
     @property
     def n_dims(self):
@@ -175,17 +174,17 @@ class ConvolutionPreCalcKernel(PreCalcKernel):
 
 
 class PreCalcKernelConfig(KernelConfig):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, f_kernel: str, N_RBF: int = 0,
+                 sigma_RBF: np.ndarray = 1.0):
+        super().__init__(N_RBF, sigma_RBF)
         self.type = 'preCalc'
-        kernel_pkl = os.path.join(self.params['result_dir'], 'kernel.pkl')
-        if self.add_features is None:
-            self.kernel = self.get_preCalc_kernel(kernel_pkl)
+        if N_RBF == 0:
+            self.kernel = self.get_preCalc_kernel(f_kernel)
         else:
-            kernels = [self.get_preCalc_kernel(kernel_pkl)]
+            kernels = [self.get_preCalc_kernel(f_kernel)]
             kernels += self.get_rbf_kernel()
             composition = [(0,)] + \
-                          [tuple(np.arange(1, len(self.add_features) + 1))]
+                          [tuple(np.arange(1, N_RBF + 1))]
             self.kernel = MultipleKernel(
                 kernel_list=kernels,
                 composition=composition,

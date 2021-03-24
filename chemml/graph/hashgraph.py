@@ -36,6 +36,10 @@ class HashGraph(Graph):
     def __hash__(self):
         return hash(self.hash)
 
+    def update_concentration(self, concentration: float):
+        for node in self.nodes:
+            node['Concentration'] *= concentration
+
     @classmethod
     def from_inchi(cls, inchi, HASH, _rdkit_config=rdkit_config()):
         mol = Chem.MolFromInchi(inchi)
@@ -84,7 +88,10 @@ class HashGraph(Graph):
     def agent_from_reaction_smarts(cls, reaction_smarts, HASH,
                                    _rdkit_config=rdkit_config()):
         cr = ChemicalReaction(reaction_smarts)
+        return cls.agent_from_cr(cr)
 
+    @classmethod
+    def agent_from_cr(cls, cr, HASH, _rdkit_config=rdkit_config()):
         if len(cr.agents) == 0:
             return HashGraph.from_smiles('[He]', HASH, _rdkit_config)
 
@@ -100,7 +107,10 @@ class HashGraph(Graph):
     @classmethod
     def from_reaction_smarts(cls, reaction_smarts, HASH):
         cr = ChemicalReaction(reaction_smarts)
+        return cls.from_cr(cr, HASH)
 
+    @classmethod
+    def from_cr(cls, cr, HASH):
         _rdkit_config = rdkit_config(reaction_center=cr.ReactingAtomsMN,
                                      reactant_or_product='reactant')
         reaction = HashGraph.from_rdkit(
@@ -121,10 +131,10 @@ class HashGraph(Graph):
         g.hash = HASH
         if g.nodes.to_pandas()['ReactingCenter'].max() <= 0:
             raise RuntimeError(f'No reacting atoms are found in reactants:　'
-                               f'{reaction_smarts}')
+                               f'{cr.reaction_smarts}')
         if g.nodes.to_pandas()['ReactingCenter'].min() >= 0:
             raise RuntimeError(f'No reacting atoms are found in products:　'
-                               f'{reaction_smarts}')
+                               f'{cr.reaction_smarts}')
         return g
 
     @classmethod

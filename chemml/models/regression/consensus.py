@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import copy
-import math
 import threading
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
-from chemml.regression.GPRgraphdot.gpr import GPR as GPRgraphdot
-from chemml.regression.GPRsklearn.gpr import GPR as GPRsklearn
+from chemml.models.regression.GPRgraphdot import GPR as GPRgraphdot
+from chemml.models.regression.GPRsklearn.gpr import GPR as GPRsklearn
 from .GPRgraphdot.gpr import _predict
 
 

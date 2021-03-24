@@ -1,21 +1,17 @@
 import os
 import json
-import pickle
-from tqdm import tqdm
 import networkx as nx
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
 from rxntools.reaction import *
 from rdkit import Chem
-from chemml.regression.gpr_learner import GPRLearner
-from chemml.classification.learner import ClassificationLearner
-from chemml.classification.gpc.gpc import GPC
-from chemml.classification.svm.svm import SVC
+from chemml.models.regression.gpr_learner import GPRLearner
+from chemml.models.classification.learner import ClassificationLearner
+from chemml.models.classification.gpc import GPC
+from chemml.models.classification.svm import SVC
 from chemml.graph.hashgraph import HashGraph
 from chemml.graph.from_rdkit import rdkit_config
 from chemml.kernels.ConvKernel import *
-from chemml.regression.consensus import ConsensusRegressor
-from chemml.regression.GPRgraphdot.gpr import LRAGPR
 
 
 def set_graph_property(input_config):
@@ -83,21 +79,21 @@ def set_mode_train_size_ratio_seed(train_test_config):
 
 def set_gpr_model(gpr, kernel_config, optimizer, alpha):
     if gpr == 'graphdot':
-        from chemml.regression.GPRgraphdot.gpr import GPR
-        model = GPR(kernel=kernel_config.kernel,
+        from chemml.models.regression.GPRgraphdot import GPR
+        model = GPR(kernel=kernel_config.kernel_type,
                     optimizer=optimizer,
                     alpha=alpha,
                     normalize_y=True)
     elif gpr == 'sklearn':
-        from chemml.regression.GPRsklearn.gpr import GPR
-        model = GPR(kernel=kernel_config.kernel,
+        from chemml.models.regression.GPRsklearn.gpr import GPR
+        model = GPR(kernel=kernel_config.kernel_type,
                     optimizer=optimizer,
                     alpha=alpha,
                     y_scale=True)
     elif gpr == 'graphdot_nystrom':
-        from chemml.regression.GPRgraphdot.gpr import LRAGPR
+        from chemml.models.regression.GPRgraphdot import LRAGPR
         model = LRAGPR(
-            kernel=kernel_config.kernel,
+            kernel=kernel_config.kernel_type,
             optimizer=optimizer,
             alpha=alpha,
             normalize_y=True)
@@ -109,7 +105,7 @@ def set_gpr_model(gpr, kernel_config, optimizer, alpha):
 def set_gpc_model(gpc, kernel_config, optimizer, n_jobs):
     if gpc == 'sklearn':
         model = GPC(
-            kernel=kernel_config.kernel,
+            kernel=kernel_config.kernel_type,
             optimizer=optimizer,
             n_jobs=n_jobs
         )
@@ -121,7 +117,7 @@ def set_gpc_model(gpc, kernel_config, optimizer, n_jobs):
 def set_svc_model(svc, kernel_config, C):
     if svc == 'sklearn':
         model = SVC(
-            kernel=kernel_config.kernel,
+            kernel=kernel_config.kernel_type,
             C=C
         )
     else:
@@ -223,7 +219,7 @@ def read_input(result_dir, input, kernel_config, properties, params):
         train_size=params['train_size'],
         train_ratio=params['train_ratio'],
         seed=params['seed'],
-        bygroup=kernel_config.add_features is not None,
+        bygroup=kernel_config.addfeatures is not None,
         byclass=params['byclass']
     )
     # get X, Y of train and test sets
@@ -324,7 +320,7 @@ def gpr_run(data, result_dir, kernel_config, params, load_model=False, tag=0):
         learner.model.save(result_dir, overwrite=True)
         kernel_config.save(result_dir, learner.model_)
         print('***\tEnd: hyperparameters optimization.\t***\n')
-        predict_train = False
+        predict_train = True
         if predict_train:
             out, r2, ex_var, mae, rmse, mse = learner.evaluate_train()
             print('Training set:')
@@ -713,14 +709,14 @@ def get_df(csv, pkl, single_graph, multi_graph, reaction_graph, n_jobs=1,
 def get_XYid_from_df(df, kernel_config, properties=None):
     if df.size == 0:
         return None, None, None
-    if kernel_config.type == 'graph':
+    if kernel_config.graph_type == 'graph':
         X_name = kernel_config.single_graph + kernel_config.multi_graph
-    elif kernel_config.type == 'preCalc':
+    elif kernel_config.graph_type == 'preCalc':
         X_name = ['group_id']
     else:
-        raise Exception('unknown kernel type:', kernel_config.type)
-    if kernel_config.add_features is not None:
-        X_name += kernel_config.add_features
+        raise Exception('unknown kernel type:', kernel_config.graph_type)
+    if kernel_config.addfeatures is not None:
+        X_name += kernel_config.addfeatures
     X = df[X_name].to_numpy()
     if properties is None:
         return X, None, None
