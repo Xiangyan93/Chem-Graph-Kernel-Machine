@@ -18,15 +18,15 @@ from chemml.models.regression.GPRgraphdot import GPR, LRAGPR
 from chemml.models.classification.gpc import GPC
 from chemml.models.classification.svm import SVC
 from chemml.models.regression.consensus import ConsensusRegressor
-from chemml.kernels.utils import set_kernel
 
 
 class Evaluator:
     def __init__(self, args: TrainArgs,
-                 dataset: Dataset):
+                 dataset: Dataset,
+                 kernel):
         self.args = args
         self.dataset = dataset
-        self.kernel = set_kernel(args, dataset)
+        self.kernel = kernel
         self.set_model(args)
 
     def evaluate(self):
@@ -34,19 +34,19 @@ class Evaluator:
             X, y, gid = self.dataset.X, self.dataset.y, self.dataset.X_gid
             y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
             print('LOOCV:')
-            for metric in self.args.metric:
+            for metric in self.args.metrics:
                 print('%s: %.5f' % (metric, self._evaluate(y, y_pred, metric)))
-
             self._df(target=y, predict=y_pred, uncertainty=y_std).to_csv(
-                '%s/loocv.log' % self.args.save_dir, sep='\t',
-                index=False, float_format='%15.10f')
-            return
+                '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
+                float_format='%15.10f')
+            return self._evaluate(y, y_pred, self.args.metric)
 
         train_dict = dict()
-        eval_dict = dict()
+        test_dict = dict()
         for metric in self.args.metric:
             train_dict[metric] = []
-            eval_dict[metric] = []
+            test_dict[metric] = []
+
         for i in range(self.args.num_folds):
             dataset_train, dataset_test = self.dataset.split(
                 self.args.split_type,
@@ -54,38 +54,40 @@ class Evaluator:
                 seed=self.args.seed + i)
             X_train, y_train = dataset_train.X, dataset_train.y.ravel()
             X_test, y_test, gid = dataset_test.X, dataset_test.y.ravel(), dataset_test.X_gid
+
             if self.args.dataset_type == 'regression':
                 self.model.fit(X_train, y_train, loss=self.args.loss,
                                verbose=True)
                 y_pred, y_std = self.model.predict(X_test, return_std=True)
                 self._df(target=y_test, predict=y_pred, uncertainty=y_std).\
-                    to_csv('%s/test%d.log' % (self.args.save_dir, i), sep='\t',
+                    to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
-                for metric in self.args.metric:
-                    eval_dict[metric].append(
+                for metric in self.args.metrics:
+                    test_dict[metric].append(
                         self._evaluate(y_test, y_pred, metric))
+
                 if self.args.evaluate_train:
                     y_pred, y_std = self.model.predict(X_train, return_std=True)
-                    for metric in self.args.metric:
+                    for metric in self.args.metrics:
                         train_dict[metric].append(
                             self._evaluate(y_train, y_pred, metric))
             else:
                 self.model.fit(X_train, y_train)
                 y_pred, y_std = self.model.predict(X_test)
                 self._df(target=y_test, predict=y_pred, uncertainty=y_std).\
-                    to_csv('%s/test%d.log' % (self.args.save_dir, i), sep='\t',
+                    to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
-                for metric in self.args.metric:
-                    eval_dict[metric].append(
+                for metric in self.args.metrics:
+                    test_dict[metric].append(
                         self._evaluate(y_test, y_pred, metric))
         if self.args.evaluate_train:
             for metric, result in train_dict.items():
                 print(metric,
                       ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
                 # print(np.asarray(result).ravel())
-        for metric, result in eval_dict.items():
+        for metric, result in test_dict.items():
             print(metric, ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
-            # print(np.asarray(result).ravel())
+        return np.mean(test_dict[self.args.metric])
 
     def set_model(self, args: TrainArgs):
         if args.model_type == 'gpr':
@@ -143,11 +145,11 @@ class Evaluator:
         elif metrics == 'precision':
             return precision_score(y, y_pred, average='macro')
         elif metrics == 'r2':
-            return r2_score(y, y_pred, multioutput='raw_values')
+            return r2_score(y, y_pred)
         elif metrics == 'mae':
-            return mean_absolute_error(y, y_pred, multioutput='raw_values')
+            return mean_absolute_error(y, y_pred)
         elif metrics == 'mse':
-            return mean_squared_error(y, y_pred, multioutput='raw_values')
+            return mean_squared_error(y, y_pred)
         elif metrics == 'rmse':
             return np.sqrt(Evaluator._evaluate(y, y_pred, 'mse'))
         else:

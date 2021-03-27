@@ -475,8 +475,11 @@ class Dataset:
 
     @property
     def y(self):
-        y = [d.y for d in self.data]
-        return np.concatenate(y, dtype=float)
+        y = np.concatenate([d.y for d in self.data])
+        if y.shape[1] == 1:
+            return y.ravel()
+        else:
+            return y
 
     def save(self, path, filename='dataset.pkl', overwrite=False):
         f_dataset = os.path.join(path, filename)

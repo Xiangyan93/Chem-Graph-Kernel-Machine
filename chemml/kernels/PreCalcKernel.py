@@ -173,7 +173,7 @@ class ConvolutionPreCalcKernel(PreCalcKernel):
 '''
 
 
-class PreCalcBaseKernelConfig(BaseKernelConfig):
+class PreCalcKernelConfig(BaseKernelConfig):
     def __init__(self, f_kernel: str, N_RBF: int = 0,
                  sigma_RBF: np.ndarray = 1.0):
         super().__init__(N_RBF, sigma_RBF)
@@ -182,7 +182,7 @@ class PreCalcBaseKernelConfig(BaseKernelConfig):
             self.kernel = self.get_preCalc_kernel(f_kernel)
         else:
             kernels = [self.get_preCalc_kernel(f_kernel)]
-            kernels += self.get_rbf_kernel()
+            kernels += self._get_rbf_kernel()
             composition = [(0,)] + \
                           [tuple(np.arange(1, N_RBF + 1))]
             self.kernel = MultipleKernel(

@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 import os
 import json
-from typing import Dict, Iterator, List, Optional, Union, Literal
+from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 from tqdm import tqdm
+from hyperopt import hp
 from graphdot.kernel.marginalized import MarginalizedGraphKernel
 from graphdot.util.pretty_tuple import pretty_tuple
 from graphdot.kernel.fix import Normalization
 from graphdot.microkernel import (
     Additive,
-    Constant as kC,
+    Constant as Const,
     TensorProduct,
     SquareExponential as sExp,
     KroneckerDelta as kDelta,
@@ -274,41 +275,20 @@ class ConvolutionGraphKernel(MGK):
         return graph, K_graph, K_gradient_graph
 
 
-class GraphBaseKernelConfig(BaseKernelConfig):
+class GraphKernelConfig(BaseKernelConfig):
     def __init__(self, N_MGK: int, N_conv_MGK: int,
                  graph_hyperparameters: List[Dict],
                  unique: bool = False,
                  N_RBF: int = 0,
-                 sigma_RBF: np.ndarray = 1.0):
-        super().__init__(N_RBF, sigma_RBF)
+                 sigma_RBF: List[float] = [1.0],
+                 sigma_RBF_bound: List[Tuple[float, float]] = ['fixed']):
+        super().__init__(N_RBF, sigma_RBF, sigma_RBF_bound)
         self.N_MGK = N_MGK
         self.N_conv_MGK = N_conv_MGK
         self.graph_hyperparameters = graph_hyperparameters
         self.unique = unique
         assert (len(self.graph_hyperparameters) == N_MGK + N_conv_MGK)
-        if N_MGK == 1 and N_conv_MGK == 0 and N_RBF == 0:
-            self.kernel = self.get_single_graph_kernel(
-                self.graph_hyperparameters[0])
-        elif N_MGK == 0 and N_conv_MGK == 1 and N_RBF == 0:
-            self.kernel = self.get_conv_graph_kernel(
-                self.graph_hyperparameters[0])
-        else:
-            kernels = []
-            for i in range(N_MGK):
-                kernels.append(
-                    self.get_single_graph_kernel(self.graph_hyperparameters[i]))
-            for i in range(N_MGK, N_MGK + N_conv_MGK):
-                kernels.append(
-                    self.get_conv_graph_kernel(self.graph_hyperparameters[i]))
-            kernels += self.get_rbf_kernel()
-            composition = [(i,) for i in range(N_MGK + N_conv_MGK)] + \
-                          [tuple(np.arange(N_MGK + N_conv_MGK,
-                                           N_RBF + N_MGK + N_conv_MGK))]
-            self.kernel = MultipleKernel(
-                kernel_list=kernels,
-                composition=composition,
-                combined_rule='product',
-            )
+        self._update_kernel()
         # reading saved hyperparameters.
         if self.graph_hyperparameters[0].get('theta') is not None:
             theta = []
@@ -318,8 +298,95 @@ class GraphBaseKernelConfig(BaseKernelConfig):
                 print('Reading Existed kernel parameter %s' % theta)
                 self.kernel = self.kernel.clone_with_theta(theta)
 
-    def get_single_graph_kernel(self, hyperdict: Dict):
-        knode, kedge, p = self.get_knode_kedge_p(hyperdict)
+    def get_space(self):
+        SPACE = dict()
+        for i, hyperdict in enumerate(self.graph_hyperparameters):
+            for key, value in hyperdict.items():
+                if value.__class__ == list:
+                    hp_key = '%d:%s:' % (i, key)
+                    hp = self._get_hp(hp_key, value)
+                    if hp is not None:
+                        SPACE[hp_key] = hp
+                else:
+                    for micro_key, micro_value in value.items():
+                        hp_key = '%d:%s:%s' % (i, key, micro_key)
+                        hp = self._get_hp(hp_key, micro_value)
+                        if hp is not None:
+                            SPACE[hp_key] = hp
+        print(self.sigma_RBF, self.sigma_RBF_bound)
+        for i in range(len(self.sigma_RBF)):
+            hp_key = 'RBF:%d:' % i
+            hp = self._get_hp(hp_key, [self.sigma_RBF[i],
+                                       self.sigma_RBF_bound[i]])
+            if hp is not None:
+                SPACE[hp_key] = hp
+        return SPACE
+
+    def update_space(self, hyperdict: Dict[str, Union[int, float]]):
+        for key, value in hyperdict.items():
+            n, term, microterm = key.split(':')
+            # RBF kernels
+            if n == 'RBF':
+                n_rbf = int(term)
+                self.sigma_RBF[n_rbf] = value
+            else:
+                n = int(n)
+                if term in ['Normalization', 'q', 'a_type', 'b_type']:
+                    self.graph_hyperparameters[n][term][0] = value
+                else:
+                    self.graph_hyperparameters[n][term][microterm][0] = value
+        self._update_kernel()
+
+    def save(self, path):
+        for i, hyperdict in enumerate(self.graph_hyperparameters):
+            open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w').write(
+                json.dumps(hyperdict, indent=1, sort_keys=False))
+
+    def _update_kernel(self):
+        N_MGK = self.N_MGK
+        N_conv_MGK = self.N_conv_MGK
+        N_RBF = self.N_RBF
+        if N_MGK == 1 and N_conv_MGK == 0 and N_RBF == 0:
+            self.kernel = self._get_single_graph_kernel(
+                self.graph_hyperparameters[0])
+        elif N_MGK == 0 and N_conv_MGK == 1 and N_RBF == 0:
+            self.kernel = self._get_conv_graph_kernel(
+                self.graph_hyperparameters[0])
+        else:
+            kernels = []
+            for i in range(N_MGK):
+                kernels.append(
+                    self._get_single_graph_kernel(self.graph_hyperparameters[i]))
+            for i in range(N_MGK, N_MGK + N_conv_MGK):
+                kernels.append(
+                    self._get_conv_graph_kernel(self.graph_hyperparameters[i]))
+            kernels += self._get_rbf_kernel()
+            composition = [(i,) for i in range(N_MGK + N_conv_MGK)] + \
+                          [tuple(np.arange(N_MGK + N_conv_MGK,
+                                           N_RBF + N_MGK + N_conv_MGK))]
+            self.kernel = MultipleKernel(
+                kernel_list=kernels,
+                composition=composition,
+                combined_rule='product',
+            )
+
+    @staticmethod
+    def _get_hp(key, value):
+        if value[1] == 'fixed':
+            return None
+        elif value[0] in ['Additive', 'Tensorproduct']:
+            return hp.choice(key, value[1])
+        elif len(value) == 2:
+            return hp.uniform(key, low=value[1][0], high=value[1][1])
+        elif len(value) == 3:
+            return hp.quniform(key, low=value[1][0], high=value[1][1],
+                               q=value[2])
+        else:
+            raise RuntimeError('.')
+
+
+    def _get_single_graph_kernel(self, hyperdict: Dict):
+        knode, kedge, p = self._get_knode_kedge_p(hyperdict)
         kernel = MGK(
             node_kernel=knode,
             edge_kernel=kedge,
@@ -332,13 +399,13 @@ class GraphBaseKernelConfig(BaseKernelConfig):
             return Norm(kernel)
         elif hyperdict['Normalization'] == False:
             return kernel
-        elif hyperdict['Normalization'][0]:
+        else:
             return NormalizationMolSize(
-                kernel, s=hyperdict['Normalization'][1],
-                s_bounds=hyperdict['Normalization'][2])
+                kernel, s=hyperdict['Normalization'][0],
+                s_bounds=hyperdict['Normalization'][1])
 
-    def get_conv_graph_kernel(self, hyperdict: Dict):  # dont delete kernel_pkl
-        knode, kedge, p = self.get_knode_kedge_p(hyperdict)
+    def _get_conv_graph_kernel(self, hyperdict: Dict):
+        knode, kedge, p = self._get_knode_kedge_p(hyperdict)
         kernel = ConvolutionGraphKernel(
             node_kernel=knode,
             edge_kernel=kedge,
@@ -356,69 +423,62 @@ class GraphBaseKernelConfig(BaseKernelConfig):
                 kernel, s=hyperdict['Normalization'][1],
                 s_bounds=hyperdict['Normalization'][2])
 
-    @staticmethod
-    def get_knode_kedge_p(hyperdict: Dict):
-        def get_microk(microk):
-            if microk[2] != 'fixed':
-                microk[2] = tuple(microk[2])
-            if microk[0] == 'kDelta':
-                return kDelta(microk[1], microk[2])
-            elif microk[0] == 'sExp':
-                # if microk[2] == 'fixed':
-                # microk[2] = (microk[1], microk[1])
-                return sExp(microk[1], length_scale_bounds=microk[2])
-            elif microk[0] == 'kConv':
-                return kConv(kDelta(microk[1], microk[2]))
-            elif microk[0] == 'kC':
-                return kC(microk[1], microk[2])
-            elif microk[0] == 'Uniform_p':
-                return UniformProbability(microk[1], microk[2])
-            elif microk[0] == 'Const_p':
-                return Constant(microk[1], microk[2])
-            elif microk[0] == 'Assign_p':
-                return AssignProbability(microk[1], microk[2])
-            else:
-                raise Exception('unknown microkernel type')
-
+    def _get_knode_kedge_p(self, hyperdict: Dict[str, Union[List, Dict]]):
         knode_dict = {}
         kedge_dict = {}
         p_dict = {}
-        for key, microk_list in hyperdict.items():
+        for key, microk_dict in hyperdict.items():
             if key.startswith('atom_'):
-                microk = [get_microk(mk) for mk in microk_list]
+                microk = [self._get_microk(k, mk)
+                          for k, mk in microk_dict.items()]
                 knode_dict.update({key[5:]: np.product(microk)})
             elif key.startswith('bond_'):
-                microk = [get_microk(mk) for mk in microk_list]
+                microk = [self._get_microk(k, mk)
+                          for k, mk in microk_dict.items()]
                 kedge_dict.update({key[5:]: np.product(microk)})
             elif key.startswith('probability_'):
-                microp = [get_microk(mk) for mk in microk_list]
+                microp = [self._get_microk(k, mk)
+                          for k, mk in microk_dict.items()]
                 p_dict.update({key[12:]: np.product(microp)})
 
-        def fun(type, dict):
-            if type == 'Tensorproduct':
-                return TensorProduct(**dict)
-            elif type == 'Additive':
-                return Normalize(Additive(**dict))
-            elif type == 'Additive_p':
-                return Additive_p(**dict)
-            else:
-                raise Exception('unknown type:', type)
+        return self._combine_microk(hyperdict['a_type'][0], knode_dict), \
+               self._combine_microk(hyperdict['b_type'][0], kedge_dict), \
+               self._combine_microk(hyperdict['p_type'][0], p_dict)
 
-        return fun(hyperdict['a_type'], knode_dict), \
-               fun(hyperdict['b_type'], kedge_dict), \
-               fun(hyperdict['p_type'], p_dict)
-
-    def save(self, path, model):
-        kernel = model.kernel_ if hasattr(model, 'kernel_') \
-            else model.kernel_type
-        if hasattr(kernel, 'kernel_list'):
-            for i, hyperdict in enumerate(self.graph_hyperparameters):
-                theta = kernel.kernel_list[i].theta
-                hyperdict.update({'theta': theta.tolist()})
-                open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w') \
-                    .write(json.dumps(self.graph_hyperparameters))
+    @staticmethod
+    def _get_microk(microk: str, value: List):
+        # For fixed hyperparameter
+        if value[1] != 'fixed':
+            value[1] = tuple(value[1])
+        # microkernels
+        if microk == 'kDelta':
+            return kDelta(value[0], value[1])
+        elif microk == 'sExp':
+            return sExp(value[0], length_scale_bounds=value[1])
+        elif microk == 'kConv':
+            return kConv(kDelta(value[0], value[1]))
+        elif microk == 'Const':
+            return Const(value[0], value[1])
+        # microprobability
+        elif microk == 'Uniform_p':
+            return UniformProbability(value[0], value[1])
+        elif microk == 'Const_p':
+            return Constant(value[0], value[1])
+        elif microk == 'Assign_p':
+            return AssignProbability(value[0], value[1])
         else:
-            theta = kernel.theta
-            self.graph_hyperparameters[0].update({'theta': theta.tolist()})
-            open(os.path.join(path, 'hyperparameters.json'), 'w') \
-                .write(json.dumps(self.graph_hyperparameters[0]))
+            raise RuntimeError(f'Unknown microkernel type {microk}')
+
+    @staticmethod
+    def _combine_microk(
+        type: Literal['Tensorproduct', 'Additive', 'Additive_p'],
+        microk_dict: Dict
+    ):
+        if type == 'Tensorproduct':
+            return TensorProduct(**microk_dict)
+        elif type == 'Additive':
+            return Normalize(Additive(**microk_dict))
+        elif type == 'Additive_p':
+            return Additive_p(**microk_dict)
+        else:
+            raise RuntimeError(f'Unknown type: {type}')

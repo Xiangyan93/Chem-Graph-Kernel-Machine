@@ -194,6 +194,10 @@ def get_chiral_tag(mol, atom, depth=5):
         return 1
 
 
+def get_group_id(atom):
+    return [atom.GetAtomicNum()]
+
+
 class rdkit_config:
     def __init__(self, bond_type='order',
                  set_morgan_identifier=True, morgan_radius=3,
@@ -204,6 +208,7 @@ class rdkit_config:
                  reaction_center=None, reactant_or_product='reactant',
                  concentration=1.0,
                  IsSanitized=True,
+                 set_group=True,
                  set_TPSA=False):
         self.bond_type = bond_type
         self.set_morgan_identifier = set_morgan_identifier
@@ -217,10 +222,19 @@ class rdkit_config:
         self.reactant_or_product = reactant_or_product
         self.concentration = concentration
         self.IsSanitized = IsSanitized
+        self.set_group = set_group
         self.set_TPSA = set_TPSA
         if self.set_elemental_mode:
             # read elemental modes.
             self.emode = pd.read_csv(os.path.join(CWD, 'emodes.dat'), sep='\s+')
+        if self.set_group:
+            self.group_dict = {
+                1: 'group_an1', 5: 'group_an5', 6: 'group_an6', 7: 'group_an7',
+                8: 'group_an8', 9: 'group_an9', 14: 'group_an14',
+                15: 'group_an15',
+                16: 'group_an16', 17: 'group_an17', 35: 'group_an35',
+                53: 'group_an53'
+            }
 
     @staticmethod
     def get_list_hash(l):
@@ -307,7 +321,11 @@ class rdkit_config:
                         f'{self.reactant_or_product}')
             else:
                 node['ReactingCenter'] = 0.0
-
+        if self.set_group:
+            node['GroupID'] = get_group_id(atom)
+            assert node['GroupID'][0] in self.group_dict
+            for key, value in self.group_dict.items():
+                node[value] = 1.0 if key in node['GroupID'] else 0.0
         # set ring information
         if self.set_ring_membership:
             node['RingSize_list'] = np.asarray(

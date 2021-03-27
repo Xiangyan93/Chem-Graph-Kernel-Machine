@@ -4,8 +4,8 @@ from typing import Dict, Iterator, List, Optional, Union, Literal
 import numpy as np
 from chemml.args import KernelArgs
 from chemml.data import Dataset
-from chemml.kernels.GraphKernel import GraphBaseKernelConfig
-from chemml.kernels.PreCalcKernel import PreCalcBaseKernelConfig
+from chemml.kernels.GraphKernel import GraphKernelConfig
+from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
 
 
 def get_kernel_info(args):
@@ -21,12 +21,11 @@ def get_kernel_info(args):
     return N_MGK, N_conv_MGK
 
 
-def set_kernel(args: KernelArgs, dataset: Dataset):
+def get_kernel_config(args: KernelArgs, dataset: Dataset):
     N_MGK, N_conv_MGK = get_kernel_info(args)
     if args.kernel_type == 'graph':
         graph_hyperparameters = [
-            json.loads(open(j, 'r').readline())
-            for j in args.graph_hyperparameters
+            json.load(open(j)) for j in args.graph_hyperparameters
         ]
         assert N_MGK + N_conv_MGK == len(graph_hyperparameters)
         N_RBF_molfeatures = 0 if dataset.data[0]._X_molfeatures is None \
@@ -51,9 +50,10 @@ def set_kernel(args: KernelArgs, dataset: Dataset):
             'graph_hyperparameters': graph_hyperparameters,
             'unique': False,
             'N_RBF': N_RBF,
-            'sigma_RBF': np.concatenate(sigma_RBF),
+            'sigma_RBF': [10.0],# np.concatenate(sigma_RBF),
+            'sigma_RBF_bound': [(1, 20)], # * N_RBF,
         }
-        return GraphBaseKernelConfig(**params).kernel
+        return GraphKernelConfig(**params)
     else:
         N_RBF = 0 if dataset.data[0].addfeatures is None \
             else dataset.data[0].addfeatures.shape[1]
@@ -65,4 +65,4 @@ def set_kernel(args: KernelArgs, dataset: Dataset):
             'N_RBF': N_RBF,
             'sigma_RBF': sigma_RBF,
         }
-        return PreCalcBaseKernelConfig(**params).kernel
+        return PreCalcKernelConfig(**params)

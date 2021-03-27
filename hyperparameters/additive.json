@@ -7,90 +7,146 @@
   ]
  ],
  "a_type": [
-  "Tensorproduct",
+  "Additive",
   "fixed"
  ],
  "atom_AtomicNumber": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
   "kDelta": [
-   0.75,
+   0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_AtomicNumber_list_1": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kConv": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_AtomicNumber_list_2": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kConv": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_AtomicNumber_list_3": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kConv": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_AtomicNumber_list_4": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kConv": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_MorganHash": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_Ring_count": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_RingSize_list": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kConv": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_Hcount": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
@@ -100,67 +156,103 @@
   ]
  },
  "atom_AtomicNumber_count_1": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_AtomicNumber_count_2": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "atom_Chiral": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "b_type": [
-  "Tensorproduct",
+  "Additive",
   "fixed"
  ],
  "bond_Order": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "bond_Stereo": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "bond_RingStereo": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ]
+  ],
   "kDelta": [
    0.9,
    [
     0.5,
     1.0
-   ],
-   0.05
+   ]
   ]
  },
  "p_type": [
@@ -176,9 +268,8 @@
  "q": [
   0.01,
   [
-   0.01,
+   0.001,
    0.5
-  ],
-  0.01
+  ]
  ]
 }

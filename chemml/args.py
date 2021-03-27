@@ -103,16 +103,19 @@ class TrainArgs(KernelArgs):
     ensemble_rule: Literal['smallest_uncertainty', 'weight_uncertainty',
                            'mean'] = 'weight_uncertainty'
     """The rule to combining prediction from estimators."""
-    metric: List[str] = None
+    metric: str
+    """metric"""
+    extra_metric: List[str] = None
     """Metrics"""
     evaluate_train: bool = False
     """"""
     def __init__(self, *args, **kwargs) -> None:
         super(TrainArgs, self).__init__(*args, **kwargs)
         self.check()
-        if self.metric is None:
-            self.metric = ['r2'] if self.dataset_type == 'regression' else \
-                ['accuracy']
+
+    @property
+    def metrics(self):
+        return [self.metric] + self.extra_metric
 
     def check(self):
         if self.split_type == 'loocv':
@@ -120,3 +123,6 @@ class TrainArgs(KernelArgs):
 
     def kernel_args(self):
         return super()
+
+class HyperoptArgs(TrainArgs):
+    num_iters: int = 20
