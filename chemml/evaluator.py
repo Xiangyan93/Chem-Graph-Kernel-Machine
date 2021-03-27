@@ -43,7 +43,7 @@ class Evaluator:
 
         train_dict = dict()
         test_dict = dict()
-        for metric in self.args.metric:
+        for metric in self.args.metrics:
             train_dict[metric] = []
             test_dict[metric] = []
 

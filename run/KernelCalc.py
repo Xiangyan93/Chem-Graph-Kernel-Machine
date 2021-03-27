@@ -7,7 +7,7 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from chemml.args import KernelArgs
 from chemml.data.data import Dataset
-from chemml.kernels.utils import set_kernel
+from chemml.kernels.utils import get_kernel_config
 
 
 def main(args: KernelArgs) -> None:
@@ -20,7 +20,7 @@ def main(args: KernelArgs) -> None:
     assert dataset.kernel_type == 'graph'
     X = dataset.X
     # set kernel_config
-    kernel = set_kernel(args, dataset)
+    kernel = get_kernel_config(args, dataset).kernel
     print('**\tCalculating kernel matrix\t**')
     K = kernel(X)
     # print(dataset)

@@ -313,11 +313,10 @@ class GraphKernelConfig(BaseKernelConfig):
                         hp = self._get_hp(hp_key, micro_value)
                         if hp is not None:
                             SPACE[hp_key] = hp
-        print(self.sigma_RBF, self.sigma_RBF_bound)
         for i in range(len(self.sigma_RBF)):
             hp_key = 'RBF:%d:' % i
             hp = self._get_hp(hp_key, [self.sigma_RBF[i],
-                                       self.sigma_RBF_bound[i]])
+                                       self.sigma_RBF_bounds[i]])
             if hp is not None:
                 SPACE[hp_key] = hp
         return SPACE
@@ -341,6 +340,13 @@ class GraphKernelConfig(BaseKernelConfig):
         for i, hyperdict in enumerate(self.graph_hyperparameters):
             open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w').write(
                 json.dumps(hyperdict, indent=1, sort_keys=False))
+        if self.sigma_RBF is not None:
+            rbf = {
+                'sigma_RBF': self.sigma_RBF,
+                'sigma_RBF_bounds': self.sigma_RBF_bounds
+            }
+            open(os.path.join(path, 'sigma_RBF.json'), 'w').write(
+                json.dumps(self.sigma_RBF, indent=1, sort_keys=False))
 
     def _update_kernel(self):
         N_MGK = self.N_MGK

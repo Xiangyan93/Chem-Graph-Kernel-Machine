@@ -28,41 +28,54 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
             json.load(open(j)) for j in args.graph_hyperparameters
         ]
         assert N_MGK + N_conv_MGK == len(graph_hyperparameters)
+
         N_RBF_molfeatures = 0 if dataset.data[0]._X_molfeatures is None \
             else dataset.data[0]._X_molfeatures.shape[1]
         N_RBF_addfeatures = 0 if dataset.data[0].addfeatures is None \
             else dataset.data[0].addfeatures.shape[1]
         N_RBF = N_RBF_molfeatures + N_RBF_addfeatures
-        sigma_RBF = []
-        if args.molfeatures_hyperparameters.__class__ == float:
-            sigma_RBF.append(np.ones(N_RBF_molfeatures) * \
-                             args.molfeatures_hyperparameters)
+
+        if args.features_hyperparameters_file is not None:
+            rbf = json.load(open(args.features_hyperparameters_file))
+            sigma_RBF = rbf['sigma_RBF']
+            sigma_RBF_bounds = rbf['sigma_RBF_bounds']
         else:
-            sigma_RBF.append(args.molfeatures_hyperparameters)
-        if args.addfeatures_hyperparameters.__class__ == float:
-            sigma_RBF.append(np.ones(N_RBF_addfeatures) * \
-                             args.addfeatures_hyperparameters)
-        else:
-            sigma_RBF.append(args.addfeatures_hyperparameters)
+            sigma_RBF = args.features_hyperparameters
+            sigma_RBF_bounds = [(
+                args.features_hyperparameters_min[i],
+                args.features_hyperparameters_max[i])
+                for i in range(len(args.features_hyperparameters))]
         params = {
             'N_MGK': N_MGK,
             'N_conv_MGK': N_conv_MGK,
             'graph_hyperparameters': graph_hyperparameters,
             'unique': False,
             'N_RBF': N_RBF,
-            'sigma_RBF': [10.0],# np.concatenate(sigma_RBF),
-            'sigma_RBF_bound': [(1, 20)], # * N_RBF,
+            'sigma_RBF': sigma_RBF,# np.concatenate(sigma_RBF),
+            'sigma_RBF_bound': sigma_RBF_bounds, # * N_RBF,
         }
         return GraphKernelConfig(**params)
     else:
         N_RBF = 0 if dataset.data[0].addfeatures is None \
             else dataset.data[0].addfeatures.shape[1]
-        sigma_RBF = np.ones(N_RBF) * args.molfeatures_hyperparameters \
-            if args.addfeatures_hyperparameters.__class__ == float \
-            else args.addfeatures_hyperparameters
+
+        if args.features_hyperparameters_file is not None:
+            rbf = json.load(open(args.features_hyperparameters_file))
+            sigma_RBF = rbf['sigma_RBF']
+            sigma_RBF_bounds = rbf['sigma_RBF_bounds']
+        else:
+            sigma_RBF = args.features_hyperparameters
+            if args.features_hyperparameters is None:
+                sigma_RBF_bounds = None
+            else:
+                sigma_RBF_bounds = [(
+                    args.features_hyperparameters_min[i],
+                    args.features_hyperparameters_max[i])
+                    for i in range(len(args.features_hyperparameters))]
         params = {
             'f_kernel': os.path.join(args.save_dir, 'kernel.pkl'),
             'N_RBF': N_RBF,
             'sigma_RBF': sigma_RBF,
+            'sigma_RBF_bounds': sigma_RBF_bounds,  # * N_RBF,
         }
         return PreCalcKernelConfig(**params)

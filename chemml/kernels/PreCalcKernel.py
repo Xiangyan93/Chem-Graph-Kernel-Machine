@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pickle
+from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 from chemml.kernels.BaseKernelConfig import BaseKernelConfig
 from chemml.kernels.MultipleKernel import *
 
@@ -175,8 +176,9 @@ class ConvolutionPreCalcKernel(PreCalcKernel):
 
 class PreCalcKernelConfig(BaseKernelConfig):
     def __init__(self, f_kernel: str, N_RBF: int = 0,
-                 sigma_RBF: np.ndarray = 1.0):
-        super().__init__(N_RBF, sigma_RBF)
+                 sigma_RBF: List[float] = [1.0],
+                 sigma_RBF_bounds: List[Tuple[float, float]] = ['fixed']):
+        super().__init__(N_RBF, sigma_RBF, sigma_RBF_bounds)
         self.type = 'preCalc'
         if N_RBF == 0:
             self.kernel = self.get_preCalc_kernel(f_kernel)

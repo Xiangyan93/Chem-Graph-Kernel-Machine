@@ -20,16 +20,21 @@ def main(args: HyperoptArgs) -> None:
     kernel_config = get_kernel_config(args, dataset)
 
     def objective(hyperparams: Dict[str, List[Union[int, float]]]) -> float:
+        if args.model_type == 'gpr':
+            args.alpha = hyperparams.pop('alpha')
         kernel_config.update_space(hyperparams)
         evaluator = Evaluator(args, dataset, kernel_config.kernel)
         return evaluator.evaluate()
 
     SPACE = kernel_config.get_space()
+    if args.model_type == 'gpr':
+        SPACE['alpha'] = hp.quniform('alpha', low=0.001, high=0.02, q=0.001)
     best = fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
                 rstate=np.random.RandomState(args.seed))
+    if args.model_type == 'gpr':
+        print('Optimal alpha: ', best.pop('alpha'))
     kernel_config.update_space(best)
     kernel_config.save(args.save_dir)
-    print(kernel_config.graph_hyperparameters)
 
 
 if __name__ == '__main__':

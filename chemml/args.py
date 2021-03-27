@@ -60,12 +60,17 @@ class KernelArgs(CommonArgs):
     """The type of kernel to use."""
     graph_hyperparameters: List[str] = None
     """hyperparameters file for graph kernel."""
-    molfeatures_hyperparameters: float = 1.0
-    """hyperparameters for molecular molfeatures."""
+    features_hyperparameters: List[float] = None
+    """hyperparameters for molecular features."""
+    features_hyperparameters_min: List[float] = None
+    """hyperparameters for molecular features."""
+    features_hyperparameters_max: List[float] = None
+    """hyperparameters for molecular features."""
+    features_hyperparameters_file: str = None
+    """JSON file contains features hyperparameters"""
+
     molfeatures_normalize: bool = False
     """Nomralize the molecular molfeatures."""
-    addfeatures_hyperparameters: float = 1.0
-    """hyperparameters for additional molfeatures."""
     addfeatures_normalize: bool = False
     """omral the additonal molfeatures."""
 
@@ -115,7 +120,10 @@ class TrainArgs(KernelArgs):
 
     @property
     def metrics(self):
-        return [self.metric] + self.extra_metric
+        if self.extra_metric is None:
+            return [self.metric]
+        else:
+            return [self.metric] + self.extra_metric
 
     def check(self):
         if self.split_type == 'loocv':
