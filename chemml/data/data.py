@@ -458,6 +458,10 @@ class Dataset:
         else:
             return np.concatenate([d.X_graph for d in self.data])
 
+    @property
+    def X_mol(self):
+        return concatenate([self.X_graph, self.X_molfeatures], axis=1)
+
     # This is used for graph kernel
     @property
     def X(self) -> np.ndarray:
@@ -480,6 +484,13 @@ class Dataset:
             return y.ravel()
         else:
             return y
+
+    @property
+    def N_addfeatures(self):
+        if self.X_raw_addfeatures is None:
+            return 0
+        else:
+            return self.X_raw_addfeatures.shape[1]
 
     def save(self, path, filename='dataset.pkl', overwrite=False):
         f_dataset = os.path.join(path, filename)

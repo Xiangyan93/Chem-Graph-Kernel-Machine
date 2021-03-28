@@ -18,7 +18,7 @@ def main(args: KernelArgs) -> None:
     dataset.update_args(args)
     dataset.normalize_features()
     assert dataset.kernel_type == 'graph'
-    X = dataset.X
+    X = dataset.X_mol
     # set kernel_config
     kernel = get_kernel_config(args, dataset).kernel
     print('**\tCalculating kernel matrix\t**')

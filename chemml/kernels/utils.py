@@ -1,6 +1,7 @@
 import os
 import json
-from typing import Dict, Iterator, List, Optional, Union, Literal
+import pickle
+from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import numpy as np
 from chemml.args import KernelArgs
 from chemml.data import Dataset
@@ -8,7 +9,7 @@ from chemml.kernels.GraphKernel import GraphKernelConfig
 from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
 
 
-def get_kernel_info(args):
+def get_kernel_info(args: KernelArgs) -> Tuple[int, int]:
     N_MGK = 0
     N_conv_MGK = 0
     if args.pure_columns is not None:
@@ -52,7 +53,7 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
             'unique': False,
             'N_RBF': N_RBF,
             'sigma_RBF': sigma_RBF,# np.concatenate(sigma_RBF),
-            'sigma_RBF_bound': sigma_RBF_bounds, # * N_RBF,
+            'sigma_RBF_bounds': sigma_RBF_bounds, # * N_RBF,
         }
         return GraphKernelConfig(**params)
     else:
@@ -72,8 +73,10 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
                     args.features_hyperparameters_min[i],
                     args.features_hyperparameters_max[i])
                     for i in range(len(args.features_hyperparameters))]
+        kernel_pkl = os.path.join(args.save_dir, 'kernel.pkl')
+        kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
         params = {
-            'f_kernel': os.path.join(args.save_dir, 'kernel.pkl'),
+            'kernel_dict': kernel_dict,
             'N_RBF': N_RBF,
             'sigma_RBF': sigma_RBF,
             'sigma_RBF_bounds': sigma_RBF_bounds,  # * N_RBF,

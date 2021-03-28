@@ -55,6 +55,7 @@ class CommonArgs(Tap):
         super(CommonArgs, self).__init__(*args, **kwargs)
 
 
+
 class KernelArgs(CommonArgs):
     kernel_type: Literal['graph', 'preCalc'] = 'graph'
     """The type of kernel to use."""
@@ -108,9 +109,9 @@ class TrainArgs(KernelArgs):
     ensemble_rule: Literal['smallest_uncertainty', 'weight_uncertainty',
                            'mean'] = 'weight_uncertainty'
     """The rule to combining prediction from estimators."""
-    metric: str
+    metric: Metric = None
     """metric"""
-    extra_metric: List[str] = None
+    extra_metrics: List[Metric] = []
     """Metrics"""
     evaluate_train: bool = False
     """"""
@@ -119,11 +120,8 @@ class TrainArgs(KernelArgs):
         self.check()
 
     @property
-    def metrics(self):
-        if self.extra_metric is None:
-            return [self.metric]
-        else:
-            return [self.metric] + self.extra_metric
+    def metrics(self) -> List[str]:
+        return [self.metric] + self.extra_metrics
 
     def check(self):
         if self.split_type == 'loocv':
@@ -132,5 +130,25 @@ class TrainArgs(KernelArgs):
     def kernel_args(self):
         return super()
 
+    def process_args(self) -> None:
+        if self.dataset_type == 'regression':
+            assert self.model_type in ['gpr', 'gpr_nystrom']
+        else:
+            assert self.model_type in ['gpc', 'svc']
+
+        if self.split_type == 'loocv':
+            assert self.num_folds == 1
+            assert self.model_type == 'gpr'
+
+
+
 class HyperoptArgs(TrainArgs):
     num_iters: int = 20
+
+    @property
+    def minimize_score(self) -> bool:
+        """Whether the model should try to minimize the score metric or maximize it."""
+        return self.metric in {'rmse', 'mae', 'mse', 'r2'}
+
+    def process_args(self) -> None:
+        print(123123)

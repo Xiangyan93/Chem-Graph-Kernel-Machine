@@ -11,8 +11,8 @@ import pandas as pd
 
 class BaseKernelConfig:
     def __init__(self, N_RBF: int = 0,
-                 sigma_RBF: List[float] = [1.0],
-                 sigma_RBF_bounds: List[Tuple[float, float]] = ['fixed']):
+                 sigma_RBF: List[float] = None,
+                 sigma_RBF_bounds: List[Tuple[float, float]] = None):
         assert (self.__class__ != BaseKernelConfig)
         self.N_RBF = N_RBF
         self.sigma_RBF = sigma_RBF

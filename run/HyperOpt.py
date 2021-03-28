@@ -3,6 +3,7 @@
 import os
 import sys
 import pickle
+
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from typing import Dict, Union, List
@@ -15,24 +16,49 @@ from chemml.kernels.utils import get_kernel_config
 
 
 def main(args: HyperoptArgs) -> None:
+    # read data
     dataset = Dataset.load(args.save_dir)
     dataset.kernel_type = args.kernel_type
+    # get kernel config
     kernel_config = get_kernel_config(args, dataset)
 
-    def objective(hyperparams: Dict[str, List[Union[int, float]]]) -> float:
+    hyperdicts = []
+    results = []
+
+    def objective(hyperdict: Dict[str, List[Union[int, float]]]) -> float:
+        print('\nHyperopt Step')
+        hyperdicts.append(hyperdict.copy())
         if args.model_type == 'gpr':
-            args.alpha = hyperparams.pop('alpha')
-        kernel_config.update_space(hyperparams)
-        evaluator = Evaluator(args, dataset, kernel_config.kernel)
-        return evaluator.evaluate()
+            args.alpha = hyperdict.pop('alpha')
+        elif args.model_type == 'svc':
+            args.C = hyperdict.pop('C')
+        kernel_config.update_space(hyperdict)
+        evaluator = Evaluator(args, dataset, kernel_config)
+        result = evaluator.evaluate()
+        if not args.minimize_score:
+            result = - result
+        results.append(result)
+        dataset.kernel_type = 'graph'
+        return result
 
     SPACE = kernel_config.get_space()
+
+    # add adjust hyperparameters of model
     if args.model_type == 'gpr':
         SPACE['alpha'] = hp.quniform('alpha', low=0.001, high=0.02, q=0.001)
-    best = fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
-                rstate=np.random.RandomState(args.seed))
+    elif args.model_type == 'svc':
+        SPACE['C'] = hp.quniform('C', low=0.2, high=5.0, q=0.2)
+
+    fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
+         rstate=np.random.RandomState(args.seed))
+    # get best hyperparameters.
+    best_idx = np.where(results == np.min(results))[0][0]
+    best = hyperdicts[best_idx]
+    #
     if args.model_type == 'gpr':
-        print('Optimal alpha: ', best.pop('alpha'))
+        open('%s/alpha' % args.save_dir, 'w').write('%s' % best.pop('alpha'))
+    elif args.model_type == 'svc':
+        open('%s/C' % args.save_dir, 'w').write('%s' % best.pop('C'))
     kernel_config.update_space(best)
     kernel_config.save(args.save_dir)
 

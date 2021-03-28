@@ -175,15 +175,16 @@ class ConvolutionPreCalcKernel(PreCalcKernel):
 
 
 class PreCalcKernelConfig(BaseKernelConfig):
-    def __init__(self, f_kernel: str, N_RBF: int = 0,
-                 sigma_RBF: List[float] = [1.0],
-                 sigma_RBF_bounds: List[Tuple[float, float]] = ['fixed']):
+    def __init__(self, kernel_dict: Dict,
+                 N_RBF: int = 0,
+                 sigma_RBF: List[float] = None,
+                 sigma_RBF_bounds: List[Tuple[float, float]] = None):
         super().__init__(N_RBF, sigma_RBF, sigma_RBF_bounds)
         self.type = 'preCalc'
         if N_RBF == 0:
-            self.kernel = self.get_preCalc_kernel(f_kernel)
+            self.kernel = self.get_preCalc_kernel(kernel_dict)
         else:
-            kernels = [self.get_preCalc_kernel(f_kernel)]
+            kernels = [self.get_preCalc_kernel(kernel_dict)]
             kernels += self._get_rbf_kernel()
             composition = [(0,)] + \
                           [tuple(np.arange(1, N_RBF + 1))]
@@ -193,12 +194,9 @@ class PreCalcKernelConfig(BaseKernelConfig):
                 combined_rule='product',
             )
 
-    def get_preCalc_kernel(self, kernel_pkl):
-        kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
+    def get_preCalc_kernel(self, kernel_dict: Dict):
+        # kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
         X = kernel_dict['group_id']
         K = kernel_dict['K']
         theta = kernel_dict['theta']
         return PreCalcKernel(X, K, theta)
-
-    def save(self, result_dir, model):
-        pass

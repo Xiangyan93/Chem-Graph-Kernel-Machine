@@ -280,9 +280,9 @@ class GraphKernelConfig(BaseKernelConfig):
                  graph_hyperparameters: List[Dict],
                  unique: bool = False,
                  N_RBF: int = 0,
-                 sigma_RBF: List[float] = [1.0],
-                 sigma_RBF_bound: List[Tuple[float, float]] = ['fixed']):
-        super().__init__(N_RBF, sigma_RBF, sigma_RBF_bound)
+                 sigma_RBF: List[float] = None,
+                 sigma_RBF_bounds: List[Tuple[float, float]] = None):
+        super().__init__(N_RBF, sigma_RBF, sigma_RBF_bounds)
         self.N_MGK = N_MGK
         self.N_conv_MGK = N_conv_MGK
         self.graph_hyperparameters = graph_hyperparameters
@@ -304,21 +304,26 @@ class GraphKernelConfig(BaseKernelConfig):
             for key, value in hyperdict.items():
                 if value.__class__ == list:
                     hp_key = '%d:%s:' % (i, key)
-                    hp = self._get_hp(hp_key, value)
-                    if hp is not None:
-                        SPACE[hp_key] = hp
+                    hp_ = self._get_hp(hp_key, value)
+                    # True, False, and MolSizeNormalization
+                    if key == 'Normalization':
+                        SPACE[hp_key + 'choice'] = hp.choice(hp_key + 'choice',
+                                                  [True, False, hp_])
+                    elif hp_ is not None:
+                        SPACE[hp_key] = hp_
                 else:
                     for micro_key, micro_value in value.items():
                         hp_key = '%d:%s:%s' % (i, key, micro_key)
-                        hp = self._get_hp(hp_key, micro_value)
-                        if hp is not None:
-                            SPACE[hp_key] = hp
+                        hp_ = self._get_hp(hp_key, micro_value)
+                        if hp_ is not None:
+                            SPACE[hp_key] = hp_
+
         for i in range(len(self.sigma_RBF)):
             hp_key = 'RBF:%d:' % i
-            hp = self._get_hp(hp_key, [self.sigma_RBF[i],
+            hp_ = self._get_hp(hp_key, [self.sigma_RBF[i],
                                        self.sigma_RBF_bounds[i]])
-            if hp is not None:
-                SPACE[hp_key] = hp
+            if hp_ is not None:
+                SPACE[hp_key] = hp_
         return SPACE
 
     def update_space(self, hyperdict: Dict[str, Union[int, float]]):
@@ -346,7 +351,7 @@ class GraphKernelConfig(BaseKernelConfig):
                 'sigma_RBF_bounds': self.sigma_RBF_bounds
             }
             open(os.path.join(path, 'sigma_RBF.json'), 'w').write(
-                json.dumps(self.sigma_RBF, indent=1, sort_keys=False))
+                json.dumps(rbf, indent=1, sort_keys=False))
 
     def _update_kernel(self):
         N_MGK = self.N_MGK
@@ -401,9 +406,9 @@ class GraphKernelConfig(BaseKernelConfig):
             p=p,
             unique=self.unique
         )
-        if hyperdict['Normalization'] == True:
+        if hyperdict['Normalization'][0] == True:
             return Norm(kernel)
-        elif hyperdict['Normalization'] == False:
+        elif hyperdict['Normalization'][0] == False:
             return kernel
         else:
             return NormalizationMolSize(

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
+import pickle
 import pandas as pd
 import numpy as np
 from sklearn.metrics import (
@@ -15,18 +17,20 @@ from sklearn.metrics import (
 from chemml import TrainArgs
 from chemml.data import Dataset
 from chemml.models.regression.GPRgraphdot import GPR, LRAGPR
-from chemml.models.classification.gpc import GPC
-from chemml.models.classification.svm import SVC
-from chemml.models.regression.consensus import ConsensusRegressor
+from chemml.models.classification import GPC
+from chemml.models.classification import SVC
+from chemml.models.regression import ConsensusRegressor
+from chemml.kernels import PreCalcKernel, PreCalcKernelConfig
 
 
 class Evaluator:
     def __init__(self, args: TrainArgs,
                  dataset: Dataset,
-                 kernel):
+                 kernel_config):
         self.args = args
         self.dataset = dataset
-        self.kernel = kernel
+        self.kernel_config = kernel_config
+        self.kernel = kernel_config.kernel
         self.set_model(args)
 
     def evaluate(self):
@@ -40,6 +44,9 @@ class Evaluator:
                 '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
                 float_format='%15.10f')
             return self._evaluate(y, y_pred, self.args.metric)
+        # Transform graph kernel to preCalc kernel.
+        if self.args.num_folds != 1 and self.kernel.__class__ != PreCalcKernel:
+            self.make_kernel_precalc()
 
         train_dict = dict()
         test_dict = dict()
@@ -73,13 +80,19 @@ class Evaluator:
                             self._evaluate(y_train, y_pred, metric))
             else:
                 self.model.fit(X_train, y_train)
-                y_pred, y_std = self.model.predict(X_test)
-                self._df(target=y_test, predict=y_pred, uncertainty=y_std).\
+                y_pred = self.model.predict(X_test)
+                self._df(target=y_test, predict=y_pred).\
                     to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
                     test_dict[metric].append(
                         self._evaluate(y_test, y_pred, metric))
+
+                if self.args.evaluate_train:
+                    y_pred = self.model.predict(X_train)
+                    for metric in self.args.metrics:
+                        train_dict[metric].append(
+                            self._evaluate(y_train, y_pred, metric))
         if self.args.evaluate_train:
             for metric, result in train_dict.items():
                 print(metric,
@@ -88,6 +101,30 @@ class Evaluator:
         for metric, result in test_dict.items():
             print(metric, ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
         return np.mean(test_dict[self.args.metric])
+
+    def make_kernel_precalc(self):
+        X = self.dataset.X_mol
+        K = self.kernel(X)
+        # print(dataset)
+        kernel_dict = {
+            'group_id': self.dataset.X_gid.ravel(),
+            'K': K,
+            'theta': self.kernel.theta
+        }
+        if self.dataset.N_addfeatures == 0:
+            self.kernel = PreCalcKernelConfig(
+                kernel_dict=kernel_dict
+            ).kernel
+        else:
+            N_RBF = self.dataset.N_addfeatures
+            self.kernel = PreCalcKernelConfig(
+                kernel_dict=kernel_dict,
+                N_RBF=N_RBF,
+                sigma_RBF=self.kernel_config.sigma_RBF[-N_RBF:],
+                sigma_RBF_bounds=self.kernel_config.sigma_RBF_bounds[-N_RBF:]
+            ).kernel
+        self.dataset.kernel_type = 'preCalc'
+        self.set_model(self.args)
 
     def set_model(self, args: TrainArgs):
         if args.model_type == 'gpr':
