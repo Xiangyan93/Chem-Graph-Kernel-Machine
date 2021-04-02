@@ -22,6 +22,23 @@ def get_kernel_info(args: KernelArgs) -> Tuple[int, int]:
     return N_MGK, N_conv_MGK
 
 
+def get_features_hyperparameters(args: KernelArgs, N_RBF: int) -> \
+        Tuple[Optional[List[float]], Optional[List[Tuple[float, float]]]]:
+    if N_RBF == 0:
+        sigma_RBF, sigma_RBF_bounds = None, None
+    elif args.features_hyperparameters_file is not None:
+        rbf = json.load(open(args.features_hyperparameters_file))
+        sigma_RBF = rbf['sigma_RBF']
+        sigma_RBF_bounds = rbf['sigma_RBF_bounds']
+    else:
+        sigma_RBF = args.features_hyperparameters
+        sigma_RBF_bounds = [(
+            args.features_hyperparameters_min[i],
+            args.features_hyperparameters_max[i])
+            for i in range(len(args.features_hyperparameters))]
+    return sigma_RBF, sigma_RBF_bounds
+
+
 def get_kernel_config(args: KernelArgs, dataset: Dataset):
     N_MGK, N_conv_MGK = get_kernel_info(args)
     if args.kernel_type == 'graph':
@@ -35,17 +52,10 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
         N_RBF_addfeatures = 0 if dataset.data[0].addfeatures is None \
             else dataset.data[0].addfeatures.shape[1]
         N_RBF = N_RBF_molfeatures + N_RBF_addfeatures
+        sigma_RBF, sigma_RBF_bounds = get_features_hyperparameters(
+            args, N_RBF
+        )
 
-        if args.features_hyperparameters_file is not None:
-            rbf = json.load(open(args.features_hyperparameters_file))
-            sigma_RBF = rbf['sigma_RBF']
-            sigma_RBF_bounds = rbf['sigma_RBF_bounds']
-        else:
-            sigma_RBF = args.features_hyperparameters
-            sigma_RBF_bounds = [(
-                args.features_hyperparameters_min[i],
-                args.features_hyperparameters_max[i])
-                for i in range(len(args.features_hyperparameters))]
         params = {
             'N_MGK': N_MGK,
             'N_conv_MGK': N_conv_MGK,
@@ -59,20 +69,10 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
     else:
         N_RBF = 0 if dataset.data[0].addfeatures is None \
             else dataset.data[0].addfeatures.shape[1]
+        sigma_RBF, sigma_RBF_bounds = get_features_hyperparameters(
+            args, N_RBF
+        )
 
-        if args.features_hyperparameters_file is not None:
-            rbf = json.load(open(args.features_hyperparameters_file))
-            sigma_RBF = rbf['sigma_RBF']
-            sigma_RBF_bounds = rbf['sigma_RBF_bounds']
-        else:
-            sigma_RBF = args.features_hyperparameters
-            if args.features_hyperparameters is None:
-                sigma_RBF_bounds = None
-            else:
-                sigma_RBF_bounds = [(
-                    args.features_hyperparameters_min[i],
-                    args.features_hyperparameters_max[i])
-                    for i in range(len(args.features_hyperparameters))]
         kernel_pkl = os.path.join(args.save_dir, 'kernel.pkl')
         kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
         params = {

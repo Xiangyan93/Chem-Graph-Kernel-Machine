@@ -228,13 +228,10 @@ class rdkit_config:
             # read elemental modes.
             self.emode = pd.read_csv(os.path.join(CWD, 'emodes.dat'), sep='\s+')
         if self.set_group:
-            self.group_dict = {
-                1: 'group_an1', 5: 'group_an5', 6: 'group_an6', 7: 'group_an7',
-                8: 'group_an8', 9: 'group_an9', 14: 'group_an14',
-                15: 'group_an15',
-                16: 'group_an16', 17: 'group_an17', 35: 'group_an35',
-                53: 'group_an53'
-            }
+            an_list = [0, 1, 5, 6, 7, 8, 9, 14, 15, 16, 17, 35, 53]
+            self.group_dict = dict()
+            for an in an_list:
+                self.group_dict[an] = 'group_an%d' % an
 
     @staticmethod
     def get_list_hash(l):
@@ -323,7 +320,7 @@ class rdkit_config:
                 node['ReactingCenter'] = 0.0
         if self.set_group:
             node['GroupID'] = get_group_id(atom)
-            assert node['GroupID'][0] in self.group_dict
+            # assert node['GroupID'][0] in self.group_dict
             for key, value in self.group_dict.items():
                 node[value] = 1.0 if key in node['GroupID'] else 0.0
         # set ring information
@@ -361,21 +358,17 @@ class rdkit_config:
 
     def set_node_propogation(self, graph, mol, attribute, depth=1, count=True,
                              usehash=True, sum=True):
-        if len(mol.GetAtoms()) == 1:
-            for depth_ in range(1, depth+1):
-                graph.nodes[0][attribute + '_list_%i' % depth_] = \
-                    np.asarray([0])
-                graph.nodes[1][attribute + '_list_%i' % depth_] = \
-                    np.asarray([0])
-                if count:
-                    graph.nodes[0][attribute + '_count_%i' % depth_] = 1
-                    graph.nodes[1][attribute + '_count_%i' % depth_] = 1
-                if usehash:
-                    graph.nodes[0][attribute + '_hash_%i' % depth_] = hash('0')
-                    graph.nodes[1][attribute + '_hash_%i' % depth_] = hash('0')
-                if sum:
-                    graph.nodes[0][attribute + '_sum_%i' % depth_] = 0
-                    graph.nodes[1][attribute + '_sum_%i' % depth_] = 0
+        if mol.GetNumBonds() == 0:
+            for i, atom in enumerate(mol.GetAtoms()):
+                for depth_ in range(1, depth+1):
+                    graph.nodes[i][attribute + '_list_%i' % depth_] = \
+                        np.asarray([0])
+                    if count:
+                        graph.nodes[i][attribute + '_count_%i' % depth_] = 1
+                    if usehash:
+                        graph.nodes[i][attribute + '_hash_%i' % depth_] = hash('0')
+                    if sum:
+                        graph.nodes[i][attribute + '_sum_%i' % depth_] = 0
         else:
             for i, atom in enumerate(mol.GetAtoms()):
                 assert (attribute in graph.nodes[i])
@@ -402,6 +395,23 @@ class rdkit_config:
                             np.sum(graph.nodes[i]
                                    [attribute + '_list_%i' % depth_])
 
+    def set_ghost_edge(self, edge):
+        if self.bond_type == 'order':
+            edge['Order'] = 0.
+        else:
+            edge['Type'] = 0
+        edge['Aromatic'] = False
+        edge['Conjugated'] = False
+        edge['Stereo'] = 0
+        edge['InRing'] = False
+        # edge['symmetry'] = False
+        if self.set_ring_stereo:
+            edge['RingStereo'] = 0.
+        if self.set_ring_membership:
+            edge['RingSize_list'] = np.asarray([0])
+            edge['RingSize_hash'] = hash('0')
+            edge['Ring_count'] = 0
+
 
 def _from_rdkit(cls, mol, rdkit_config):
     if rdkit_config.set_hydrogen_explicit:
@@ -410,33 +420,22 @@ def _from_rdkit(cls, mol, rdkit_config):
     # For single heavy-atom molecules, such as water, methane and metalic ion.
     # A ghost atom is created and bond to it, because there must be at least
     # two nodes and one edge in graph kernel.
-    if mol.GetNumAtoms() == 1:
-        '''
-        warnings.warn('Single heavy-atom molecule detected: %s. A Ghost atom '
-                      'is created since there must be at least one edge for a'
-                      'graph in GraphDot.' % Chem.MolToSmiles(mol))
-        '''
-        g.add_node(0)
-        g.add_node(1)
-        rdkit_config.set_node(g.nodes[0], mol.GetAtomWithIdx(0), mol)
-        rdkit_config.set_node(g.nodes[1], mol.GetAtomWithIdx(0), mol)
-        ij = (0, 1)
-        g.add_edge(*ij)
-        if rdkit_config.bond_type == 'order':
-            g.edges[ij]['Order'] = 0.
+    if mol.GetNumBonds() == 0:
+        for i, atom in enumerate(mol.GetAtoms()):
+            assert (atom.GetIdx() == i)
+            g.add_node(i)
+            rdkit_config.set_node(g.nodes[i], atom, mol)
+
+        if mol.GetNumAtoms() == 1:
+            ij = (0, 0)
+            g.add_edge(*ij)
+            rdkit_config.set_ghost_edge(g.edges[ij])
         else:
-            g.edges[ij]['Type'] = 0
-        g.edges[ij]['Aromatic'] = False
-        g.edges[ij]['Conjugated'] = False
-        g.edges[ij]['Stereo'] = 0
-        g.edges[ij]['InRing'] = False
-        # g.edges[ij]['symmetry'] = False
-        if rdkit_config.set_ring_stereo:
-            g.edges[ij]['RingStereo'] = 0.
-        if rdkit_config.set_ring_membership:
-            g.edges[ij]['RingSize_list'] = np.asarray([0])
-            g.edges[ij]['RingSize_hash'] = hash('0')
-            g.edges[ij]['Ring_count'] = 0
+            I, J = np.triu_indices(mol.GetNumAtoms(), k=1)
+            for i in range(len(I)):
+                ij = (I[i], J[i])
+                g.add_edge(*ij)
+                rdkit_config.set_ghost_edge(g.edges[ij])
     else:
         for i, atom in enumerate(mol.GetAtoms()):
             assert (atom.GetIdx() == i)

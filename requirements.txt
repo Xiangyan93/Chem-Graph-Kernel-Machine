@@ -3,3 +3,5 @@ tqdm==4.59.0
 scikit-learn==0.24.1
 rxntools==0.0.2
 typed-argument-parser==1.6.1
+mendeleev==0.6.1
+hyperopt==0.2.5

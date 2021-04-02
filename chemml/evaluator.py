@@ -59,8 +59,9 @@ class Evaluator:
                 self.args.split_type,
                 self.args.split_sizes,
                 seed=self.args.seed + i)
-            X_train, y_train = dataset_train.X, dataset_train.y.ravel()
-            X_test, y_test, gid = dataset_test.X, dataset_test.y.ravel(), dataset_test.X_gid
+
+            X_train, y_train = dataset_train.X, dataset_train.y
+            X_test, y_test, gid = dataset_test.X, dataset_test.y, dataset_test.X_gid
 
             if self.args.dataset_type == 'regression':
                 self.model.fit(X_train, y_train, loss=self.args.loss,
@@ -81,7 +82,7 @@ class Evaluator:
             else:
                 self.model.fit(X_train, y_train)
                 y_pred = self.model.predict(X_test)
-                self._df(target=y_test, predict=y_pred).\
+                self._df(target=y_test.tolist(), predict=y_pred.tolist()).\
                     to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
@@ -94,10 +95,12 @@ class Evaluator:
                         train_dict[metric].append(
                             self._evaluate(y_train, y_pred, metric))
         if self.args.evaluate_train:
+            print('\nTraining set:')
             for metric, result in train_dict.items():
                 print(metric,
                       ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
                 # print(np.asarray(result).ravel())
+        print('\nTest set:')
         for metric, result in test_dict.items():
             print(metric, ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
         return np.mean(test_dict[self.args.metric])
@@ -105,7 +108,6 @@ class Evaluator:
     def make_kernel_precalc(self):
         X = self.dataset.X_mol
         K = self.kernel(X)
-        # print(dataset)
         kernel_dict = {
             'group_id': self.dataset.X_gid.ravel(),
             'K': K,
@@ -169,6 +171,13 @@ class Evaluator:
 
     @staticmethod
     def _evaluate(y, y_pred, metrics):
+        if y.ndim == 2 and y_pred.ndim == 2:
+            y = y.ravel()
+            y_pred = y_pred.ravel()
+        idx = ~np.isnan(y)
+        y = y[idx]
+        y_pred = y_pred[idx]
+
         if metrics == 'roc-auc':
             return roc_auc_score(y, y_pred)
         elif metrics == 'accuracy':

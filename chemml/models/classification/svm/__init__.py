@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from .svm import SVC
+from .svm import SVMClassifier as SVC
 
 
 __all__ = [
-    'GPC'
+    'SVC'
 ]

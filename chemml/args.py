@@ -54,6 +54,16 @@ class CommonArgs(Tap):
     def __init__(self, *args, **kwargs):
         super(CommonArgs, self).__init__(*args, **kwargs)
 
+    @property
+    def graph_columns(self):
+        graph_columns = []
+        if self.pure_columns is not None:
+            graph_columns += self.pure_columns
+        if self.mixture_columns is not None:
+            graph_columns += self.mixture_columns
+        if self.reaction_columns is not None:
+            graph_columns += self.reaction_columns
+        return graph_columns
 
 
 class KernelArgs(CommonArgs):

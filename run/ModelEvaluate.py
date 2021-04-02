@@ -16,7 +16,7 @@ def main(args: TrainArgs) -> None:
     dataset.kernel_type = args.kernel_type
     kernel_config = get_kernel_config(args, dataset)
     # print(kernel_config.graph_hyperparameters)
-    Evaluator(args, dataset, kernel_config.kernel).evaluate()
+    Evaluator(args, dataset, kernel_config).evaluate()
 
 
 if __name__ == '__main__':

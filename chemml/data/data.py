@@ -522,6 +522,7 @@ class Dataset:
             features_generator: List[str] = None,
             gid: int = None,
     ) -> SubDataset:
+        print(pure)
         data_p = []
         data_m = []
         data_r = []
@@ -541,6 +542,12 @@ class Dataset:
     @classmethod
     def from_csv(cls, args: CommonArgs):
         df = pd.read_csv(args.data_path)
+        if args.target_columns is None:
+            target_columns = [column for column in df
+                              if column not in args.graph_columns]
+        else:
+            target_columns = args.target_columns
+
         if args.unique_reading:
             n1 = len(args.pure_columns)
             n2 = len(args.mixture_columns)
@@ -557,7 +564,7 @@ class Dataset:
                     list(g[0][n2:n3]),
                     args.reaction_type,
                     to_numpy(g[1][args.feature_columns]),
-                    to_numpy(g[1][args.target_columns]),
+                    to_numpy(g[1][target_columns]),
                     i
                 )
                 for i, g in groups)
@@ -571,7 +578,7 @@ class Dataset:
                     args.mixture_type,
                     tolist(df.iloc[i].get(args.reaction_columns)),
                     args.reaction_type,
-                    to_numpy(df.iloc[i][args.target_columns]),
+                    to_numpy(df.iloc[i][target_columns]),
                     to_numpy(df.iloc[i].get(args.feature_columns)),
                     args.features_generator,
                     i
@@ -580,15 +587,15 @@ class Dataset:
         return cls(data)
 
 
-def tolist(l: pd.Series) -> List[str]:
-    if l is None:
+def tolist(list_: pd.Series) -> List[str]:
+    if list_ is None:
         return []
     else:
-        return list(l)
+        return list(list_)
 
 
-def to_numpy(l: pd.Series) -> Optional[np.ndarray]:
-    if l is None:
+def to_numpy(list_: pd.Series) -> Optional[np.ndarray]:
+    if list_ is None:
         return None
     else:
-        return l.to_numpy()
+        return list_.to_numpy()
