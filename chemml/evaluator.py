@@ -174,6 +174,7 @@ class Evaluator:
         if y.ndim == 2 and y_pred.ndim == 2:
             y = y.ravel()
             y_pred = y_pred.ravel()
+        assert y.size == y_pred.size
         idx = ~np.isnan(y)
         y = y[idx]
         y_pred = y_pred[idx]

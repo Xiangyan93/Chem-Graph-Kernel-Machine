@@ -318,12 +318,13 @@ class GraphKernelConfig(BaseKernelConfig):
                         if hp_ is not None:
                             SPACE[hp_key] = hp_
 
-        for i in range(len(self.sigma_RBF)):
-            hp_key = 'RBF:%d:' % i
-            hp_ = self._get_hp(hp_key, [self.sigma_RBF[i],
-                                       self.sigma_RBF_bounds[i]])
-            if hp_ is not None:
-                SPACE[hp_key] = hp_
+        if self.sigma_RBF is not None:
+            for i in range(len(self.sigma_RBF)):
+                hp_key = 'RBF:%d:' % i
+                hp_ = self._get_hp(hp_key, [self.sigma_RBF[i],
+                                           self.sigma_RBF_bounds[i]])
+                if hp_ is not None:
+                    SPACE[hp_key] = hp_
         return SPACE
 
     def update_space(self, hyperdict: Dict[str, Union[int, float]]):

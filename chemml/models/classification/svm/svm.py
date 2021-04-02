@@ -9,7 +9,6 @@ class SVMClassifier(SVC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._SVC = SVC(*args, **kwargs)
-        self.SVCs = []
 
     @property
     def kernel_(self):
@@ -21,6 +20,7 @@ class SVMClassifier(SVC):
         return X[idx], y[idx]
 
     def fit(self, X, y, sample_weight=None):
+        self.SVCs = []
         if len(y.shape) == 1:
             X_, y_ = self._remove_nan_X_y(X, y)
             super().fit(X_, y_, sample_weight)

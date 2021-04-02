@@ -522,7 +522,6 @@ class Dataset:
             features_generator: List[str] = None,
             gid: int = None,
     ) -> SubDataset:
-        print(pure)
         data_p = []
         data_m = []
         data_r = []
