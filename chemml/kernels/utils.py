@@ -5,8 +5,6 @@ from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import numpy as np
 from chemml.args import KernelArgs
 from chemml.data import Dataset
-from chemml.kernels.GraphKernel import GraphKernelConfig
-from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
 
 
 def get_kernel_info(args: KernelArgs) -> Tuple[int, int]:
@@ -65,6 +63,7 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
             'sigma_RBF': sigma_RBF,# np.concatenate(sigma_RBF),
             'sigma_RBF_bounds': sigma_RBF_bounds, # * N_RBF,
         }
+        from chemml.kernels.GraphKernel import GraphKernelConfig
         return GraphKernelConfig(**params)
     else:
         N_RBF = 0 if dataset.data[0].addfeatures is None \
@@ -81,4 +80,5 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
             'sigma_RBF': sigma_RBF,
             'sigma_RBF_bounds': sigma_RBF_bounds,  # * N_RBF,
         }
+        from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
         return PreCalcKernelConfig(**params)
