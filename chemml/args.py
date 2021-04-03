@@ -136,6 +136,8 @@ class TrainArgs(KernelArgs):
 
     @property
     def alpha_(self) -> float:
+        if isinstance(self.alpha, float):
+            return self.alpha
         if os.path.exists(self.alpha):
             return float(open(self.alpha, 'r').read())
         else:
@@ -143,7 +145,9 @@ class TrainArgs(KernelArgs):
 
     @property
     def C_(self) -> float:
-        if os.path.exists(self.C):
+        if isinstance(self.C, float):
+            return self.C
+        elif os.path.exists(self.C):
             return float(open(self.C, 'r').read())
         else:
             return float(self.C)
