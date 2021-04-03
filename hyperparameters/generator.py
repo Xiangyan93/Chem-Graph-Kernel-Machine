@@ -5,7 +5,7 @@ from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 
 
 class HyperJsonGenerator:
-    def tMGR(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.5, 1.0),
+    def tMGR(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.75, 1.0),
              k_an=0.75):
         return {
             'Normalization': [10000, (1000, 30000)],
@@ -31,7 +31,7 @@ class HyperJsonGenerator:
             'q': [0.01, [0.01, 0.5], 0.01],
         }
 
-    def add(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.5, 1.0),
+    def add(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.75, 1.0),
             c: float = 1.0, c_bounds: Tuple[float, float] = (1.0, 10.0)):
         return {
             'Normalization': [10000, (1000, 30000)],
@@ -57,7 +57,7 @@ class HyperJsonGenerator:
             'q': [0.01, (0.001, 0.5)],
         }
 
-    def general(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.5, 1.0),
+    def general(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.75, 1.0),
                 c: float = 1.0, c_bounds: Tuple[float, float] = (1.0, 10.0),
                 p: float = 1.0, p_bounds: Tuple[float, float] = (1.0, 10.0)):
         return {
