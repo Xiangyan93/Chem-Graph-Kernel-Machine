@@ -48,6 +48,12 @@ def main(args: HyperoptArgs) -> None:
         SPACE['alpha'] = hp.loguniform('alpha',
                                        low=np.log(args.alpha_bounds[0]),
                                        high=np.log(args.alpha_bounds[1]))
+        '''
+        SPACE['alpha'] = hp.quniform('alpha',
+                                       low=0.005,
+                                       high=0.02, q=0.001)
+                '''
+
     elif args.model_type == 'svc':
         SPACE['C'] = hp.loguniform('C',
                                    low=np.log(args.C_bounds[0]),

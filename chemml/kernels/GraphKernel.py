@@ -305,13 +305,18 @@ class GraphKernelConfig(BaseKernelConfig):
                 if value.__class__ == list:
                     hp_key = '%d:%s:' % (i, key)
                     hp_ = self._get_hp(hp_key, value)
+                    if hp_ is not None:
+                        SPACE[hp_key] = hp_
+                    '''
                     # True, False, and MolSizeNormalization
                     if key == 'Normalization':
                         SPACE[hp_key + 'choice'] = hp.choice(hp_key + 'choice',
                                                              [False])
                                                   # [True, False, hp_])
+                    
                     elif hp_ is not None:
                         SPACE[hp_key] = hp_
+                    '''
                 else:
                     for micro_key, micro_value in value.items():
                         hp_key = '%d:%s:%s' % (i, key, micro_key)
