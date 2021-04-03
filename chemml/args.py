@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
 from tap import Tap
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import numpy as np
@@ -103,9 +104,9 @@ class TrainArgs(KernelArgs):
     """Split proportions for train/validation/test sets."""
     num_folds: int = 1
     """Number of folds when performing cross validation."""
-    alpha: float = None
+    alpha: str = None
     """data noise used in gpr."""
-    C: float = None
+    C: str = None
     """C parameter used in Support Vector Machine."""
     seed: int = 0
     """Random seed."""
@@ -132,6 +133,20 @@ class TrainArgs(KernelArgs):
     @property
     def metrics(self) -> List[str]:
         return [self.metric] + self.extra_metrics
+
+    @property
+    def alpha_(self) -> float:
+        if os.path.exists(self.alpha):
+            return float(open(self.alpha, 'r').read())
+        else:
+            return float(self.alpha)
+
+    @property
+    def C_(self) -> float:
+        if os.path.exists(self.C):
+            return float(open(self.C, 'r').read())
+        else:
+            return float(self.C)
 
     def check(self):
         if self.split_type == 'loocv':

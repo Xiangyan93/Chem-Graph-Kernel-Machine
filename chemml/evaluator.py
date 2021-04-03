@@ -133,7 +133,7 @@ class Evaluator:
             self.model = GPR(
                 kernel=self.kernel,
                 optimizer=args.optimizer,
-                alpha=args.alpha,
+                alpha=args.alpha_,
                 normalize_y=True
             )
             if args.ensemble:
@@ -148,7 +148,7 @@ class Evaluator:
             self.model = LRAGPR(
                 kernel=self.kernel,
                 optimizer=args.optimizer,
-                alpha=args.alpha,
+                alpha=args.alpha_,
                 normalize_y=True
             )
         elif args.model_type == 'gpc':
@@ -160,7 +160,7 @@ class Evaluator:
         elif args.model_type == 'svc':
             self.model = SVC(
                 kernel=self.kernel,
-                C=args.C
+                C=args.C_
             )
         else:
             raise RuntimeError(f'Unsupport model:{args.model_type}')
