@@ -18,7 +18,7 @@ class HyperJsonGenerator:
             'atom_MorganHash': {'kDelta': [k, k_bounds, 0.05]},
             'atom_Ring_count': {'kDelta': [k, k_bounds, 0.05]},
             'atom_RingSize_list': {'kConv': [k, k_bounds, 0.05]},
-            'atom_Hcount': {'kDelta': [k, k_bounds]},
+            'atom_Hcount': {'kDelta': [k, k_bounds, 0.05]},
             'atom_AtomicNumber_count_1': {'kDelta': [k, k_bounds, 0.05]},
             'atom_AtomicNumber_count_2': {'kDelta': [k, k_bounds, 0.05]},
             'atom_Chiral': {'kDelta': [k, k_bounds, 0.05]},
