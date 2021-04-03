@@ -45,9 +45,13 @@ def main(args: HyperoptArgs) -> None:
 
     # add adjust hyperparameters of model
     if args.model_type == 'gpr':
-        SPACE['alpha'] = hp.quniform('alpha', low=0.001, high=0.02, q=0.001)
+        SPACE['alpha'] = hp.loguniform('alpha',
+                                       low=np.log(args.alpha_bounds[0]),
+                                       high=np.log(args.alpha_bounds[1]))
     elif args.model_type == 'svc':
-        SPACE['C'] = hp.quniform('C', low=0.2, high=5.0, q=0.2)
+        SPACE['C'] = hp.loguniform('C',
+                                   low=np.log(args.C_bounds[0]),
+                                   high=np.log(args.C_bounds[1]))
 
     fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
          rstate=np.random.RandomState(args.seed))

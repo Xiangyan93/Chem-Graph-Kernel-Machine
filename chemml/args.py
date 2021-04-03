@@ -103,9 +103,9 @@ class TrainArgs(KernelArgs):
     """Split proportions for train/validation/test sets."""
     num_folds: int = 1
     """Number of folds when performing cross validation."""
-    alpha: float = 0.01
+    alpha: float = None
     """data noise used in gpr."""
-    C: float = 1.0
+    C: float = None
     """C parameter used in Support Vector Machine."""
     seed: int = 0
     """Random seed."""
@@ -150,10 +150,20 @@ class TrainArgs(KernelArgs):
             assert self.num_folds == 1
             assert self.model_type == 'gpr'
 
+        if self.model_type in ['gpr', 'gpr_nystrom']:
+            assert self.alpha is not None
+
+        if self.model_type == 'svc':
+            assert self.C is not None
 
 
 class HyperoptArgs(TrainArgs):
     num_iters: int = 20
+    """Number of hyperparameter choices to try."""
+    alpha_bounds: Tuple[float, float] = (1e-3, 1e2)
+    """Bounds of alpha used in GPR."""
+    C_bounds: Tuple[float, float] = (1e-3, 1e3)
+    """Bounds of C used in SVC."""
 
     @property
     def minimize_score(self) -> bool:
@@ -161,5 +171,4 @@ class HyperoptArgs(TrainArgs):
         return self.metric in {'rmse', 'mae', 'mse', 'r2'}
 
     def process_args(self) -> None:
-        pass
-        # print(123123)
+        super().process_args()

@@ -308,7 +308,8 @@ class GraphKernelConfig(BaseKernelConfig):
                     # True, False, and MolSizeNormalization
                     if key == 'Normalization':
                         SPACE[hp_key + 'choice'] = hp.choice(hp_key + 'choice',
-                                                  [True, False, hp_])
+                                                             [False])
+                                                  # [True, False, hp_])
                     elif hp_ is not None:
                         SPACE[hp_key] = hp_
                 else:

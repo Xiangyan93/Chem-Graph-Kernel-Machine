@@ -57,7 +57,7 @@ class HyperJsonGenerator:
             'q': [0.01, (0.001, 0.5)],
         }
 
-    def general(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.75, 1.0),
+    def general(self, k: float = 0.9, k_bounds: Tuple[float, float] = (0.5, 1.0),
                 c: float = 1.0, c_bounds: Tuple[float, float] = (1.0, 10.0),
                 p: float = 1.0, p_bounds: Tuple[float, float] = (1.0, 10.0)):
         return {
@@ -96,9 +96,22 @@ class HyperJsonGenerator:
         }
 
 hyper_json = HyperJsonGenerator()
+product_hyper = hyper_json.tMGR()
 open('tMGR.json', 'w').write(
-    json.dumps(hyper_json.tMGR(), indent=1, sort_keys=False))
+    json.dumps(product_hyper, indent=1, sort_keys=False))
+product_hyper['Normalization'] = [True, 'fixed']
+open('tMGR-Norm.json', 'w').write(
+    json.dumps(product_hyper, indent=1, sort_keys=False))
+product_hyper['Normalization'] = [False, 'fixed']
+open('tMGR-non-Norm.json', 'w').write(
+    json.dumps(product_hyper, indent=1, sort_keys=False))
+
+additive_hyper = hyper_json.general()
 open('additive.json', 'w').write(
-    json.dumps(hyper_json.add(), indent=1, sort_keys=False))
-open('general.json', 'w').write(
-    json.dumps(hyper_json.general(), indent=1, sort_keys=False))
+    json.dumps(additive_hyper, indent=1, sort_keys=False))
+additive_hyper['Normalization'] = [True, 'fixed']
+open('additive-Norm.json', 'w').write(
+    json.dumps(additive_hyper, indent=1, sort_keys=False))
+additive_hyper['Normalization'] = [False, 'fixed']
+open('additive-non-Norm.json', 'w').write(
+    json.dumps(additive_hyper, indent=1, sort_keys=False))
