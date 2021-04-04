@@ -45,9 +45,15 @@ def main(args: HyperoptArgs) -> None:
 
     # add adjust hyperparameters of model
     if args.model_type == 'gpr':
-        SPACE['alpha'] = hp.loguniform('alpha',
-                                       low=np.log(args.alpha_bounds[0]),
-                                       high=np.log(args.alpha_bounds[1]))
+        if args.alpha_uniform is None:
+            SPACE['alpha'] = hp.loguniform('alpha',
+                                           low=np.log(args.alpha_bounds[0]),
+                                           high=np.log(args.alpha_bounds[1]))
+        else:
+            SPACE['alpha'] = hp.quniform('alpha',
+                                         low=args.alpha_bounds[0],
+                                         high=args.alpha_bounds[1],
+                                         q=args.alpha_uniform)
         '''
         SPACE['alpha'] = hp.quniform('alpha',
                                        low=0.005,
