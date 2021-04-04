@@ -61,7 +61,7 @@ class HyperJsonGenerator:
                 c: float = 1.0, c_bounds: Tuple[float, float] = (1.0, 10.0),
                 p: float = 1.0, p_bounds: Tuple[float, float] = (1.0, 10.0)):
         return {
-            'Normalization': [10000, (1000, 50000), 1000],
+            'Normalization': [10000, (1000, 50000), 5000],
             'a_type': ['Additive', 'fixed'],
             'atom_AtomicNumber': {'Const': [c, c_bounds, 1.0], 'kDelta': [k, k_bounds, 0.05]},
             'atom_AtomicNumber_list_1': {'Const': [c, c_bounds, 1.0], 'kConv': [k, k_bounds, 0.05]},
