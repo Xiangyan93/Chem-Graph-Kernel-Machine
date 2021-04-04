@@ -25,13 +25,11 @@ def main(args: HyperoptArgs) -> None:
     hyperdicts = []
     results = []
 
-    def objective(hyperdict: Dict[str, List[Union[int, float]]]) -> float:
+    def objective(hyperdict: Dict[str, float]) -> float:
         print('\nHyperopt Step')
         hyperdicts.append(hyperdict.copy())
-        if args.model_type == 'gpr':
-            args.alpha = hyperdict.pop('alpha')
-        elif args.model_type == 'svc':
-            args.C = hyperdict.pop('C')
+        args.alpha = hyperdict.pop('alpha', None)
+        args.C = hyperdict.pop('C', None)
         kernel_config.update_space(hyperdict)
         evaluator = Evaluator(args, dataset, kernel_config)
         result = evaluator.evaluate()
@@ -45,7 +43,9 @@ def main(args: HyperoptArgs) -> None:
 
     # add adjust hyperparameters of model
     if args.model_type == 'gpr':
-        if args.alpha_uniform is None:
+        if args.alpha_bounds is None:
+            pass
+        elif args.alpha_uniform is None:
             SPACE['alpha'] = hp.loguniform('alpha',
                                            low=np.log(args.alpha_bounds[0]),
                                            high=np.log(args.alpha_bounds[1]))
@@ -54,16 +54,19 @@ def main(args: HyperoptArgs) -> None:
                                          low=args.alpha_bounds[0],
                                          high=args.alpha_bounds[1],
                                          q=args.alpha_uniform)
-        '''
-        SPACE['alpha'] = hp.quniform('alpha',
-                                       low=0.005,
-                                       high=0.02, q=0.001)
-                '''
 
     elif args.model_type == 'svc':
-        SPACE['C'] = hp.loguniform('C',
-                                   low=np.log(args.C_bounds[0]),
-                                   high=np.log(args.C_bounds[1]))
+        if args.C_bounds is None:
+            pass
+        elif args.C_uniform is None:
+            SPACE['C'] = hp.loguniform('C',
+                                       low=np.log(args.C_bounds[0]),
+                                       high=np.log(args.C_bounds[1]))
+        else:
+            SPACE['C'] = hp.loguniform('C',
+                                       low=args.C_bounds[0],
+                                       high=args.C_bounds[1],
+                                       q=args.C_uniform)
 
     fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
          rstate=np.random.RandomState(args.seed))
@@ -71,9 +74,9 @@ def main(args: HyperoptArgs) -> None:
     best_idx = np.where(results == np.min(results))[0][0]
     best = hyperdicts[best_idx]
     #
-    if args.model_type == 'gpr':
+    if args.opt_alpha:
         open('%s/alpha' % args.save_dir, 'w').write('%s' % best.pop('alpha'))
-    elif args.model_type == 'svc':
+    elif args.opt_C:
         open('%s/C' % args.save_dir, 'w').write('%s' % best.pop('C'))
     kernel_config.update_space(best)
     kernel_config.save(args.save_dir)

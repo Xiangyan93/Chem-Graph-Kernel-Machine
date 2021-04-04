@@ -179,18 +179,35 @@ class TrainArgs(KernelArgs):
 class HyperoptArgs(TrainArgs):
     num_iters: int = 20
     """Number of hyperparameter choices to try."""
-    alpha_bounds: Tuple[float, float] = (1e-3, 1e2)
+    alpha_bounds: Tuple[float, float] = None
     """Bounds of alpha used in GPR."""
     alpha_uniform: float = None
-
+    """"""
     C_bounds: Tuple[float, float] = (1e-3, 1e3)
     """Bounds of C used in SVC."""
     C_uniform: float = None
+    """"""
 
     @property
     def minimize_score(self) -> bool:
         """Whether the model should try to minimize the score metric or maximize it."""
         return self.metric in {'rmse', 'mae', 'mse', 'r2'}
+
+    @property
+    def opt_alpha(self) -> bool:
+        if self.alpha_bounds is not None and \
+                self.model_type in ['gpr', 'gpr_nystrom']:
+            return True
+        else:
+            return False
+
+    @property
+    def opt_C(self) -> bool:
+        if self.C_bounds is not None and \
+                self.model_type == 'svc':
+            return True
+        else:
+            return False
 
     def process_args(self) -> None:
         super().process_args()

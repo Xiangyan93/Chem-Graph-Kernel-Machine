@@ -209,7 +209,8 @@ class rdkit_config:
                  concentration=1.0,
                  IsSanitized=True,
                  set_group=True,
-                 set_TPSA=False):
+                 set_TPSA=False,
+                 set_partial_charge=False):
         self.bond_type = bond_type
         self.set_morgan_identifier = set_morgan_identifier
         self.morgan_radius = morgan_radius
@@ -224,6 +225,7 @@ class rdkit_config:
         self.IsSanitized = IsSanitized
         self.set_group = set_group
         self.set_TPSA = set_TPSA
+        self.set_partial_charge = set_partial_charge
         if self.set_elemental_mode:
             # read elemental modes.
             self.emode = pd.read_csv(os.path.join(CWD, 'emodes.dat'), sep='\s+')
@@ -262,6 +264,8 @@ class rdkit_config:
             self.ringlist_bond = self.get_ringlist(mol, type='bond')
         if self.set_TPSA:
             self.TPSA = rdMolDescriptors._CalcTPSAContribs(mol)
+        if self.set_partial_charge:
+            Chem.ComputeGasteigerCharges(mol)
 
     @staticmethod
     def get_ringlist(mol, type='atom'):
@@ -334,6 +338,9 @@ class rdkit_config:
                 node['Ring_count'] = len(self.ringlist_atom[atom.GetIdx()])
         if self.set_TPSA:
             node['TPSA'] = self.TPSA[atom.GetIdx()]
+        if self.set_partial_charge:
+            node['GasteigerCharge'] = float(atom.GetProp('_GasteigerCharge'))
+            node['GasteigerHCharge'] = float(atom.GetProp('_GasteigerHCharge'))
 
     def set_edge(self, edge, bond):
         if self.bond_type == 'order':
