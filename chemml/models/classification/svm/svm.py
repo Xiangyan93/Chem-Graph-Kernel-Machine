@@ -21,7 +21,7 @@ class SVMClassifier(SVC):
 
     def fit(self, X, y, sample_weight=None):
         self.SVCs = []
-        if len(y.shape) == 1:
+        if y.ndim == 1:
             X_, y_ = self._remove_nan_X_y(X, y)
             super().fit(X_, y_, sample_weight)
         else:

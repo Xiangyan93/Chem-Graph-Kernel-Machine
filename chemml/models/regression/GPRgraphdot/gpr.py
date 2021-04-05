@@ -8,27 +8,27 @@ from graphdot.model.gaussian_process.nystrom import *
 
 
 def _predict(predict, X, return_std=False, return_cov=False, memory_save=True,
-            n_memory_save=10000):
+             n_memory_save=10000):
     if return_cov or not memory_save:
         return predict(X, return_std=return_std, return_cov=return_cov)
     else:
         N = X.shape[0]
-        y_mean = np.array([])
-        y_std = np.array([])
+        y_mean = []
+        y_std = []
         for i in range(math.ceil(N / n_memory_save)):
             X_ = X[i * n_memory_save:(i + 1) * n_memory_save]
             if return_std:
                 [y_mean_, y_std_] = predict(
                     X_, return_std=return_std, return_cov=return_cov)
-                y_std = np.r_[y_std, y_std_]
+                y_std.append(y_std_)
             else:
                 y_mean_ = predict(
                     X_, return_std=return_std, return_cov=return_cov)
-            y_mean = np.r_[y_mean, y_mean_]
+            y_mean.append(y_mean_)
         if return_std:
-            return y_mean, y_std
+            return np.concatenate(y_mean), np.concatenate(y_std)
         else:
-            return y_mean
+            return np.concatenate(y_mean)
 
 
 class GPR(GaussianProcessRegressor):
@@ -56,6 +56,48 @@ class GPR(GaussianProcessRegressor):
         return _predict(self.predict_, X, return_std=return_std,
                         return_cov=return_cov)
 
+    """
+    def predict_loocv(self, Z, z, return_std=False):
+        if z.ndim == 1:
+            return super().predict_loocv(Z, z, return_std=return_std)
+        else:
+            if return_std:
+                y_preds = []
+                y_stds = []
+                for i in range(z.shape[1]):
+                    y_pred, y_std = super().predict_loocv(Z, z[:, i],
+                                                          return_std=True)
+                    y_preds.append(y_pred)
+                    y_stds.append(y_std)
+                return np.concatenate(y_preds).reshape(len(y_preds), len(Z)).T, \
+                       np.concatenate(y_stds).reshape(len(y_stds), len(Z)).T
+            else:
+                y_preds = []
+                for i in range(z.shape[1]):
+                    y_pred = super().predict_loocv(Z, z[:, i],
+                                                   return_std=False)
+                    y_preds.append(y_pred)
+                return np.concatenate(y_preds).reshape(len(y_preds), len(Z)).T
+    """
+
+    def predict_loocv(self, Z, z, return_std=False):
+        assert(len(Z) == len(z))
+        z = np.asarray(z)
+        if self.normalize_y is True:
+            z_mean, z_std = np.mean(z, axis=0), np.std(z, axis=0)
+            z = (z - z_mean) / z_std
+        else:
+            z_mean, z_std = 0, 1
+        Kinv, _ = self._invert(self._gramian(Z))
+        Kinv_diag = (Kinv @ np.eye(len(Z))).diagonal()
+
+        ymean = (z - ((Kinv @ z).T / Kinv_diag).T) * z_std + z_mean
+        if return_std is True:
+            std = np.sqrt(1 / np.maximum(Kinv_diag, 1e-14))
+            return (ymean, std)
+        else:
+            return ymean
+
     @classmethod
     def load_cls(cls, f_model, kernel):
         store_dict = pickle.load(open(f_model, 'rb'))
@@ -65,6 +107,7 @@ class GPR(GaussianProcessRegressor):
         return model
 
     """sklearn GPR parameters"""
+
     @property
     def kernel_(self):
         return self.kernel
@@ -111,6 +154,7 @@ class LRAGPR(GPR):
         A dictionary of additional options to be passed along when applying the
         kernel to data.
     """
+
     def fit(self, *args, **kwargs):
         return self.fit(*args, **kwargs)
 
@@ -130,7 +174,7 @@ class LRAGPR(GPR):
         self._C = C
 
     def _corespace(self, C=None, Kcc=None):
-        assert(C is None or Kcc is None)
+        assert (C is None or Kcc is None)
         if Kcc is None:
             Kcc = self._gramian(C)
         try:
@@ -264,7 +308,7 @@ class LRAGPR(GPR):
         elif return_cov is True:
             Kzz = self._gramian(Z)
             cov = np.maximum(Kzz - (Kzx @ self.Kinv @ Kzx.T).todense(), 0)
-            return (ymean, cov * self.y_std**2)
+            return (ymean, cov * self.y_std ** 2)
         else:
             return ymean
 
@@ -302,7 +346,7 @@ class LRAGPR(GPR):
             Leave-one-out standard deviation of the predictive distribution at
             query points.
         """
-        assert(len(Z) == len(z))
+        assert (len(Z) == len(z))
         z = np.asarray(z)
         if self.normalize_y is True:
             z_mean, z_std = np.mean(z), np.std(z)
@@ -424,13 +468,13 @@ class LRAGPR(GPR):
 
         if eval_gradient is True:
             D_theta = np.zeros_like(theta)
-            K_inv2 = K_inv**2
+            K_inv2 = K_inv ** 2
             for i, t in enumerate(theta):
                 d_F = d_Kxc[:, :, i] @ Kcc_rsqrt
                 d_K = lr.dot(F, d_F.T) + lr.dot(d_F, F.T) - lr.dot(
-                            F @ Kcc_rsqrt.T @ d_Kcc[:, :, i],
-                            Kcc_rsqrt @ F.T
-                        )
+                    F @ Kcc_rsqrt.T @ d_Kcc[:, :, i],
+                    Kcc_rsqrt @ F.T
+                )
                 d_logdet = (K_inv @ d_K).trace()
                 d_Kinv_part = K_inv2 @ d_K - K_inv2 @ d_K @ (K @ K_inv)
                 d_Kinv = d_Kinv_part + d_Kinv_part.T - K_inv @ d_K @ K_inv

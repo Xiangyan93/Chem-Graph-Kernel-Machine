@@ -40,7 +40,9 @@ class Evaluator:
             print('LOOCV:')
             for metric in self.args.metrics:
                 print('%s: %.5f' % (metric, self._evaluate(y, y_pred, metric)))
-            self._df(target=y, predict=y_pred, uncertainty=y_std).to_csv(
+            self._df(target=y.tolist(),
+                     predict=y_pred.tolist(),
+                     uncertainty=y_std.tolist()).to_csv(
                 '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
                 float_format='%15.10f')
             return self._evaluate(y, y_pred, self.args.metric)
@@ -67,7 +69,9 @@ class Evaluator:
                 self.model.fit(X_train, y_train, loss=self.args.loss,
                                verbose=True)
                 y_pred, y_std = self.model.predict(X_test, return_std=True)
-                self._df(target=y_test, predict=y_pred, uncertainty=y_std).\
+                self._df(target=y_test.tolist(),
+                         predict=y_pred.tolist(),
+                         uncertainty=y_std.tolist()).\
                     to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
