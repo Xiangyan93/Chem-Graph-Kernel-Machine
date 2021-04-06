@@ -11,8 +11,7 @@ temperature, pressure, etc.
 ## Installation
 GCC (7.*), NVIDIA Driver and CUDA toolkit(>=10.1).  
 ```
-conda create -n graphdot_dev python=3.7 -y
-conda install -c rdkit rdkit=2020.03.3.0
+conda create -n graphdot_dev python=3.8 -y
 conda install -c conda-forge rdkit=2020.09.5
 pip install -r requirements.txt
 ```
