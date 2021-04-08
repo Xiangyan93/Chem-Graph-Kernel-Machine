@@ -15,6 +15,21 @@ from chemml.data.data import Dataset
 from chemml.kernels.utils import get_kernel_config
 
 
+def save_best_params(results: List[float],
+                     hyperdicts: List[Dict],
+                     kernel_config,
+                     args):
+    best_idx = np.where(results == np.min(results))[0][0]
+    best = hyperdicts[best_idx].copy()
+    #
+    if args.opt_alpha:
+        open('%s/alpha' % args.save_dir, 'w').write('%s' % best.pop('alpha'))
+    elif args.opt_C:
+        open('%s/C' % args.save_dir, 'w').write('%s' % best.pop('C'))
+    kernel_config.update_space(best)
+    kernel_config.save(args.save_dir)
+
+
 def main(args: HyperoptArgs) -> None:
     # read data
     dataset = Dataset.load(args.save_dir)
@@ -37,6 +52,7 @@ def main(args: HyperoptArgs) -> None:
             result = - result
         results.append(result)
         dataset.kernel_type = 'graph'
+        save_best_params(results, hyperdicts, kernel_config, args)
         return result
 
     SPACE = kernel_config.get_space()
@@ -71,15 +87,7 @@ def main(args: HyperoptArgs) -> None:
     fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
          rstate=np.random.RandomState(args.seed))
     # get best hyperparameters.
-    best_idx = np.where(results == np.min(results))[0][0]
-    best = hyperdicts[best_idx]
-    #
-    if args.opt_alpha:
-        open('%s/alpha' % args.save_dir, 'w').write('%s' % best.pop('alpha'))
-    elif args.opt_C:
-        open('%s/C' % args.save_dir, 'w').write('%s' % best.pop('C'))
-    kernel_config.update_space(best)
-    kernel_config.save(args.save_dir)
+    save_best_params(results, hyperdicts, kernel_config, args)
 
 
 if __name__ == '__main__':
