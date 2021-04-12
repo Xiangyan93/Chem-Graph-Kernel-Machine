@@ -39,17 +39,26 @@ def get_features_hyperparameters(args: KernelArgs, N_RBF: int) -> \
 
 def get_kernel_config(args: KernelArgs, dataset: Dataset):
     N_MGK, N_conv_MGK = get_kernel_info(args)
-    if args.kernel_type == 'graph':
+    if args.graph_kernel_type is None:
+        N_RBF = dataset.N_molfeatures + dataset.N_addfeatures
+        assert N_RBF != 0
+        sigma_RBF, sigma_RBF_bounds = get_features_hyperparameters(
+            args, N_RBF
+        )
+        params = {
+            'N_RBF': N_RBF,
+            'sigma_RBF': sigma_RBF,# np.concatenate(sigma_RBF),
+            'sigma_RBF_bounds': sigma_RBF_bounds, # * N_RBF,
+        }
+        from chemml.kernels.BaseKernelConfig import BaseKernelConfig
+        return BaseKernelConfig(**params)
+    elif args.graph_kernel_type == 'graph':
         graph_hyperparameters = [
             json.load(open(j)) for j in args.graph_hyperparameters
         ]
         assert N_MGK + N_conv_MGK == len(graph_hyperparameters)
 
-        N_RBF_molfeatures = 0 if dataset.data[0]._X_molfeatures is None \
-            else dataset.data[0]._X_molfeatures.shape[1]
-        N_RBF_addfeatures = 0 if dataset.data[0].addfeatures is None \
-            else dataset.data[0].addfeatures.shape[1]
-        N_RBF = N_RBF_molfeatures + N_RBF_addfeatures
+        N_RBF = dataset.N_molfeatures + dataset.N_addfeatures
         sigma_RBF, sigma_RBF_bounds = get_features_hyperparameters(
             args, N_RBF
         )

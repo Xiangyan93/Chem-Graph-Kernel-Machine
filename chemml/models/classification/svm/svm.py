@@ -39,3 +39,12 @@ class SVMClassifier(SVC):
             return np.concatenate(y_mean).reshape(len(y_mean), len(X)).T
         else:
             return super().predict(X)
+
+    def predict_proba(self, X):
+        if self.SVCs:
+            y_mean = []
+            for SVC in self.SVCs:
+                y_mean.append(SVC.predict_proba(X)[:, 1])
+            return np.concatenate(y_mean).reshape(len(y_mean), len(X)).T
+        else:
+            return super().predict_proba(X)[:, 1]

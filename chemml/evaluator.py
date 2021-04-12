@@ -4,6 +4,7 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
+from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 from sklearn.metrics import (
     mean_squared_error,
     mean_absolute_error,
@@ -34,27 +35,21 @@ class Evaluator:
         self.set_model(args)
 
     def evaluate(self):
+        # Leave-One-Out cross validation
         if self.args.split_type == 'loocv':
-            X, y, gid = self.dataset.X, self.dataset.y, self.dataset.X_gid
-            y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
-            print('LOOCV:')
-            for metric in self.args.metrics:
-                print('%s: %.5f' % (metric, self._evaluate(y, y_pred, metric)))
-            self._df(target=y.tolist(),
-                     predict=y_pred.tolist(),
-                     uncertainty=y_std.tolist()).to_csv(
-                '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
-                float_format='%15.10f')
-            return self._evaluate(y, y_pred, self.args.metric)
+            self._evaluate_loocv()
+
         # Transform graph kernel to preCalc kernel.
-        if self.args.num_folds != 1 and self.kernel.__class__ != PreCalcKernel:
+        if self.args.num_folds != 1 and self.kernel.__class__ != PreCalcKernel \
+                and self.args.graph_kernel_type == 'graph':
             self.make_kernel_precalc()
 
-        train_dict = dict()
-        test_dict = dict()
+        # Initialization
+        train_results = dict()
+        test_results = dict()
         for metric in self.args.metrics:
-            train_dict[metric] = []
-            test_dict[metric] = []
+            train_results[metric] = []
+            test_results[metric] = []
 
         for i in range(self.args.num_folds):
             dataset_train, dataset_test = self.dataset.split(
@@ -62,52 +57,102 @@ class Evaluator:
                 self.args.split_sizes,
                 seed=self.args.seed + i)
 
-            X_train, y_train = dataset_train.X, dataset_train.y
-            X_test, y_test, gid = dataset_test.X, dataset_test.y, dataset_test.X_gid
+            X_train, y_train, repr_train = dataset_train.X, dataset_train.y, dataset_train._repr()
+            X_test, y_test, repr_test = dataset_test.X, dataset_test.y, dataset_test._repr()
+            # Find the most similar sample in training sets.
+            if self.args.detail:
+                y_similar = self.get_similar_info(X_test, X_train, repr_train, 5)
+            else:
+                y_similar = None
 
             if self.args.dataset_type == 'regression':
                 self.model.fit(X_train, y_train, loss=self.args.loss,
                                verbose=True)
                 y_pred, y_std = self.model.predict(X_test, return_std=True)
-                self._df(target=y_test.tolist(),
-                         predict=y_pred.tolist(),
-                         uncertainty=y_std.tolist()).\
+
+                self._output_df(df=pd.DataFrame({
+                    'target': y_test.tolist(),
+                    'predict': y_pred.tolist(),
+                    'uncertainty': y_std.tolist(),
+                    'repr': repr_test}), y_similar=y_similar).\
                     to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
-                    test_dict[metric].append(
+                    test_results[metric].append(
                         self._evaluate(y_test, y_pred, metric))
 
                 if self.args.evaluate_train:
                     y_pred, y_std = self.model.predict(X_train, return_std=True)
                     for metric in self.args.metrics:
-                        train_dict[metric].append(
+                        train_results[metric].append(
                             self._evaluate(y_train, y_pred, metric))
             else:
                 self.model.fit(X_train, y_train)
-                y_pred = self.model.predict(X_test)
-                self._df(target=y_test.tolist(), predict=y_pred.tolist()).\
+                y_pred = self.model.predict_proba(X_test)
+                # y_ = (y_pred + 0.5).astype(int)
+                # print(len(y_), sum(y_[:, 0]), sum(y_[:, 1]))
+                self._output_df(df=pd.DataFrame({
+                    'target': y_test.tolist(),
+                    'predict': y_pred.tolist(),
+                    'repr': repr_test}), y_similar=y_similar).\
                     to_csv('%s/test_%d.log' % (self.args.save_dir, i), sep='\t',
                     index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
-                    test_dict[metric].append(
+                    test_results[metric].append(
                         self._evaluate(y_test, y_pred, metric))
 
                 if self.args.evaluate_train:
                     y_pred = self.model.predict(X_train)
                     for metric in self.args.metrics:
-                        train_dict[metric].append(
+                        train_results[metric].append(
                             self._evaluate(y_train, y_pred, metric))
         if self.args.evaluate_train:
             print('\nTraining set:')
-            for metric, result in train_dict.items():
+            for metric, result in train_results.items():
                 print(metric,
-                      ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
+                      ': %.5f +/- %.5f' % (np.nanmean(result), np.nanstd(result)))
                 # print(np.asarray(result).ravel())
         print('\nTest set:')
-        for metric, result in test_dict.items():
-            print(metric, ': %.5f +/- %.5f' % (np.mean(result), np.std(result)))
-        return np.mean(test_dict[self.args.metric])
+        for metric, result in test_results.items():
+            print(metric, ': %.5f +/- %.5f' % (np.nanmean(result), np.nanstd(result)))
+        return np.nanmean(test_results[self.args.metric])
+
+    def _evaluate_loocv(self):
+        X, y, X_repr = self.dataset.X, self.dataset.y, self.dataset._repr()
+        y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
+        print('LOOCV:')
+        for metric in self.args.metrics:
+            print('%s: %.5f' % (metric, self._evaluate(y, y_pred, metric)))
+        if self.args.detail:
+            y_similar = self.get_similar_info(X, X, X_repr, 5)
+        else:
+            y_similar = None
+        self._output_df(df=pd.DataFrame({
+            'target': y.tolist(),
+            'predict': y_pred.tolist(),
+            'uncertainty': y_std.tolist()}), y_similar=y_similar).to_csv(
+            '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
+            float_format='%15.10f')
+        return self._evaluate(y, y_pred, self.args.metric)
+
+    def get_similar_info(self, X, X_train, X_repr, n_most_similar):
+        K = self.kernel(X, X_train)
+        assert (K.shape == (len(X), len(X_train)))
+        similar_info = []
+        kindex = self.get_most_similar_graphs(K, n=n_most_similar)
+        for i, index in enumerate(kindex):
+            def round5(x):
+                return ',%.5f' % x
+
+            k = list(map(round5, K[i][index]))
+            repr = np.asarray(X_repr)[index]
+            info = ';'.join(list(map(str.__add__, repr, k)))
+            similar_info.append(info)
+        return similar_info
+
+    @staticmethod
+    def get_most_similar_graphs(K, n=5):
+        return np.argsort(-K)[:, :min(n, K.shape[1])]
 
     def make_kernel_precalc(self):
         X = self.dataset.X_mol
@@ -129,7 +174,7 @@ class Evaluator:
                 sigma_RBF=self.kernel_config.sigma_RBF[-N_RBF:],
                 sigma_RBF_bounds=self.kernel_config.sigma_RBF_bounds[-N_RBF:]
             ).kernel
-        self.dataset.kernel_type = 'preCalc'
+        self.dataset.graph_kernel_type = 'preCalc'
         self.set_model(self.args)
 
     def set_model(self, args: TrainArgs):
@@ -164,24 +209,36 @@ class Evaluator:
         elif args.model_type == 'svc':
             self.model = SVC(
                 kernel=self.kernel,
-                C=args.C_
+                C=args.C_,
+                probability=True
             )
         else:
             raise RuntimeError(f'Unsupport model:{args.model_type}')
 
     @staticmethod
-    def _df(**kwargs):
-        return pd.DataFrame(kwargs)
+    def _output_df(df: pd.DataFrame, y_similar: List = None):
+        if y_similar is not None:
+            df['y_similar'] = y_similar
+        return df
 
-    @staticmethod
-    def _evaluate(y, y_pred, metrics):
+    def _evaluate(self, y, y_pred, metrics):
         if y.ndim == 2 and y_pred.ndim == 2:
-            y = y.ravel()
-            y_pred = y_pred.ravel()
-        assert y.size == y_pred.size
+            num_tasks = y.shape[1]
+            results = []
+            for i in range(num_tasks):
+                results.append(self._metric_func(y[:, i], y_pred[:, i],
+                                                      metrics))
+            return np.nanmean(results)
+        else:
+            return self._metric_func(y, y_pred, metrics)
+
+    def _metric_func(self, y, y_pred, metrics):
         idx = ~np.isnan(y)
         y = y[idx]
         y_pred = y_pred[idx]
+        if self.args.dataset_type == 'classification':
+            if 0 not in y or 1 not in y:
+                return np.nan
 
         if metrics == 'roc-auc':
             return roc_auc_score(y, y_pred)

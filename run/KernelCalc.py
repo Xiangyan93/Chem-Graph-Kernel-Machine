@@ -11,13 +11,13 @@ from chemml.kernels.utils import get_kernel_config
 
 
 def main(args: KernelArgs) -> None:
-    assert args.kernel_type == 'graph'
+    assert args.graph_kernel_type == 'graph'
     assert args.feature_columns is None
     assert args.n_jobs == 1
     dataset = Dataset.load(args.save_dir)
     dataset.update_args(args)
     dataset.normalize_features()
-    assert dataset.kernel_type == 'graph'
+    assert dataset.graph_kernel_type == 'graph'
     X = dataset.X_mol
     # set kernel_config
     kernel = get_kernel_config(args, dataset).kernel

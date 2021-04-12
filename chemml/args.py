@@ -68,7 +68,7 @@ class CommonArgs(Tap):
 
 
 class KernelArgs(CommonArgs):
-    kernel_type: Literal['graph', 'preCalc'] = 'graph'
+    graph_kernel_type: Literal['graph', 'preCalc'] = None
     """The type of kernel to use."""
     graph_hyperparameters: List[str] = None
     """hyperparameters file for graph kernel."""
@@ -126,6 +126,10 @@ class TrainArgs(KernelArgs):
     """Metrics"""
     evaluate_train: bool = False
     """"""
+    detail: bool = False
+    """"""
+
+
     def __init__(self, *args, **kwargs) -> None:
         super(TrainArgs, self).__init__(*args, **kwargs)
         self.check()
@@ -211,3 +215,4 @@ class HyperoptArgs(TrainArgs):
 
     def process_args(self) -> None:
         super().process_args()
+        assert self.graph_kernel_type != 'preCalc'

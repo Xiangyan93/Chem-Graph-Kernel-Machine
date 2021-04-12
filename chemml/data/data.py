@@ -49,6 +49,9 @@ class SingleMolDatapoint:
         self.set_mol()
         self.graph = HashGraph.from_rdkit(self.mol, self.input)
 
+    def __repr__(self):
+        return self.input
+
     def set_molfeatures(self, features_generator: List[str]):
         if features_generator is None:
             return
@@ -107,6 +110,9 @@ class SingleReactionDatapoint:
             self.graph_agent = HashGraph.agent_from_cr(
                 self.chemical_reaction, self.reaction_smarts)
 
+    def __repr__(self):
+        return self.reaction_smarts
+
     @property
     def X_single_graph(self) -> np.ndarray:
         if self.reaction_type == 'reaction':
@@ -150,6 +156,10 @@ class MultiMolDatapoint:
         else:
             self.graph = [
                 rv for r in zip(graphs, self.concentration) for rv in r]
+
+    def __repr__(self):
+        return ';'.join(list(map(lambda x, y: x.__repr__() + ',%.3f' % y,
+                                 self.data, self.concentration)))
 
     @property
     def mol(self) -> Chem.Mol:
@@ -214,6 +224,10 @@ class CompositeDatapoint:
         self.data_m = data_m
         self.data_cr = data_cr
 
+    def __repr__(self):
+        return ';'.join(list(map(
+            lambda x: x.__repr__(), self.data_p + self.data_m + self.data_cr)))
+
     def set_molfeatures(self, features_generator):
         for d in self.data_p:
             d.set_molfeatures(features_generator)
@@ -262,6 +276,13 @@ class SubDataset:
         self.addfeatures = addfeatures
         # set group id
         self.gid = gid
+
+    def _repr(self):
+        if self.addfeatures is None:
+            return [self.data.__repr__()]
+        else:
+            return list(map(lambda x: self.data.__repr__() + ';' + str(x),
+                            self.addfeatures.tolist()))
 
     def expand_addfeatures(self, X, concat=False):
         if X is None:
@@ -344,12 +365,12 @@ class Dataset:
     def __init__(self, data: List[SubDataset] = None,
                  molfeatures_scaler: StandardScaler = None,
                  addfeatures_scaler: StandardScaler = None,
-                 kernel_type: Literal['graph', 'preCalc'] = 'graph'):
+                 graph_kernel_type: Literal['graph', 'preCalc'] = None):
         self.data = data
         self.unify_datatype()
         self.molfeatures_scaler = molfeatures_scaler
         self.addfeatures_scaler = addfeatures_scaler
-        self.kernel_type = kernel_type
+        self.graph_kernel_type = graph_kernel_type
         self.ignore_addfeatures = False
 
     def __len__(self) -> int:
@@ -357,6 +378,12 @@ class Dataset:
 
     def __getitem__(self, item) -> Union[SubDataset, List[SubDataset]]:
         return self.data[item]
+
+    def _repr(self):
+        repr = []
+        for l in list(map(lambda x: x._repr(), self.data)):
+            repr += l
+        return repr
 
     def split(self, split_type: str = 'random',
               sizes: Tuple[float, float] = (0.8, 0.2),
@@ -374,14 +401,14 @@ class Dataset:
         else:
             raise RuntimeError(f'Unsupported split_type {split_type}')
         return Dataset(train, self.molfeatures_scaler,
-                       self.addfeatures_scaler, self.kernel_type), \
+                       self.addfeatures_scaler, self.graph_kernel_type), \
                Dataset(test, self.molfeatures_scaler,
-                       self.addfeatures_scaler, self.kernel_type)
+                       self.addfeatures_scaler, self.graph_kernel_type)
 
     def update_args(self, args: KernelArgs):
         if args.feature_columns is None:
             self.ignore_addfeatures = True
-        self.kernel_type = args.kernel_type
+        self.graph_kernel_type = args.graph_kernel_type
         self.molfeatures_normalize = args.molfeatures_normalize
         self.addfeatures_normalize = args.addfeatures_normalize
 
@@ -419,8 +446,22 @@ class Dataset:
         return [d.mol for d in self.data]
 
     @property
+    def N_molfeatures(self):
+        if self.data[0]._X_molfeatures is None:
+            return 0
+        else:
+            return self.data[0]._X_molfeatures.shape[1]
+
+    @property
+    def N_addfeatures(self):
+        if self.data[0].addfeatures is None:
+            return 0
+        else:
+            return self.data[0].addfeatures.shape[1]
+
+    @property
     def X_raw_molfeatures(self) -> Optional[np.ndarray]:
-        assert self.kernel_type == 'graph'
+        assert self.graph_kernel_type != 'preCalc'
         if self.ignore_addfeatures:
             return concatenate([d._X_molfeatures for d in self.data])
         else:
@@ -465,7 +506,9 @@ class Dataset:
     # This is used for graph kernel
     @property
     def X(self) -> np.ndarray:
-        if self.kernel_type == 'graph':
+        if self.graph_kernel_type is None:
+            return concatenate([self.X_features], axis=1)
+        elif self.graph_kernel_type == 'graph':
             return concatenate([self.X_graph, self.X_features], axis=1)
         else:
             return concatenate([self.X_gid, self.X_addfeatures], axis=1)

@@ -13,7 +13,8 @@ from chemml.evaluator import Evaluator
 
 def main(args: TrainArgs) -> None:
     dataset = Dataset.load(args.save_dir)
-    dataset.kernel_type = args.kernel_type
+    # print(dataset._repr())
+    dataset.graph_kernel_type = args.graph_kernel_type
     kernel_config = get_kernel_config(args, dataset)
     # print(kernel_config.graph_hyperparameters)
     Evaluator(args, dataset, kernel_config).evaluate()

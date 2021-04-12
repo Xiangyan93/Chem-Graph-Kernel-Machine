@@ -324,13 +324,7 @@ class GraphKernelConfig(BaseKernelConfig):
                         if hp_ is not None:
                             SPACE[hp_key] = hp_
 
-        if self.sigma_RBF is not None:
-            for i in range(len(self.sigma_RBF)):
-                hp_key = 'RBF:%d:' % i
-                hp_ = self._get_hp(hp_key, [self.sigma_RBF[i],
-                                           self.sigma_RBF_bounds[i]])
-                if hp_ is not None:
-                    SPACE[hp_key] = hp_
+        SPACE.update(super().get_space())
         return SPACE
 
     def update_space(self, hyperdict: Dict[str, Union[int, float]]):
@@ -352,13 +346,7 @@ class GraphKernelConfig(BaseKernelConfig):
         for i, hyperdict in enumerate(self.graph_hyperparameters):
             open(os.path.join(path, 'hyperparameters_%d.json' % i), 'w').write(
                 json.dumps(hyperdict, indent=1, sort_keys=False))
-        if self.sigma_RBF is not None:
-            rbf = {
-                'sigma_RBF': self.sigma_RBF,
-                'sigma_RBF_bounds': self.sigma_RBF_bounds
-            }
-            open(os.path.join(path, 'sigma_RBF.json'), 'w').write(
-                json.dumps(rbf, indent=1, sort_keys=False))
+        super().save(path)
 
     def _update_kernel(self):
         N_MGK = self.N_MGK
@@ -387,21 +375,6 @@ class GraphKernelConfig(BaseKernelConfig):
                 composition=composition,
                 combined_rule='product',
             )
-
-    @staticmethod
-    def _get_hp(key, value):
-        if value[1] == 'fixed':
-            return None
-        elif value[0] in ['Additive', 'Tensorproduct']:
-            return hp.choice(key, value[1])
-        elif len(value) == 2:
-            return hp.uniform(key, low=value[1][0], high=value[1][1])
-        elif len(value) == 3:
-            return hp.quniform(key, low=value[1][0], high=value[1][1],
-                               q=value[2])
-        else:
-            raise RuntimeError('.')
-
 
     def _get_single_graph_kernel(self, hyperdict: Dict):
         knode, kedge, p = self._get_knode_kedge_p(hyperdict)

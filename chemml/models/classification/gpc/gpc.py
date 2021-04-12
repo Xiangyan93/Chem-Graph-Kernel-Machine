@@ -1,31 +1,53 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from sklearn.gaussian_process._gpc import GaussianProcessClassifier as GPC
-import os
-import pickle
+import numpy as np
+import copy
 
-'''
-class GPC(GaussianProcessClassifier):
-    def save(self, dir):
-        f_model = os.path.join(dir, 'model.pkl')
-        store_dict = self.__dict__.copy()
-        store_dict['theta'] = self.kernel.theta
-        store_dict.pop('kernel', None)
-        store_dict['theta_'] = self.kernel_.theta
-        store_dict.pop('kernel_', None)
-        pickle.dump(store_dict, open(f_model, 'wb'), protocol=4)
 
-    def load(self, dir):
-        f_model = os.path.join(dir, 'model.pkl')
-        return self.load_cls(f_model, self.kernel)
+class GaussianProcessClassifier(GPC):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._GPC = GPC(*args, **kwargs)
 
-    @classmethod
-    def load_cls(cls, f_model, kernel):
-        store_dict = pickle.load(open(f_model, 'rb'))
-        kernel = kernel.clone_with_theta(store_dict.pop('theta'))
-        kernel_ = kernel.clone_with_theta(store_dict.pop('theta_'))
-        model = cls(kernel=kernel)
-        model.kernel_ = kernel_
-        model.__dict__.update(**store_dict)
-        return model
-'''
+    @property
+    def kernel_(self):
+        return self._GPC.kernel
+
+    @staticmethod
+    def _remove_nan_X_y(X, y):
+        if None in y:
+            idx = np.where(y!=None)[0]
+        else:
+            idx = ~np.isnan(y)
+        return np.asarray(X)[idx], y[idx].astype(int)
+
+    def fit(self, X, y):
+        self.GPCs = []
+        if y.ndim == 1:
+            X_, y_ = self._remove_nan_X_y(X, y)
+            super().fit(X_, y_)
+        else:
+            for i in range(y.shape[1]):
+                GPC = copy.deepcopy(self._GPC)
+                X_, y_ = self._remove_nan_X_y(X, y[:, i])
+                GPC.fit(X_, y_)
+                self.GPCs.append(GPC)
+
+    def predict(self, X):
+        if self.GPCs:
+            y_mean = []
+            for GPC in self.GPCs:
+                y_mean.append(GPC.predict(X))
+            return np.concatenate(y_mean).reshape(len(y_mean), len(X)).T
+        else:
+            return super().predict(X)
+
+    def predict_proba(self, X):
+        if self.GPCs:
+            y_mean = []
+            for GPC in self.GPCs:
+                y_mean.append(GPC.predict_proba(X)[:, 1])
+            return np.concatenate(y_mean).reshape(len(y_mean), len(X)).T
+        else:
+            return super().predict_proba(X)[:, 1]

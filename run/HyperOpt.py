@@ -33,7 +33,7 @@ def save_best_params(results: List[float],
 def main(args: HyperoptArgs) -> None:
     # read data
     dataset = Dataset.load(args.save_dir)
-    dataset.kernel_type = args.kernel_type
+    dataset.graph_kernel_type = args.graph_kernel_type
     # get kernel config
     kernel_config = get_kernel_config(args, dataset)
 
@@ -51,7 +51,7 @@ def main(args: HyperoptArgs) -> None:
         if not args.minimize_score:
             result = - result
         results.append(result)
-        dataset.kernel_type = 'graph'
+        dataset.graph_kernel_type = args.graph_kernel_type
         save_best_params(results, hyperdicts, kernel_config, args)
         return result
 
