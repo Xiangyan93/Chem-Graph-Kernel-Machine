@@ -31,7 +31,7 @@ class BaseKernelConfig:
         # ConstantKernel(1.0, (1e-3, 1e3)) * \
             return [add_kernel]
         else:
-            return []
+            return [None]
     @staticmethod
     def _get_hp(key, value):
         if value[1] == 'fixed':
