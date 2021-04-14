@@ -37,7 +37,7 @@ class Evaluator:
     def evaluate(self):
         # Leave-One-Out cross validation
         if self.args.split_type == 'loocv':
-            self._evaluate_loocv()
+            return self._evaluate_loocv()
 
         # Transform graph kernel to preCalc kernel.
         if self.args.num_folds != 1 and self.kernel.__class__ != PreCalcKernel \
