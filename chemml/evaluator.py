@@ -259,6 +259,6 @@ class Evaluator:
         elif metrics == 'mse':
             return mean_squared_error(y, y_pred)
         elif metrics == 'rmse':
-            return np.sqrt(Evaluator._evaluate(y, y_pred, 'mse'))
+            return np.sqrt(self._metric_func(y, y_pred, 'mse'))
         else:
             raise RuntimeError(f'Unsupported metrics {metrics}')
