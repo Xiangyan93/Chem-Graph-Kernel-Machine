@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Adaptor for RDKit's Molecule objects"""
 import os
 CWD = os.path.dirname(os.path.abspath(__file__))
 from typing import Dict, List, Tuple, Optional
-import re
 import networkx as nx
 import pandas as pd
 import numpy as np
-from rdkit.Chem import AllChem as Chem
 from rdkit.Chem import rdMolDescriptors
 from graphdot.graph._from_networkx import _from_networkx
 from rxntools.smiles import *

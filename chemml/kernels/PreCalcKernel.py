@@ -3,8 +3,8 @@
 import os
 import pickle
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
-from chemml.kernels.BaseKernelConfig import BaseKernelConfig
-from chemml.kernels.MultipleKernel import *
+from .BaseKernelConfig import BaseKernelConfig
+from .MultipleKernel import *
 
 
 class PreCalcKernel:

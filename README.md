@@ -11,13 +11,7 @@ temperature, pressure, etc.
 ## Installation
 GCC (7.*), NVIDIA Driver and CUDA toolkit(>=10.1).  
 ```
-conda create -n graphdot_dev python=3.8 -y
-conda install -c conda-forge rdkit=2020.09.5
-pip install -r requirements.txt
-```
-Some revisions haven't been merged into GraphDot yet, please use the graphdot:
-```
-git clone -b feature/start_probability https://gitlab.com/XiangyanSJTU/graphdot.git
+conda env create -f environment.yml
 ```
 ## Usages
 1. The executable files are in directory [run](https://github.com/Xiangyan93/ChemML/tree/main/run).

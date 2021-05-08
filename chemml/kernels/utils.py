@@ -1,10 +1,11 @@
+# !/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import json
 import pickle
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
-import numpy as np
-from chemml.args import KernelArgs
-from chemml.data import Dataset
+from ..args import KernelArgs
+from ..data import Dataset
 
 
 def get_kernel_info(args: KernelArgs) -> Tuple[int, int]:
@@ -91,3 +92,14 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset):
         }
         from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
         return PreCalcKernelConfig(**params)
+
+
+def graph2preCalc(dataset: Dataset, kernel_config):
+    X = dataset.X_mol
+    kernel = kernel_config.kernel
+    K = kernel(X)
+    kernel_dict = {
+        'group_id': dataset.X_gid.ravel(),
+        'K': K,
+        'theta': kernel.theta
+    }

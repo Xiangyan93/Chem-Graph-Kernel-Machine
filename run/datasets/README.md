@@ -4,5 +4,7 @@ Two example data sets are given here. Critical temperature (critical-sim.txt)
 and VLE density and surface tension (slab-sim.txt). These data are obtained
 from high-throughput molecular dynamics simulation.
 
-2. RxnClassification: [Development of a Novel Fingerprint for Chemical Reactions and Its Application to Large-Scale Reaction Classification and Similarity](https://doi.org/10.1021/ci5006614)
+2. Public: Public data sets, as well as optimized hyperparameters.
+
+3. RxnClassification: [Development of a Novel Fingerprint for Chemical Reactions and Its Application to Large-Scale Reaction Classification and Similarity](https://doi.org/10.1021/ci5006614)
 Chemical reaction classification.

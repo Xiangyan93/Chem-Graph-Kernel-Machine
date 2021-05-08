@@ -3,7 +3,6 @@
 import os
 from tap import Tap
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
-import numpy as np
 
 
 Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
@@ -84,7 +83,7 @@ class KernelArgs(CommonArgs):
     molfeatures_normalize: bool = False
     """Nomralize the molecular molfeatures."""
     addfeatures_normalize: bool = False
-    """omral the additonal molfeatures."""
+    """Nomralize the additonal molfeatures."""
 
 
 class TrainArgs(KernelArgs):
@@ -216,3 +215,41 @@ class HyperoptArgs(TrainArgs):
     def process_args(self) -> None:
         super().process_args()
         assert self.graph_kernel_type != 'preCalc'
+
+
+class ActiveLearningArgs(TrainArgs):
+    learning_algorithm: Literal['unsupervised', 'supervised', 'random'] = \
+        'unsupervised'
+    """Active learning algorithm."""
+    sample_add_algorithm: Literal['nlargest', 'cluster', 'random'] = 'nlargest'
+    """Sample adding algorithm."""
+    initial_size: int = 5
+    """Initial sample size of active learning."""
+    add_size: int = 1
+    """Number of samples added per active learning step."""
+    pool_size: int = None
+    """
+    A subset of the sample pool is randomly selected for active learning. 
+    None means all samples are selected.
+    """
+    cluster_size: int = None
+    """If sample_add_algorithm='cluster', N worst samples are selected for 
+    clustering."""
+    stop_uncertainty: float = None
+    """If learning_algorithm='unsupervised', stop active learning if the 
+    uncertainty is smaller than stop_uncertainty."""
+    stop_size: int = None
+    """Stop active learning when N samples are selected."""
+    evaluate_stride: int = 100
+    """Evaluate the model performance every N samples."""
+    def process_args(self) -> None:
+        # active learning is only valid for GPR
+        assert self.dataset_type == 'regression'
+        assert self.model_type == 'gpr'
+        assert self.split_type == 'random'
+        if self.stop_uncertainty is not None:
+            assert self.learning_algorithm == 'unsupervised'
+        if self.cluster_size is not None:
+            assert self.sample_add_algorithm == 'cluster'
+        if self.sample_add_algorithm == 'nlargest':
+            self.cluster_size = self.add_size

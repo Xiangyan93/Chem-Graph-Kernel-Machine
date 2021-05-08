@@ -5,8 +5,8 @@ import copy
 import threading
 from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
-from chemml.models.regression.GPRgraphdot import GPR as GPRgraphdot
-from chemml.models.regression.GPRsklearn.gpr import GPR as GPRsklearn
+from ...models.regression.GPRgraphdot import GPR as GPRgraphdot
+from ...models.regression.GPRsklearn.gpr import GPR as GPRsklearn
 from .GPRgraphdot.gpr import _predict
 
 

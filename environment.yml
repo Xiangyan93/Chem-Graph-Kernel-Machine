@@ -1,0 +1,20 @@
+name: graphdot
+
+channels:
+  - conda-forge
+  - pytorch
+  - rdkit
+
+dependencies:
+  - python>=3.8
+  - pip>=20.0.2
+  - hyperopt>=0.2.5
+  - rdkit>=2020.03.1.0
+  - scikit-learn>=0.24.1
+  - tqdm>=4.59.0
+  - pip:
+    - typed-argument-parser>=1.6.1
+    - git+https://github.com/bp-kelley/descriptastorus
+    - git+https://gitlab.com/XiangyanSJTU/graphdot@feature/start_probability
+    - rxntools==0.0.2
+    - mendeleev==0.6.1

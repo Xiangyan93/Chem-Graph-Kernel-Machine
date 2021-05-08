@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from typing import Callable, List, Union
 
 import numpy as np

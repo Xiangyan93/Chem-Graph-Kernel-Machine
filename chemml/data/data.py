@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import os
 import pickle
 import threading
@@ -16,9 +18,9 @@ import networkx as nx
 from graphdot.graph._from_networkx import _from_networkx
 
 # from .scaler import StandardScaler
-from chemml.molfeatures import get_features_generator, FeaturesGenerator
-from chemml.graph.hashgraph import HashGraph
-from chemml.args import CommonArgs, KernelArgs, TrainArgs
+from ..molfeatures import get_features_generator, FeaturesGenerator
+from ..graph.hashgraph import HashGraph
+from ..args import CommonArgs, KernelArgs, TrainArgs
 from .scaffold import scaffold_split
 
 
@@ -387,23 +389,29 @@ class Dataset:
 
     def split(self, split_type: str = 'random',
               sizes: Tuple[float, float] = (0.8, 0.2),
-              seed: int = 0):
+              seed: int = 0) -> List:
         random = Random(seed)
+        data = []
         if split_type == 'random':
             indices = list(range(len(self.data)))
             random.shuffle(indices)
-            train_size = int(sizes[0] * len(self.data))
-            train = [self.data[i] for i in indices[:train_size]]
-            test = [self.data[i] for i in indices[train_size:]]
+            end = 0
+            for size in sizes:
+                start = end
+                end = int(size * len(self.data))
+                data_ = [self.data[i] for i in indices[start:end]]
+                data.append(Dataset(data_, self.molfeatures_scaler,
+                    self.addfeatures_scaler, self.graph_kernel_type))
+            return data
         elif split_type == 'scaffold_balanced':
             train, test = scaffold_split(
                 self, sizes=sizes, balanced=True, seed=seed)
+            return [Dataset(train, self.molfeatures_scaler,
+                           self.addfeatures_scaler, self.graph_kernel_type),
+                   Dataset(test, self.molfeatures_scaler,
+                           self.addfeatures_scaler, self.graph_kernel_type)]
         else:
             raise RuntimeError(f'Unsupported split_type {split_type}')
-        return Dataset(train, self.molfeatures_scaler,
-                       self.addfeatures_scaler, self.graph_kernel_type), \
-               Dataset(test, self.molfeatures_scaler,
-                       self.addfeatures_scaler, self.graph_kernel_type)
 
     def update_args(self, args: KernelArgs):
         if args.feature_columns is None:
@@ -584,6 +592,10 @@ class Dataset:
     @classmethod
     def from_csv(cls, args: CommonArgs):
         df = pd.read_csv(args.data_path)
+        return cls.from_df(args, df)
+
+    @classmethod
+    def from_df(cls, args: CommonArgs, df: pd.DataFrame):
         if args.target_columns is None:
             target_columns = [column for column in df
                               if column not in args.graph_columns]

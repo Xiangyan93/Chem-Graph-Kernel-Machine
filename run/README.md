@@ -9,7 +9,7 @@ Labeled reaction smarts string are valid input of chemical reactions.
 Note that the posterior uncertainty scale from 0 to 1 when using normalized 
 kernel.
 
-## Single-Valued Property
+## GPR for Single-Valued Property
 1. The file datasets/ThermoSIM/critical-sim.txt contains the critical temperature and
 critical density of molecules obtained from molecular dynamics (MD) simulation.
 
@@ -21,41 +21,30 @@ critical density of molecules obtained from molecular dynamics (MD) simulation.
 3. Kernel Calculation
     - Calculate the entire kernel matrix, and saved.
         ```
-        python3 KernelCalc.py --kernel graph --graph_hyperparameters ../hyperparameters/tMGR.json --save_dir tc --pure_columns smiles
+        python3 KernelCalc.py --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json --save_dir tc --pure_columns smiles
         ```
 4. Performance evaluation
     - The training set ratio is 0.8. test-0.log are output. And
         You can set 1.0 to build a model using all data.
         ```
-        python3 ModelEvaluate.py --kernel_type preCalc --save_dir tc --pure_columns smiles --dataset_type regression --model_type gpr --split_type scaffold_balanced --split_sizes 0.8 0.2 --alpha 0.01 --metric mae rmse --num_folds 100 --evaluate_train
+        python3 ModelEvaluate.py --graph_kernel_type preCalc --save_dir tc --pure_columns smiles --dataset_type regression --model_type gpr --split_type scaffold_balanced --split_sizes 0.8 0.2 --alpha 0.01 --metric mae --num_folds 10
         ```
 5. Hyperparameters optimization
-    - Step 2-4 can be done by 1 command, but it is 2-3 times slower since the 
-        graph kernel are not saved and repeatly computed.
+    - Bayesian Optimization. The optimal hyperparameters and alpha will be saved
+    in tc/hyperparameters_0.json, tc/alpha.
         ```
-        python3 GPR.py --result_dir tc_direct --gpr graphdot:none --kernel graph:0.01 --input_config SMILES:::tc --train_test_config train_test::0.8:0 -i datasets/ThermoSIM/critical-sim.txt --json_hyper ../hyperparameters/tMGR.json
+        python3 HyperOpt.py --graph_kernel_type graph --save_dir tc --pure_columns smiles --dataset_type regression --model_type gpr --split_type loocv --metric mae --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02
         ```
-    - Hyperparameters optimization is not suggested since it is frequently to 
-        get weired hyperparameters. Two types of optimization are available:
-        1. sklearn, maximize the log marginal likelihood
-            ```
-            python3 GPR.py --result_dir tc --gpr sklearn:fmin_l_bfgs_b --kernel graph:0.01 --input_config SMILES:::tc --train_test_config train_test::0.1:0 -i datasets/ThermoSIM/critical-sim.txt --json_hyper ../hyperparameters/tMGR.json
-            ```
-        2. graphdot, minimize the Leave-One-Out loss
-            ```
-            python3 GPR.py --result_dir tc --gpr graphdot:L-BFGS-B --kernel graph:0.01 --input_config SMILES:::tc --train_test_config train_test::0.1:0 -i datasets/ThermoSIM/critical-sim.txt --json_hyper ../hyperparameters/tMGR.json
-            ```
-6. Prediction
-    - Convert the model.pkl from preCalc kernel to graph kernel. This step is 
-        only needed when you prepare the model through step 2-4.
-        ```
-        python3 preCalc2graph.py --result_dir tc --gpr graphdot:none --input_config SMILES:::tc --json_hyper ../hyperparameters/tMGR.json
-        ```
-    - Prepare a file of molecules to be predicted formatted as datasets/ThermoSIM/predict.txt.
-        the results are save in predict.log.
-        ```
-        python3 predict.py --result_dir tc --gpr graphdot:none -i datasets/ThermoSIM/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/tMGR.json --f_model tc/model.pkl
-        ```
+
+## Use RDKit features
+Use RBF kernels for 200 global molecular features calculated by RDKit. A Hybrid
+kernel is used.
+```
+python3 ReadData.py --save_dir tc --data_path datasets/ThermoSIM/critical-sim.txt --pure_columns smiles --target_columns tc --n_jobs 6 --features_generator rdkit_2d_normalized
+python3 HyperOpt.py --graph_kernel_type graph --save_dir tc --pure_columns smiles --dataset_type regression --model_type gpr --split_type loocv --metric mae --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02 --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 10.0
+python3 KernelCalc.py --graph_kernel_type graph --graph_hyperparameters tc/hyperparameters_0.json --features_hyperparameters_file tc/sigma_RBF.json --save_dir tc --pure_columns smiles
+python3 ModelEvaluate.py --graph_kernel_type preCalc --save_dir tc --pure_columns smiles --dataset_type regression --model_type gpr --split_type scaffold_balanced --split_sizes 0.8 0.2 --alpha 0.01 --metric mae --num_folds 10
+```
 
 ## Temperature-Dependent Property
 1. The file datasets/ThermoSIM/slab-sim.txt contains the VLE density and surface tension of 

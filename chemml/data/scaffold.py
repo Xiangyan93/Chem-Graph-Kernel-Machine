@@ -1,15 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from collections import defaultdict
-import logging
 from random import Random
 from typing import Dict, List, Set, Tuple, Union
-import warnings
 
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from tqdm import tqdm
-import numpy as np
-import pandas as pd
-# from .data import Dataset, SubDataset
 
 
 def generate_scaffold(mol: Union[str, Chem.Mol],

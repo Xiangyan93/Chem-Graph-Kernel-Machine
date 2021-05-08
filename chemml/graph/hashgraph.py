@@ -7,7 +7,7 @@ from graphdot import Graph
 from graphdot.graph._from_networkx import _from_networkx
 import networkx as nx
 from rxntools.reaction import *
-from chemml.graph.from_rdkit import _from_rdkit, rdkit_config
+from .from_rdkit import _from_rdkit, rdkit_config
 
 
 class HashGraph(Graph):

@@ -8,8 +8,6 @@ from sklearn.gaussian_process.kernels import (
     ConstantKernel,
     RBF
 )
-import numpy as np
-import pandas as pd
 
 
 class BaseKernelConfig:

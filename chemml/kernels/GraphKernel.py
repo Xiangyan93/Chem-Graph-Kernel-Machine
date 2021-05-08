@@ -23,9 +23,9 @@ from graphdot.microprobability import (
     UniformProbability,
     AssignProbability
 )
-from chemml.kernels.BaseKernelConfig import BaseKernelConfig
-from chemml.kernels.MultipleKernel import *
-from chemml.kernels.ConvKernel import *
+from .BaseKernelConfig import BaseKernelConfig
+from .MultipleKernel import *
+from .ConvKernel import *
 
 
 class Norm(Normalization):
