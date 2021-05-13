@@ -1,0 +1,430 @@
+{
+ "Normalization": [
+  true,
+  "fixed"
+ ],
+ "a_type": [
+  "Additive",
+  "fixed"
+ ],
+ "atom_AtomicNumber": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_AtomicNumber_list_1": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kConv": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_AtomicNumber_list_2": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kConv": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_AtomicNumber_list_3": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kConv": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_AtomicNumber_list_4": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kConv": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_MorganHash": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_Ring_count": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_RingSize_list": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kConv": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_Hcount": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_AtomicNumber_count_1": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_AtomicNumber_count_2": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "atom_Chiral": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "b_type": [
+  "Additive",
+  "fixed"
+ ],
+ "bond_Order": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "bond_Stereo": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "bond_RingStereo": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "bond_Conjugated": {
+  "Const": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ],
+  "kDelta": [
+   0.9,
+   [
+    0.75,
+    1.0
+   ],
+   0.05
+  ]
+ },
+ "p_type": [
+  "Additive_p",
+  "fixed"
+ ],
+ "probability_AtomicNumber": {
+  "Const_p": [
+   1.0,
+   "fixed"
+  ]
+ },
+ "probability_group_an5": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an6": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an7": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an8": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an9": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an14": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an15": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an16": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an17": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an35": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "probability_group_an53": {
+  "Assign_p": [
+   1.0,
+   [
+    1.0,
+    10.0
+   ],
+   1.0
+  ]
+ },
+ "q": [
+  0.01,
+  [
+   0.01,
+   0.5
+  ],
+  0.01
+ ]
+}
