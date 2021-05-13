@@ -124,18 +124,18 @@ class KernelArgs(CommonArgs):
 
 
 class KernelBlockArgs(KernelArgs):
-    block_size: int
+    block_size: int = 5000
     """"""
     block_id: Tuple[int, int]
     """"""
 
     @property
     def X_idx(self):
-        return np.arange(self.block_id[0] * self.block_size, (self.block_id[0] + 1) * self.block_size)
+        return self.block_id[0] * self.block_size, (self.block_id[0] + 1) * self.block_size
 
     @property
     def Y_idx(self):
-        return np.arange(self.block_id[1] * self.block_size, (self.block_id[1] + 1) * self.block_size)
+        return self.block_id[1] * self.block_size, (self.block_id[1] + 1) * self.block_size
 
     def process_args(self) -> None:
         super().process_args()

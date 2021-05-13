@@ -20,10 +20,17 @@ def main(args: KernelBlockArgs) -> None:
     # set kernel_config
     kernel = get_kernel_config(args, dataset).kernel
     print('**\tCalculating kernel matrix\t**')
+    X = dataset.X_repr[args.X_idx[0]:args.X_idx[1]]
+    if args.block_id[0] == args.block_id[1]:
+        Y = X
+        K = kernel(dataset.X[args.X_idx[0]:args.X_idx[1]])
+    else:
+        Y = dataset.X_repr[args.Y_idx[0]:args.Y_idx[1]]
+        K = kernel(dataset.X[args.X_idx[0]:args.X_idx[1]], dataset.X[args.Y_idx[0]:args.Y_idx[1]])
     kernel_dict = {
-        'X': dataset.X_repr[args.X_idx],
-        'Y': dataset.X_repr[args.Y_idx],
-        'K': kernel(dataset.X[args.X_idx], dataset.X[args.Y_idx]),
+        'X': X,
+        'Y': Y,
+        'K': K,
         'theta': kernel.theta
     }
     print('**\tEnd Calculating kernel matrix\t**')

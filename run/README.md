@@ -144,35 +144,16 @@ from different random seed, and then (2) Scipy optimization (local optimization)
 </div>
 
 ## Kernel Computation in Blocks
-1. For large data sets, it is convenient to calculate the kernel matrix in blocks 
-and then concatenate them. A example is given for chemical reaction kernel.
-The following commands are equivalent to the Step 3 in Chemical Reaction Classification.
+For large data sets, it is convenient to calculate the kernel matrix in blocks 
+and then concatenate them. A example is given for fresolv data sets.
 
-2. Compute a sub-block of graph kernel matrix
-    - Kernel matrix of reaction
-        ```
-        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_sg:::reaction_type --block_config 1500:0,0 --json_hyper ../hyperparameters/reaction.json
-        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_sg:::reaction_type --block_config 1500:0,1 --json_hyper ../hyperparameters/reaction.json
-        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_sg:::reaction_type --block_config 1500:1,1 --json_hyper ../hyperparameters/reaction.json
-        ```
-      
-    - Kernel matrix of reagents
-        ```
-        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,0 --json_hyper ../hyperparameters/tMGR.json
-        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,1 --json_hyper ../hyperparameters/tMGR.json
-        python3 ComputeGraphKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_agents_sg:::reaction_type --block_config 1500:1,1 --json_hyper ../hyperparameters/tMGR.json
-        ```
-      
-3. Compute a sub-block of hybrid kernel matrix
-    - Hybrid kernel matrix of reaction and reagents
-        ```
-        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_sg,reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,0
-        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_sg,reaction_smarts_agents_sg:::reaction_type --block_config 1500:0,1
-        python3 ComputeKernelBlock.py --result_dir rxn -i datasets/RxnClassification/test_3000.csv --input_config reaction_smarts_sg,reaction_smarts_agents_sg:::reaction_type --block_config 1500:1,1
-        ```
-
-4. Compute the final kernel matrix
-    - Concatenate all the blocks of kernel matrix
-        ```
-        python3 ConcatBlockKernels.py --result_dir rxn --block_config 1500:2,2
-        ```
+1. Compute a sub-block of kernel matrix.
+    ```
+    python3 KernelBlockCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --block_id 0 0 --block_size 400
+    python3 KernelBlockCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --block_id 0 1 --block_size 400
+    python3 KernelBlockCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --block_id 1 1 --block_size 400
+    ```
+2. Concatenate the block kernel matrices.
+    ```
+    python3 ConcatBlockKernels.py --block_id 2 2
+    ```

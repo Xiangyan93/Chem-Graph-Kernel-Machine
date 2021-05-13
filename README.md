@@ -16,6 +16,4 @@ conda activate graphdot
 ```
 ## Usages
 1. The executable files are in directory [run](https://github.com/Xiangyan93/ChemML/tree/main/run).
-2. Notebook examples are in directory [notebook](https://github.com/Xiangyan93/ChemML/tree/main/notebook).
-3. The directory [analysis](https://github.com/Xiangyan93/ChemML/tree/main/analysis) provide t-SNE and kPCA analysis using the nMGK.
-4. The hyperparameter files in json format are placed in directory [hyperparameters](https://github.com/Xiangyan93/ChemML/tree/main/hyperparameters)
+2. The hyperparameter files in json format are placed in directory [hyperparameters](https://github.com/Xiangyan93/ChemML/tree/main/hyperparameters).
