@@ -1,108 +1,159 @@
-# ChemML Executable Files
-This directory contains the executable files for GPR-nMGK.
+# Chem-Graph-Kernel-Machine Executable Files
+This directory contains the all executable files. 
 
-## Single-Valued Property
-1. The datasets/critical-sim.txt contains the critical temperature and
-critical density of molecules obtained from molecular dynamics (MD) simulation.
-It is suggested to use a preCalc kernel as show in step 2-4. Use graph kernel
-directly will be 2-3 times slower due to repeated calculations, as shown in 
-step 5.
 
-2. Preparation
-    - Transfer the SMILES or inchi into graph object.
-        ```
-        python3 txt2pkl.py --result_dir tc -i datasets/critical-sim.txt --input_config SMILES:::tc --ntasks 6
-        ```
-3. Kernel Calculation
-    - For fixed hyperparameters, it is fast to calculate the kernel matrix first.
-        ```
-        python3 KernelCalc.py --result_dir tc --input_config SMILES:::tc --json_hyper ../hyperparameters/hyper1.json
-        ```
-4. Performance evaluation
-    - The training set ratio is 0.8. train-0.log and test-0.log are output. Set
-        You can set 1.0 to build a model using all data.
-        ```
-        python3 GPR.py --result_dir tc --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::tc --train_test_config train_test::0.8:0
-        ```
-5. Hyperparameters optimization
-    - Step 2-4 can be done by 1 command, but it is 2-3 times slower since the 
-        graph kernel are repeatly calculated.
-        ```
-        python3 GPR.py --result_dir tc --gpr graphdot:none --kernel graph:0.01 --input_config SMILES:::tc --train_test_config train_test::0.8:0 -i datasets/critical-sim.txt --json_hyper ../hyperparameters/hyper1.json
-        ```
-    - Hyperparameters optimization is not suggested since it is frequently to 
-        get weired hyperparameters. Two types of optimization are available:
-        1. sklearn, maximize the log marginal likelihood
-            ```
-            python3 GPR.py --result_dir tc --gpr sklearn:fmin_l_bfgs_b --kernel graph:0.01 --input_config SMILES:::tc --train_test_config train_test::0.8:0 -i datasets/critical-sim.txt --json_hyper ../hyperparameters/hyper1.json
-            ```
-        2. graphdot, minimize the Leave-One-Out loss
-            ```
-            python3 GPR.py --result_dir tc --gpr graphdot:L-BFGS-B --kernel graph:0.01 --input_config SMILES:::tc --train_test_config train_test::0.8:0 -i datasets/critical-sim.txt --json_hyper ../hyperparameters/hyper1.json
-            ```
-6. Prediction
-    - Convert the model from preCalc kernel to graph kernel.
-        ```
-        python3 preCalc2graph.py --result_dir tc --gpr graphdot:none --input_config SMILES:::tc --json_hyper ../hyperparameters/hyper1.json
-        ```
-    - Prepare a file of molecules to be predicted formatted as datasets/predict.txt.
-        the results are save in predict.csv.
-        ```
-        python3 predict.py --result_dir tc --gpr graphdot:none -i datasets/predict.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model tc/model.pkl
-        ```
+## Data sets.
+The input file should be formatted as [datasets](https://github.com/Xiangyan93/ChemML/tree/main/run/datasets). 
 
-## Temperature-Dependent Property
-1. The datasets/slab-sim.txt contains the VLE density and surface tension of 
-molecular liquids obtained from molecular dynamics (MD) simulation. It is 
-dependent on temperature.
+Both SMILES or InChI string are valid input of molecules.
+Labeled reaction smarts string are valid input of chemical reactions.
 
-2. Preparation
-    - Transfer the SMILES or inchi into graph object.
-        ```
-        python3 txt2pkl.py --result_dir st -i datasets/slab-sim.txt --input_config SMILES:::st --ntasks 6
-        ```
-3. Kernel Calculation
-    - For fixed hyperparameters, it is fast to calculate the kernel matrix first.
-        ```
-        python3 KernelCalc.py --result_dir st --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json
-        ```
-4. Performance evaluation
-    - The training set ratio is 0.8. train-0.log and test-0.log are output. Set
-        You can set 1.0 to build a model using all data.
-        ```
-        python3 GPR.py --result_dir st --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100
-        ```
-5. Hyperparameters optimization
-    - The correctness of hyperparameters optimization in this case is not verified.
-6. Prediction
-    - Convert the model from preCalc kernel to graph kernel.
-        ```
-        python3 preCalc2graph.py --result_dir st --gpr graphdot:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
-        ```
-    - Prepare a file of molecules to be predicted formatted as datasets/predict_T.txt.
-        the results are save in predict.csv.
-        ```
-        python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
-        ```
+## Marginalized Graph Kernel (MGK) Architecture.
+The architecture of MGK and associated hyperparameters are defined in a file in 
+JSON format. Several choices are provided in ../hyperparameters. "tMGR" use a
+tensor-product architecture. "additive" use an additive architecture.
+- "tMGR.json" is MGK with molecular-size-dependent normalization.
+- "tMGR-Norm.json" is MGK with simple normalization.
+- "tMGR-non-Norm.json" is MGK without normalization.
 
-7. Low Rank approximation
-    - Use Nystrom low rank approximation
+## Gaussian Process Regression (GPR) for Single-Valued Property
+The file datasets/Public/freesolv.csv is the hydration free energy in water. We use
+this data set as example.
+
+1. Read Dataset.
+    - Read the dataset and preprocess. Save result in freesolv/dataset.pkl.
         ```
-        python3 GPR.py --result_dir st --gpr graphdot_nystrom:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100 --nystrom_config 1000
-        python3 preCalc2graph.py --result_dir st --gpr graphdot_nystrom:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
-        python3 predict.py --result_dir st --gpr graphdot_nystrom:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
+        python3 ReadData.py --save_dir freesolv --data_path datasets/Public/freesolv.csv --pure_columns smiles --target_columns freesolv --n_jobs 6
         ```
-8. Consensus model
-    - Use consensus model
+2. Kernel Calculation
+    - Calculate the entire kernel matrix, and saved. Use the non-optimized hyperparameters.
         ```
-        python3 GPR.py --result_dir st --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100 --consensus_config 10:1000:10:weight_uncertainty
-        python3 preCalc2graph.py --result_dir st --gpr graphdot:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100 --consensus_config 10:1000:10:weight_uncertainty
-        python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100 --consensus_config 10:1000:1:weight_uncertainty
+        python3 KernelCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json
         ```
-9. Active Learning
-    - Use supervised active learning
+3. Performance evaluation
+    - The training set ratio is 0.8. test-*.log are output. 
         ```
-        python3 GPR_active.py --result_dir st --gpr graphdot:none --kernel preCalc:0.01 --input_config SMILES:::st --train_test_config train_test::0.8:0 --add_features T:100 --active_config supervised:nlargest:5:1:500:0:200:100
-        python3 preCalc2graph.py --result_dir st --gpr graphdot_nystrom:none --input_config SMILES:::st --json_hyper ../hyperparameters/hyper1.json --add_features T:100
-        python3 predict.py --result_dir st --gpr graphdot:none -i datasets/predict_T.txt --input_config SMILES::: --json_hyper ../hyperparameters/hyper1.json --f_model st/model.pkl --add_features T:100
+        python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 10
         ```
+The performance is not good, use RDKit features and optimized hyperparameters for best performance.
+
+## Gaussian Process Regression (GPR) for Temperature-Dependent Property
+The file datasets/ThermoSIM/slab-sim.txt is the surface tension at different temperatures. 
+We use this data set as example.
+```
+python3 ReadData.py --save_dir st --data_path datasets/ThermoSIM/slab-sim.txt --pure_columns smiles --target_columns st --feature_columns T --group_reading --n_jobs 6
+python3 KernelCalc.py --save_dir st --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json
+python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.2 0.8 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 10 --features_hyperparameters 100.0
+```
+
+## Use RDKit features
+Use both molecular graph (MGK) and 200 molecular descriptors (RBF kernels) that calculated by RDKit as input.
+
+The optimized hyperparameters are provided in datasets/Public/freesolv.
+```
+python3 ReadData.py --save_dir freesolv --data_path datasets/Public/freesolv.csv --pure_columns smiles --target_columns freesolv --n_jobs 6 --features_generator rdkit_2d_normalized
+python3 KernelCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json
+python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha datasets/Public/freesolv/alpha --metric rmse --extra_metrics r2 --num_folds 10
+```
+
+## Classification
+We use bbbp data set as an example.
+
+Read data and calculate kernels.
+```
+python3 ReadData.py --save_dir bbbp --data_path datasets/Public/bbbp.csv --pure_columns smiles --target_columns p_np --n_jobs 6 --features_generator rdkit_2d_normalized
+python3 KernelCalc.py --save_dir bbbp --graph_kernel_type graph --graph_hyperparameters datasets/Public/bbbp/hyperparameters_0.json --features_hyperparameters_file datasets/Public/bbbp/sigma_RBF.json
+```
+1. Gaussian Process Classification
+```
+python3 ModelEvaluate.py --save_dir bbbp --graph_kernel_type preCalc --dataset_type classification --model_type gpc --split_type random --split_sizes 0.8 0.2 --metric roc-auc --num_folds 10
+```
+2. Support Vector Machine Classification
+```
+python3 ModelEvaluate.py --save_dir bbbp --graph_kernel_type preCalc --dataset_type classification --model_type svc --split_type random --split_sizes 0.8 0.2 --C 1.0 --metric roc-auc --num_folds 10
+```
+
+## Classification for chemical reactions
+SVC is faster than GPC, as well as lower memory costs.
+```
+python3 ReadData.py --save_dir rxn --data_path datasets/RxnClassification/test.csv --reaction_columns good_smarts --target_columns reaction_type --n_jobs 6
+python3 KernelCalc.py --save_dir rxn --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/reaction.json
+python3 ModelEvaluate.py --save_dir rxn --graph_kernel_type preCalc --dataset_type multiclass --model_type svc --split_type random --split_sizes 0.8 0.2 --C 1.0 --metric accuracy --no_proba --num_folds 10
+python3 ModelEvaluate.py --save_dir rxn --graph_kernel_type preCalc --dataset_type multiclass --model_type gpc --split_type random --split_sizes 0.8 0.2 --metric accuracy --no_proba --num_folds 10
+```
+
+## Hyperparameters Optimization
+For regression tasks, it is suggested to minimize the LOOCV loss.
+
+For classification tasks, it is suggested to minimize the roc-auc of 10-fold training/test data splits.
+
+Best hyperparameters can be obtained by applying (1) multiple Bayesian optimization (global optimization) 
+from different random seed, and then (2) Scipy optimization (local optimization).
+
+1. Bayesian Optimization. Using hyperopt python package.
+    - GPR without RDKit features.
+        ```
+        python3 HyperOpt.py --save_dir freesolv --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02
+        ```
+    - GPR with RDKit features.
+        ```
+        python3 HyperOpt.py --save_dir freesolv --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02 --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 20.0
+        ```
+    - GPC with RDKit features.
+        ```
+        python3 HyperOpt.py --save_dir freesolv --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02 --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 20.0
+        ```
+2. Scipy Optimization.
+   
+   This is allowed only for regression tasks. 
+   
+   The data noise "alpha" in GPR is fixed.
+   - GPR without RDKit features.
+        ```
+        python3 HyperOpt.py --save_dir freesolv --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/tMGR.json --seed 0 --alpha 0.01 --optimizer SLSQP
+        ```
+   - GPR with RDKit features.
+        ```
+        python3 HyperOpt.py --save_dir freesolv --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/tMGR.json --seed 0 --alpha 0.01 --optimizer SLSQP --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 20.0
+        ```
+## Active Learning
+1. Supervised active learning.
+    ```
+    python3 ActiveLearning.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --alpha datasets/Public/freesolv/alpha --metric rmse --extra_metrics r2 --learning_algorithm supervised --initial_size 2 --add_size 1 --stop_size 400 --evaluate_stride 50
+    ```
+2. Unsupervised active learning.
+    ```
+    python3 ActiveLearning.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --alpha datasets/Public/freesolv/alpha --metric rmse --extra_metrics r2 --learning_algorithm unsupervised --initial_size 2 --add_size 1 --stop_size 400 --evaluate_stride 50
+    ```
+<div align="center">
+<p><img src="../docs/picture/active_learning.png" width="500"/></p>
+</div> 
+
+
+## Data Embedding.
+1. tSNE.
+    ```
+    python3 Embedding.py --save_dir freesolv --graph_kernel_type preCalc --embedding_algorithm tSNE --save_png --n_jobs 6
+    ```
+2. kPCA.
+    ```
+    python3 Embedding.py --save_dir freesolv --graph_kernel_type preCalc --embedding_algorithm kPCA --save_png --n_jobs 6
+    ```
+<div align="center">
+<p><img src="../docs/picture/tSNE_freesolv.png" width="500"/><img src="../docs/picture/kPCA_freesolv.png" width="500"/></p>
+</div>
+
+## Kernel Computation in Blocks
+For large data sets, it is convenient to calculate the kernel matrix in blocks 
+and then concatenate them. A example is given for fresolv data sets.
+
+1. Compute a sub-block of kernel matrix.
+    ```
+    python3 KernelBlockCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --block_id 0 0 --block_size 400
+    python3 KernelBlockCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --block_id 0 1 --block_size 400
+    python3 KernelBlockCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --block_id 1 1 --block_size 400
+    ```
+2. Concatenate the block kernel matrices.
+    ```
+    python3 ConcatBlockKernels.py --block_id 2 2
+    ```
