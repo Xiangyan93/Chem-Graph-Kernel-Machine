@@ -126,19 +126,23 @@ from different random seed, and then (2) Scipy optimization (local optimization)
     python3 ActiveLearning.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --alpha datasets/Public/freesolv/alpha --metric rmse --extra_metrics r2 --learning_algorithm unsupervised --initial_size 2 --add_size 1 --stop_size 400 --evaluate_stride 50
     ```
 <div align="center">
-<p><img src="../docs/picture/active_learning.png" width="1000"/></p>
+<p><img src="../docs/picture/active_learning.png" width="500"/></p>
 </div> 
 
 
 ## Data Embedding.
 1. tSNE.
-```
-python3 Embedding.py --save_dir freesolv --graph_kernel_type preCalc --embedding_algorithm tSNE --save_png --n_jobs 6
-```
+    ```
+    python3 Embedding.py --save_dir freesolv --graph_kernel_type preCalc --embedding_algorithm tSNE --save_png --n_jobs 6
+    ```
 2. kPCA.
-```
-python3 Embedding.py --save_dir freesolv --graph_kernel_type preCalc --embedding_algorithm kPCA --save_png --n_jobs 6
-```
+    ```
+    python3 Embedding.py --save_dir freesolv --graph_kernel_type preCalc --embedding_algorithm kPCA --save_png --n_jobs 6
+    ```
+<div align="center">
+<p><img src="../docs/picture/tSNE_freesolv.png" width="500"/><img src="../docs/picture/kPCA_freesolv.png" width="500"/></p>
+</div>
+
 ## Kernel Computation in Blocks
 1. For large data sets, it is convenient to calculate the kernel matrix in blocks 
 and then concatenate them. A example is given for chemical reaction kernel.
