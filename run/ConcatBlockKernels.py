@@ -7,8 +7,6 @@ sys.path.append(os.path.join(CWD, '..'))
 import pickle
 import numpy as np
 from chemml.args import KernelBlockArgs
-from chemml.data.data import Dataset
-from chemml.kernels.utils import get_kernel_config
 
 
 def main(args: KernelBlockArgs) -> None:
