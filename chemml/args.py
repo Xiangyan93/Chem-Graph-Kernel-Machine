@@ -110,6 +110,15 @@ class KernelArgs(CommonArgs):
             return [(self.features_hyperparameters_min[i], self.features_hyperparameters_max[i])
                     for i in range(len(self.features_hyperparameters))]
 
+    @property
+    def ignore_features_add(self) -> bool:
+        if self.feature_columns is None and \
+                self.features_hyperparameters is None and \
+                self.features_hyperparameters_file is None:
+            return True
+        else:
+            return False
+
     def process_args(self) -> None:
         super().process_args()
 

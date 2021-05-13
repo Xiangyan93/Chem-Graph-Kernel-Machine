@@ -12,6 +12,7 @@ temperature, pressure, etc.
 GCC (7.*), NVIDIA Driver and CUDA toolkit(>=10.1).  
 ```
 conda env create -f environment.yml
+conda activate graphdot
 ```
 ## Usages
 1. The executable files are in directory [run](https://github.com/Xiangyan93/ChemML/tree/main/run).

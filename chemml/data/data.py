@@ -467,8 +467,10 @@ class Dataset:
             raise RuntimeError(f'Unsupported split_type {split_type}')
 
     def update_args(self, args: KernelArgs):
-        if args.feature_columns is None:
+        if args.ignore_features_add:
             self.set_ignore_features_add(True)
+        else:
+            self.set_ignore_features_add(False)
         self.graph_kernel_type = args.graph_kernel_type
         self.features_mol_normalize = args.features_mol_normalize
         self.features_add_normalize = args.features_add_normalize
