@@ -3,6 +3,7 @@
 import os
 from tap import Tap
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
+import numpy as np
 
 
 Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
@@ -35,27 +36,26 @@ class CommonArgs(Tap):
     For chemical reactions.
     Name of the columns containing single reaction smarts string.
     """
-    reaction_type: Literal['reaction', 'agent', 'reaction+agent'] = \
-        'reaction'
+    reaction_type: Literal['reaction', 'agent', 'reaction+agent'] = 'reaction'
     """How the chemical reaction is represented."""
     feature_columns: List[str] = None
     """
-    Name of the columns containing additional molfeatures such as temperature, 
+    Name of the columns containing additional features_mol such as temperature, 
     pressuer.
     """
     features_generator: List[str] = None
-    """Method(s) of generating additional molfeatures."""
+    """Method(s) of generating additional features_mol."""
     target_columns: List[str] = None
     """
     Name of the columns containing target values.
     """
-    unique_reading: bool = False
+    group_reading: bool = False
     """Find unique input strings first, then read the data."""
     def __init__(self, *args, **kwargs):
         super(CommonArgs, self).__init__(*args, **kwargs)
 
     @property
-    def graph_columns(self):
+    def graph_columns(self) -> List[str]:
         graph_columns = []
         if self.pure_columns is not None:
             graph_columns += self.pure_columns
@@ -64,6 +64,22 @@ class CommonArgs(Tap):
         if self.reaction_columns is not None:
             graph_columns += self.reaction_columns
         return graph_columns
+
+    def update_columns(self, keys: List[str]):
+        """Add all undefined columns to target_columns"""
+        if self.target_columns is not None:
+            return
+        else:
+            used_columns = self.graph_columns
+            if self.feature_columns is not None:
+                used_columns += self.feature_columns
+            for key in self.graph_columns:
+                keys.remove(key)
+            self.target_columns = keys
+
+    def process_args(self) -> None:
+        if not os.path.exists(self.save_dir):
+            os.mkdir(self.save_dir)
 
 
 class KernelArgs(CommonArgs):
@@ -79,11 +95,42 @@ class KernelArgs(CommonArgs):
     """hyperparameters for molecular features."""
     features_hyperparameters_file: str = None
     """JSON file contains features hyperparameters"""
+    features_mol_normalize: bool = False
+    """Nomralize the molecular features_mol."""
+    features_add_normalize: bool = False
+    """Nomralize the additonal features_mol."""
+    single_features_hyperparameter: bool = True
+    """Use the same hyperparameter for all features."""
 
-    molfeatures_normalize: bool = False
-    """Nomralize the molecular molfeatures."""
-    addfeatures_normalize: bool = False
-    """Nomralize the additonal molfeatures."""
+    @property
+    def features_hyperparameters_bounds(self):
+        if self.features_hyperparameters_min is None or self.features_hyperparameters_max is None:
+            return 'fixed'
+        else:
+            return [(self.features_hyperparameters_min[i], self.features_hyperparameters_max[i])
+                    for i in range(len(self.features_hyperparameters))]
+
+    def process_args(self) -> None:
+        super().process_args()
+
+
+class KernelBlockArgs(KernelArgs):
+    block_size: int
+    """"""
+    block_id: Tuple[int, int]
+    """"""
+
+    @property
+    def X_idx(self):
+        return np.arange(self.block_id[0] * self.block_size, (self.block_id[0] + 1) * self.block_size)
+
+    @property
+    def Y_idx(self):
+        return np.arange(self.block_id[1] * self.block_size, (self.block_id[1] + 1) * self.block_size)
+
+    def process_args(self) -> None:
+        super().process_args()
+        assert self.block_id[1] >= self.block_id[0]
 
 
 class TrainArgs(KernelArgs):
@@ -93,10 +140,10 @@ class TrainArgs(KernelArgs):
     """
     model_type: Literal['gpr', 'svc', 'gpc', 'gpr_nystrom']
     """Type of model to use"""
-    optimizer: Literal['L-BFGS-B', 'fmin_l_bfgs_b', 'bayesian'] = None
-    """Optimizer"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
+    optimizer: Literal['SLSQP', 'L-BFGS-B', 'BFGS', 'fmin_l_bfgs_b'] = None
+    """Optimizer"""
     split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
     """Method of splitting the data into train/val/test."""
     split_sizes: Tuple[float, float] = (0.8, 0.2)
@@ -123,15 +170,12 @@ class TrainArgs(KernelArgs):
     """metric"""
     extra_metrics: List[Metric] = []
     """Metrics"""
+    no_proba: bool = False
+    """Use predict_proba for classification task."""
     evaluate_train: bool = False
-    """"""
+    """If set True, evaluate the model on training set."""
     detail: bool = False
-    """"""
-
-
-    def __init__(self, *args, **kwargs) -> None:
-        super(TrainArgs, self).__init__(*args, **kwargs)
-        self.check()
+    """If set True, 5 most similar molecules in the training set will be save in the test_*.log."""
 
     @property
     def metrics(self) -> List[str]:
@@ -155,18 +199,26 @@ class TrainArgs(KernelArgs):
         else:
             return float(self.C)
 
-    def check(self):
-        if self.split_type == 'loocv':
-            assert self.dataset_type == 'regression'
-
     def kernel_args(self):
         return super()
 
     def process_args(self) -> None:
+        super().process_args()
         if self.dataset_type == 'regression':
             assert self.model_type in ['gpr', 'gpr_nystrom']
+            for metric in self.metrics:
+                assert metric in ['rmse', 'mae', 'mse', 'r2']
+        elif self.dataset_type == 'classification':
+            assert self.model_type in ['gpc', 'svc']
+            for metric in self.metrics:
+                assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score']
         else:
             assert self.model_type in ['gpc', 'svc']
+            for metric in self.metrics:
+                assert metric in ['accuracy', 'precision', 'recall', 'f1_score']
+
+        if 'accuracy' in self.metrics:
+            assert self.no_proba
 
         if self.split_type == 'loocv':
             assert self.num_folds == 1
@@ -177,6 +229,9 @@ class TrainArgs(KernelArgs):
 
         if self.model_type == 'svc':
             assert self.C is not None
+
+        if self.split_type == 'loocv':
+            assert self.dataset_type == 'regression'
 
 
 class HyperoptArgs(TrainArgs):
@@ -215,6 +270,8 @@ class HyperoptArgs(TrainArgs):
     def process_args(self) -> None:
         super().process_args()
         assert self.graph_kernel_type != 'preCalc'
+        if self.optimizer in ['L-BFGS-B']:
+            assert self.model_type == 'gpr'
 
 
 class ActiveLearningArgs(TrainArgs):
@@ -253,3 +310,28 @@ class ActiveLearningArgs(TrainArgs):
             assert self.sample_add_algorithm == 'cluster'
         if self.sample_add_algorithm == 'nlargest':
             self.cluster_size = self.add_size
+        assert self.initial_size >= 2
+
+
+class EmbeddingArgs(KernelArgs):
+    embedding_algorithm: Literal['tSNE', 'kPCA'] = 'tSNE'
+    """Algorithm for data embedding."""
+    n_components: int = 2
+    """Dimension of the embedded space."""
+    perplexity: float = 30.0
+    """
+    The perplexity is related to the number of nearest neighbors that
+    is used in other manifold learning algorithms. Larger datasets
+    usually require a larger perplexity. Consider selecting a value
+    between 5 and 50. Different values can result in significantly
+    different results.
+    """
+    n_iter: int = 1000
+    """Maximum number of iterations for the optimization. Should be at least 250."""
+    save_png: bool = False
+    """If True, save the png file of the data embedding."""
+
+    def process_args(self) -> None:
+        super().process_args()
+        if self.save_png:
+            assert self.n_components == 2

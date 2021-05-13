@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-import pickle
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from chemml.args import TrainArgs
@@ -12,11 +11,8 @@ from chemml.evaluator import Evaluator
 
 
 def main(args: TrainArgs) -> None:
-    dataset = Dataset.load(args.save_dir)
-    # print(dataset._repr())
-    dataset.graph_kernel_type = args.graph_kernel_type
+    dataset = Dataset.load(args.save_dir, args=args)
     kernel_config = get_kernel_config(args, dataset)
-    # print(kernel_config.graph_hyperparameters)
     Evaluator(args, dataset, kernel_config).evaluate()
 
 

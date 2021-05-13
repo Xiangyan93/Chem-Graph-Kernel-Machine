@@ -8,7 +8,7 @@ sys.path.append(os.path.join(CWD, '..'))
 from chemml.args import ActiveLearningArgs
 from chemml.data.data import Dataset
 from chemml.kernels.utils import get_kernel_config
-from chemml.evaluator import Evaluator, ActiveLearner
+from chemml.evaluator import ActiveLearner
 
 
 def main(args: ActiveLearningArgs) -> None:

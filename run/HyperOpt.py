@@ -2,15 +2,13 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-import pickle
-
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from typing import Dict, Union, List
 from hyperopt import fmin, hp, tpe
 import numpy as np
 from chemml.evaluator import Evaluator
-from chemml.args import TrainArgs, HyperoptArgs
+from chemml.args import HyperoptArgs
 from chemml.data.data import Dataset
 from chemml.kernels.utils import get_kernel_config
 
@@ -26,17 +24,11 @@ def save_best_params(results: List[float],
         open('%s/alpha' % args.save_dir, 'w').write('%s' % best.pop('alpha'))
     elif args.opt_C:
         open('%s/C' % args.save_dir, 'w').write('%s' % best.pop('C'))
-    kernel_config.update_space(best)
-    kernel_config.save(args.save_dir)
+    kernel_config.update_from_space(best)
+    kernel_config.save_hyperparameters(args.save_dir)
 
 
-def main(args: HyperoptArgs) -> None:
-    # read data
-    dataset = Dataset.load(args.save_dir)
-    dataset.graph_kernel_type = args.graph_kernel_type
-    # get kernel config
-    kernel_config = get_kernel_config(args, dataset)
-
+def Bayesian(args: HyperoptArgs, dataset: Dataset, kernel_config):
     hyperdicts = []
     results = []
 
@@ -45,7 +37,7 @@ def main(args: HyperoptArgs) -> None:
         hyperdicts.append(hyperdict.copy())
         args.alpha = hyperdict.pop('alpha', None)
         args.C = hyperdict.pop('C', None)
-        kernel_config.update_space(hyperdict)
+        kernel_config.update_from_space(hyperdict)
         evaluator = Evaluator(args, dataset, kernel_config)
         result = evaluator.evaluate()
         if not args.minimize_score:
@@ -88,6 +80,20 @@ def main(args: HyperoptArgs) -> None:
          rstate=np.random.RandomState(args.seed))
     # get best hyperparameters.
     save_best_params(results, hyperdicts, kernel_config, args)
+
+
+def main(args: HyperoptArgs) -> None:
+    # read data
+    dataset = Dataset.load(args.save_dir)
+    dataset.graph_kernel_type = args.graph_kernel_type
+    # get kernel config
+    kernel_config = get_kernel_config(args, dataset)
+    if args.optimizer is None:
+        Bayesian(args, dataset, kernel_config)
+    else:
+        Evaluator(args, dataset, kernel_config).evaluate()
+        kernel_config.update_from_theta()
+        kernel_config.save_hyperparameters(args.save_dir)
 
 
 if __name__ == '__main__':

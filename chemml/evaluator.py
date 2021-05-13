@@ -58,7 +58,8 @@ class Evaluator:
                 self.args.split_type,
                 self.args.split_sizes,
                 seed=self.args.seed + i)
-            train_metrics, test_metrics = self._evaluate_train_test(dataset_train, dataset_test, tag=i)
+            train_metrics, test_metrics = self._evaluate_train_test(dataset_train, dataset_test,
+                                                                    test_log='test_%d.log' % i)
             for j, metric in enumerate(self.args.metrics):
                 if self.args.evaluate_train:
                     train_results[metric].append(train_metrics[j])
@@ -77,13 +78,13 @@ class Evaluator:
 
     def _evaluate_train_test(self, dataset_train: Dataset,
                              dataset_test: Dataset,
-                             tag: int = 0) -> Tuple[List[float], List[float]]:
+                             test_log: str = 'test.log') -> Tuple[List[float], List[float]]:
         X_train = dataset_train.X
         y_train = dataset_train.y
-        repr_train = dataset_train._repr()
+        repr_train = dataset_train.X_repr.ravel()
         X_test = dataset_test.X
         y_test = dataset_test.y
-        repr_test = dataset_test._repr()
+        repr_test = dataset_test.X_repr.ravel()
         # Find the most similar sample in training sets.
         if self.args.detail:
             y_similar = self.get_similar_info(X_test, X_train, repr_train, 5)
@@ -93,8 +94,7 @@ class Evaluator:
         train_metrics = []
         test_metrics = []
         if self.args.dataset_type == 'regression':
-            self.model.fit(X_train, y_train, loss=self.args.loss,
-                           verbose=True)
+            self.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
             y_pred, y_std = self.model.predict(X_test, return_std=True)
             # save results test_0.log
             self._output_df(df=pd.DataFrame({
@@ -102,7 +102,7 @@ class Evaluator:
                 'predict': y_pred.tolist(),
                 'uncertainty': y_std.tolist(),
                 'repr': repr_test}), y_similar=y_similar). \
-                to_csv('%s/test_%d.log' % (self.args.save_dir, tag), sep='\t',
+                to_csv('%s/%s' % (self.args.save_dir, test_log), sep='\t',
                        index=False, float_format='%15.10f')
             # save results metric
             for metric in self.args.metrics:
@@ -116,14 +116,15 @@ class Evaluator:
                         self._evaluate(y_train, y_pred, metric))
         else:
             self.model.fit(X_train, y_train)
-            y_pred = self.model.predict_proba(X_test)
-            # y_ = (y_pred + 0.5).astype(int)
-            # print(len(y_), sum(y_[:, 0]), sum(y_[:, 1]))
+            if self.args.no_proba:
+                y_pred = self.model.predict(X_test)
+            else:
+                y_pred = self.model.predict_proba(X_test)
             self._output_df(df=pd.DataFrame({
                 'target': y_test.tolist(),
                 'predict': y_pred.tolist(),
                 'repr': repr_test}), y_similar=y_similar). \
-                to_csv('%s/test_%d.log' % (self.args.save_dir, tag), sep='\t',
+                to_csv('%s/%s' % (self.args.save_dir, test_log), sep='\t',
                        index=False, float_format='%15.10f')
             for metric in self.args.metrics:
                 test_metrics.append(
@@ -137,7 +138,9 @@ class Evaluator:
         return train_metrics, test_metrics
 
     def _evaluate_loocv(self):
-        X, y, X_repr = self.dataset.X, self.dataset.y, self.dataset._repr()
+        X, y, X_repr = self.dataset.X, self.dataset.y, self.dataset.X_repr.ravel()
+        if self.args.optimizer is not None:
+            self.model.fit(X, y, loss='loocv', verbose=True)
         y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
         print('LOOCV:')
         for metric in self.args.metrics:
@@ -252,9 +255,10 @@ class Evaluator:
             return self._metric_func(y, y_pred, metrics)
 
     def _metric_func(self, y, y_pred, metrics):
-        idx = ~np.isnan(y)
-        y = y[idx]
-        y_pred = y_pred[idx]
+        if y.dtype == float:
+            idx = ~np.isnan(y)
+            y = y[idx]
+            y_pred = y_pred[idx]
         if self.args.dataset_type == 'classification':
             if 0 not in y or 1 not in y:
                 return np.nan
@@ -291,8 +295,10 @@ class ActiveLearner(Evaluator):
         super().__init__(args, dataset_train, kernel_config)
         self.args = args
         self.dataset_pool = dataset_pool
-        self.eval_step = 0
         self.max_uncertainty = 1.
+        self.log_df = pd.DataFrame({'training_size': []})
+        for metric in args.metrics:
+            self.log_df[metric] = []
 
     @property
     def current_size(self):
@@ -305,10 +311,7 @@ class ActiveLearner(Evaluator):
             print('**\tStart train\t**\n')
             if self.current_size % self.args.evaluate_stride == 0:
                 print('\n**\tstart evaluate\t**\n')
-                train_metrics, test_metrics = self._evaluate_train_test(
-                    self.dataset, self.dataset_pool, tag=self.eval_step)
-                self.eval_step += 1
-                print('%s on test set: %.5f' % (self.args.metric, test_metrics[0]))
+                self.evaluate()
                 print('\n**\tend evaluate\t**\n')
             else:
                 self.train()
@@ -316,6 +319,7 @@ class ActiveLearner(Evaluator):
             if self.stop():
                 break
             self.add_sample()
+        self.log_df.to_csv('%s/active_learning.log' % self.args.save_dir, sep='\t', index=False, float_format='%15.10f')
         print('\n***\tEnd: active learning\t***\n')
 
     def stop(self) -> bool:
@@ -325,20 +329,21 @@ class ActiveLearner(Evaluator):
         # stop active learning when pool data set is empty.
         elif len(self.dataset_pool) == 0:
             return True
-        elif self.max_uncertainty < self.args.stop_uncertainty:
+        elif self.args.stop_uncertainty is not None and self.max_uncertainty < self.args.stop_uncertainty:
             return True
         else:
             return False
 
     def train(self):
         X_train, y_train = self.dataset.X, self.dataset.y
-        self.model.fit(X_train, y_train, loss=self.args.loss,
-                       verbose=True)
+        self.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
 
     def evaluate(self):
         train_metrics, test_metrics = self._evaluate_train_test(
-            self.dataset, self.dataset_pool)
-        print('%s: %.5f' % (self.args.metric, test_metrics[0]))
+            self.dataset, self.dataset_pool, test_log='test_active_%d.log' % self.current_size)
+        self.log_df.loc[len(self.log_df)] = [self.current_size] + test_metrics
+        for i, metric in enumerate(self.args.metrics):
+            print('%s: %.5f' % (metric, test_metrics[i]))
 
     def add_sample(self):
         pool_idx = self.pool_idx()
