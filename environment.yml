@@ -15,5 +15,5 @@ dependencies:
     - typed-argument-parser>=1.6.1
     - git+https://github.com/bp-kelley/descriptastorus
     - git+https://gitlab.com/XiangyanSJTU/graphdot@feature/start_probability
-    - rxntools==0.0.2
+    - rxntools>=0.0.2
     - mendeleev==0.6.1

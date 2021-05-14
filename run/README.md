@@ -145,7 +145,7 @@ from different random seed, and then (2) Scipy optimization (local optimization)
 
 ## Kernel Computation in Blocks
 For large data sets, it is convenient to calculate the kernel matrix in blocks 
-and then concatenate them. A example is given for fresolv data sets.
+and then concatenate them. A example is given for freesolv data sets.
 
 1. Compute a sub-block of kernel matrix.
     ```
