@@ -474,6 +474,7 @@ class Dataset:
         self.graph_kernel_type = args.graph_kernel_type
         self.features_mol_normalize = args.features_mol_normalize
         self.features_add_normalize = args.features_add_normalize
+        self.normalize_features()
 
     def set_ignore_features_add(self, ignore_features_add: bool) -> bool:
         self.ignore_features_add = ignore_features_add
@@ -527,7 +528,6 @@ class Dataset:
         dataset.__dict__.update(**store)
         if args is not None:
             dataset.update_args(args)
-        dataset.normalize_features()
         return dataset
 
     @staticmethod

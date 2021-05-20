@@ -177,27 +177,8 @@ class Evaluator:
         return np.argsort(-K)[:, :min(n, K.shape[1])]
 
     def make_kernel_precalc(self):
-        X = self.dataset.X_mol
-        K = self.kernel(X)
-        kernel_dict = {
-            'group_id': self.dataset.X_gid.ravel(),
-            'K': K,
-            'theta': self.kernel.theta
-        }
-        if self.dataset.N_addfeatures == 0:
-            self.kernel = PreCalcKernelConfig(
-                kernel_dict=kernel_dict
-            ).kernel
-        else:
-            N_RBF = self.dataset.N_addfeatures
-            self.kernel = PreCalcKernelConfig(
-                kernel_dict=kernel_dict,
-                N_RBF=N_RBF,
-                sigma_RBF=self.kernel_config.sigma_RBF[-N_RBF:],
-                sigma_RBF_bounds=self.kernel_config.sigma_RBF_bounds[-N_RBF:]
-            ).kernel
-        self.dataset.graph_kernel_type = 'preCalc'
-        self.set_model(self.args)
+        self.kernel_config = self.kernel_config.get_preCalc_kernel_config(self.args, self.dataset)
+        self.kernel = self.kernel_config.kernel
 
     def set_model(self, args: TrainArgs):
         if args.model_type == 'gpr':
@@ -255,6 +236,8 @@ class Evaluator:
             return self._metric_func(y, y_pred, metrics)
 
     def _metric_func(self, y, y_pred, metrics):
+        if True in np.isnan(y_pred):
+            return 0
         if y.dtype == float:
             idx = ~np.isnan(y)
             y = y[idx]
@@ -319,7 +302,13 @@ class ActiveLearner(Evaluator):
             if self.stop():
                 break
             self.add_sample()
-        self.log_df.to_csv('%s/active_learning.log' % self.args.save_dir, sep='\t', index=False, float_format='%15.10f')
+        if self.args.save_dir is not None:
+            self.log_df.to_csv('%s/active_learning.log' % self.args.save_dir,
+                               sep='\t', index=False, float_format='%15.10f')
+            pd.DataFrame({'smiles': self.dataset.X_repr.ravel()}).to_csv('%s/training_smiles.csv' % self.args.save_dir,
+                                                                 index=False)
+        self.evaluate()
+
         print('\n***\tEnd: active learning\t***\n')
 
     def stop(self) -> bool:
@@ -355,6 +344,7 @@ class ActiveLearner(Evaluator):
         elif self.args.learning_algorithm == 'unsupervised':
             y_pred, y_std = self.model.predict(X, return_std=True)
             self.max_uncertainty = y_std.max()
+            print('Add sample with maximum uncertainty: %f' % self.max_uncertainty)
             add_idx = self._get_add_samples_idx(y_std, pool_idx)
         elif self.args.learning_algorithm == 'random':
             if len(pool_idx) < self.args.add_size:

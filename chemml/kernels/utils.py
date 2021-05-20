@@ -86,14 +86,3 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset,
         }
         from chemml.kernels.PreCalcKernel import PreCalcKernelConfig
         return PreCalcKernelConfig(**params)
-
-
-def graph2preCalc(dataset: Dataset, kernel_config):
-    X = dataset.X_mol
-    kernel = kernel_config.kernel
-    K = kernel(X)
-    kernel_dict = {
-        'group_id': dataset.X_gid.ravel(),
-        'K': K,
-        'theta': kernel.theta
-    }

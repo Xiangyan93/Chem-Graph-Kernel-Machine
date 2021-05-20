@@ -22,7 +22,7 @@ class BaseKernelConfig:
         self.sigma_RBF_bounds = sigma_RBF_bounds
         self.kernel = self._get_rbf_kernel()[0]
 
-    def get_kernel_dict(self, X: np.ndarray, X_labels: List[str]) -> Dict:
+    def get_kernel_dict(self, X: np.ndarray, X_labels: np.ndarray) -> Dict:
         K = self.kernel(X)
         return {
             'X': X_labels,

@@ -304,7 +304,7 @@ class ActiveLearningArgs(TrainArgs):
     stop_uncertainty: float = None
     """If learning_algorithm='unsupervised', stop active learning if the 
     uncertainty is smaller than stop_uncertainty."""
-    stop_size: int = None
+    stop_size: int
     """Stop active learning when N samples are selected."""
     evaluate_stride: int = 100
     """Evaluate the model performance every N samples."""

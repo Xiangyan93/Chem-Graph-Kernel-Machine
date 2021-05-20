@@ -386,6 +386,7 @@ class GraphKernelConfig(BaseKernelConfig):
 
     def get_preCalc_kernel_config(self, args: KernelArgs, dataset: Dataset):
         kernel_dict = self.get_kernel_dict(dataset.X_mol, dataset.X_repr.ravel())
+        args.graph_kernel_type = 'preCalc'
         return get_kernel_config(args, dataset, kernel_dict)
 
     # save hyperparameters files and kernel.pkl.
