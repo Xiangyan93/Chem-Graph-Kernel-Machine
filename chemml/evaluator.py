@@ -186,7 +186,8 @@ class Evaluator:
                 kernel=self.kernel,
                 optimizer=args.optimizer,
                 alpha=args.alpha_,
-                normalize_y=True
+                normalize_y=True,
+                batch_size=args.batch_size
             )
             if args.ensemble:
                 self.model = ConsensusRegressor(
