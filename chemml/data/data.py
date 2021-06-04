@@ -279,7 +279,7 @@ class SubDataset:
         if self.features_add is None or self.ignore_features_add:
             return np.asarray([[self.data.__repr__()]])
         else:
-            return np.asarray([list(map(lambda x: self.data.__repr__() + ';' + str(x), self.features_add.tolist()))])
+            return np.asarray([list(map(lambda x: self.data.__repr__() + ';' + str(x), self.features_add.tolist()))]).T
 
     @property
     def X(self):

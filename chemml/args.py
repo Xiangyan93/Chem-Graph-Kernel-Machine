@@ -259,7 +259,7 @@ class HyperoptArgs(TrainArgs):
     """"""
     optimizer: Literal['SLSQP', 'L-BFGS-B', 'BFGS', 'fmin_l_bfgs_b', 'sgd', 'rmsprop', 'adam'] = None
     """Optimizer"""
-    batch_size: int = 50
+    batch_size: int = None
     """batch_size"""
 
     @property
