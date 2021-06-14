@@ -316,6 +316,7 @@ class ActiveLearningArgs(TrainArgs):
     evaluate_stride: int = 100
     """Evaluate the model performance every N samples."""
     def process_args(self) -> None:
+        super().process_args()
         # active learning is only valid for GPR
         assert self.dataset_type == 'regression'
         assert self.model_type == 'gpr'

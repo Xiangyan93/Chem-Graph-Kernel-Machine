@@ -101,7 +101,7 @@ from different random seed, and then (2) Scipy optimization (local optimization)
         ```
     - GPC with RDKit features.
         ```
-        python3 HyperOpt.py --save_dir freesolv --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02 --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 20.0
+        python3 HyperOpt.py --save_dir bbbp --graph_kernel_type graph --dataset_type classification --model_type gpc --split_type random --metric auc --num_folds 10 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 20.0
         ```
 2. Scipy Optimization.
    
