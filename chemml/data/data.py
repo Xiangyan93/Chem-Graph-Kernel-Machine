@@ -608,7 +608,7 @@ def tolist(list_: pd.Series) -> List[str]:
     if list_ is None:
         return []
     else:
-        if (',' in list_[0]) and ('[' in list_[0][0]) and (']' in list_[0][-1]):
+        if (',' in list_[0]) and ('[' == list_[0][0]) and (']' == list_[0][-1]):
             list_[0] = eval(list_[0])
             return list(list_)
         else:
