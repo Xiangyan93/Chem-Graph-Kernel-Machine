@@ -81,10 +81,10 @@ class Evaluator:
                              test_log: str = 'test.log') -> Tuple[List[float], List[float]]:
         X_train = dataset_train.X
         y_train = dataset_train.y
-        repr_train = dataset_train.X_repr.ravel()
+        repr_train = dataset_train.repr.ravel()
         X_test = dataset_test.X
         y_test = dataset_test.y
-        repr_test = dataset_test.X_repr.ravel()
+        repr_test = dataset_test.repr.ravel()
         # Find the most similar sample in training sets.
         if self.args.detail:
             y_similar = self.get_similar_info(X_test, X_train, repr_train, 5)
@@ -186,7 +186,8 @@ class Evaluator:
                 kernel=self.kernel,
                 optimizer=args.optimizer,
                 alpha=args.alpha_,
-                normalize_y=True
+                normalize_y=True,
+                batch_size=args.batch_size
             )
             if args.ensemble:
                 self.model = ConsensusRegressor(
@@ -236,8 +237,10 @@ class Evaluator:
             return self._metric_func(y, y_pred, metrics)
 
     def _metric_func(self, y, y_pred, metrics):
-        if True in np.isnan(y_pred):
-            return 0
+        # y_pred has nan may happen when train_y are all 1 or 0.
+        if y_pred.dtype != object and True in np.isnan(y_pred):
+            return np.nan
+        # y may be unlabeled in some index. Select index of labeled data.
         if y.dtype == float:
             idx = ~np.isnan(y)
             y = y[idx]

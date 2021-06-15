@@ -151,8 +151,7 @@ class TrainArgs(KernelArgs):
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
-    optimizer: Literal['SLSQP', 'L-BFGS-B', 'BFGS', 'fmin_l_bfgs_b'] = None
-    """Optimizer"""
+
     split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
     """Method of splitting the data into train/val/test."""
     split_sizes: Tuple[float, float] = (0.8, 0.2)
@@ -165,7 +164,6 @@ class TrainArgs(KernelArgs):
     """C parameter used in Support Vector Machine."""
     seed: int = 0
     """Random seed."""
-
     ensemble: bool = False
     """use ensemble model."""
     n_estimator: int = 1
@@ -242,6 +240,11 @@ class TrainArgs(KernelArgs):
         if self.split_type == 'loocv':
             assert self.dataset_type == 'regression'
 
+        if not hasattr(self, 'optimizer'):
+            self.optimizer = None
+        if not hasattr(self, 'batch_size'):
+            self.batch_size = None
+
 
 class HyperoptArgs(TrainArgs):
     num_iters: int = 20
@@ -254,6 +257,10 @@ class HyperoptArgs(TrainArgs):
     """Bounds of C used in SVC."""
     C_uniform: float = None
     """"""
+    optimizer: Literal['SLSQP', 'L-BFGS-B', 'BFGS', 'fmin_l_bfgs_b', 'sgd', 'rmsprop', 'adam'] = None
+    """Optimizer"""
+    batch_size: int = None
+    """batch_size"""
 
     @property
     def minimize_score(self) -> bool:
@@ -309,6 +316,7 @@ class ActiveLearningArgs(TrainArgs):
     evaluate_stride: int = 100
     """Evaluate the model performance every N samples."""
     def process_args(self) -> None:
+        super().process_args()
         # active learning is only valid for GPR
         assert self.dataset_type == 'regression'
         assert self.model_type == 'gpr'

@@ -279,7 +279,7 @@ class SubDataset:
         if self.features_add is None or self.ignore_features_add:
             return np.asarray([[self.data.__repr__()]])
         else:
-            return np.asarray([list(map(lambda x: self.data.__repr__() + ';' + str(x), self.features_add.tolist()))])
+            return np.asarray([list(map(lambda x: self.data.__repr__() + ';' + str(x), self.features_add.tolist()))]).T
 
     @property
     def X(self):
@@ -608,7 +608,11 @@ def tolist(list_: pd.Series) -> List[str]:
     if list_ is None:
         return []
     else:
-        return list(list_)
+        if (',' in list_[0]) and (list_[0][0] == '[') and (list_[0][-1] == ']'):
+            list_[0] = eval(list_[0])
+            return list(list_)
+        else:
+            return list(list_)
 
 
 def to_numpy(list_: pd.Series) -> Optional[np.ndarray]:
