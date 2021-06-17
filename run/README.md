@@ -15,6 +15,7 @@ tensor-product architecture. "additive" use an additive architecture.
 - "tMGR.json" is MGK with molecular-size-dependent normalization.
 - "tMGR-Norm.json" is MGK with simple normalization.
 - "tMGR-non-Norm.json" is MGK without normalization.
+- "tMGR-PNorm.json" is MGK with starting probability normalization.
 
 ## Gaussian Process Regression (GPR) for Single-Valued Property
 The file datasets/Public/freesolv.csv is the hydration free energy in water. We use
@@ -35,7 +36,17 @@ this data set as example.
         ```
         python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 10
         ```
-The performance is not good, use RDKit features and optimized hyperparameters for best performance.
+4. Train model using all data
+    - The training set ratio is 1.0. model.pkl is saved model.
+        ```
+        python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 1.0 0.0 --alpha 0.01 --metric rmse --num_folds 1 --save_model
+        ```
+5. Prediction.
+    - Predict the property of unknown molecules.
+        ```
+        python3 Predict.py --save_dir freesolv --test_path datasets/predict.csv --pure_columns smiles --n_jobs 6 --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json --dataset_type regression --model_type gpr --alpha 0.01 --metric rmse --preds_path test.log
+        ```
+The performance is not optimal, use RDKit features and optimized hyperparameters for best performance.
 
 ## Gaussian Process Regression (GPR) for Temperature-Dependent Property
 The file datasets/ThermoSIM/slab-sim.txt is the surface tension at different temperatures. 
@@ -44,6 +55,8 @@ We use this data set as example.
 python3 ReadData.py --save_dir st --data_path datasets/ThermoSIM/slab-sim.txt --pure_columns smiles --target_columns st --feature_columns T --group_reading --n_jobs 6
 python3 KernelCalc.py --save_dir st --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json
 python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.2 0.8 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 10 --features_hyperparameters 100.0
+python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 1.0 0.0 --alpha 0.01 --metric rmse --num_folds 1 --features_hyperparameters 100.0 --save_model
+python3 Predict.py --save_dir st --test_path datasets/predict_T.csv --pure_columns smiles --feature_columns T --n_jobs 6 --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json --features_hyperparameters 100.0 --dataset_type regression --model_type gpr --alpha 0.01 --metric rmse --preds_path test.log
 ```
 
 ## Use RDKit features
@@ -54,24 +67,26 @@ The optimized hyperparameters are provided in datasets/Public/freesolv.
 python3 ReadData.py --save_dir freesolv --data_path datasets/Public/freesolv.csv --pure_columns smiles --target_columns freesolv --n_jobs 6 --features_generator rdkit_2d_normalized
 python3 KernelCalc.py --save_dir freesolv --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json
 python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha datasets/Public/freesolv/alpha --metric rmse --extra_metrics r2 --num_folds 10
+python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 1.0 0.0 --alpha datasets/Public/freesolv/alpha --metric rmse --num_folds 1 --save_model
+python3 Predict.py --save_dir freesolv --test_path datasets/predict.csv --pure_columns smiles --features_generator rdkit_2d_normalized --n_jobs 6 --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --dataset_type regression --model_type gpr --alpha 0.01 --metric rmse --preds_path test.log
 ```
 
 ## Classification
 We use bbbp data set as an example.
 
-Read data and calculate kernels.
-```
-python3 ReadData.py --save_dir bbbp --data_path datasets/Public/bbbp.csv --pure_columns smiles --target_columns p_np --n_jobs 6 --features_generator rdkit_2d_normalized
-python3 KernelCalc.py --save_dir bbbp --graph_kernel_type graph --graph_hyperparameters datasets/Public/bbbp/hyperparameters_0.json --features_hyperparameters_file datasets/Public/bbbp/sigma_RBF.json
-```
-1. Gaussian Process Classification
-```
-python3 ModelEvaluate.py --save_dir bbbp --graph_kernel_type preCalc --dataset_type classification --model_type gpc --split_type random --split_sizes 0.8 0.2 --metric roc-auc --num_folds 10
-```
-2. Support Vector Machine Classification
-```
-python3 ModelEvaluate.py --save_dir bbbp --graph_kernel_type preCalc --dataset_type classification --model_type svc --split_type random --split_sizes 0.8 0.2 --C 1.0 --metric roc-auc --num_folds 10
-```
+1. Read data and calculate kernels.
+    ```
+    python3 ReadData.py --save_dir bbbp --data_path datasets/Public/bbbp.csv --pure_columns smiles --target_columns p_np --n_jobs 6 --features_generator rdkit_2d_normalized
+    python3 KernelCalc.py --save_dir bbbp --graph_kernel_type graph --graph_hyperparameters datasets/Public/bbbp/hyperparameters_0.json --features_hyperparameters_file datasets/Public/bbbp/sigma_RBF.json
+    ```
+2. Gaussian Process Classification
+    ```
+    python3 ModelEvaluate.py --save_dir bbbp --graph_kernel_type preCalc --dataset_type classification --model_type gpc --split_type random --split_sizes 0.8 0.2 --metric roc-auc --num_folds 10
+    ```
+3. Support Vector Machine Classification
+    ```
+    python3 ModelEvaluate.py --save_dir bbbp --graph_kernel_type preCalc --dataset_type classification --model_type svc --split_type random --split_sizes 0.8 0.2 --C 1.0 --metric roc-auc --num_folds 10
+    ```
 
 ## Classification for chemical reactions
 SVC is faster than GPC, as well as lower memory costs.

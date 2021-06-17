@@ -37,8 +37,11 @@ class HashGraph(Graph):
         return hash(self.hash)
 
     def update_concentration(self, concentration: float):
-        for node in self.nodes:
-            node['Concentration'] *= concentration
+        self.nodes['Concentration'] *= concentration
+
+    def normalize_concentration(self):
+        sum_c = self.nodes['Concentration'].sum()
+        self.nodes['Concentration_norm'] = self.nodes['Concentration'] / sum_c
 
     @classmethod
     def from_inchi(cls, inchi, HASH, _rdkit_config=rdkit_config()):
@@ -64,6 +67,7 @@ class HashGraph(Graph):
     def from_rdkit(cls, mol, HASH, _rdkit_config=rdkit_config()):
         _rdkit_config.preprocess(mol)
         g = _from_rdkit(cls, mol, _rdkit_config)
+        g.normalize_concentration()
         g.hash = HASH
         # g = g.permute(rcm(g))
         return g
@@ -88,7 +92,7 @@ class HashGraph(Graph):
     def agent_from_reaction_smarts(cls, reaction_smarts, HASH,
                                    _rdkit_config=rdkit_config()):
         cr = ChemicalReaction(reaction_smarts)
-        return cls.agent_from_cr(cr)
+        return cls.agent_from_cr(cr, HASH)
 
     @classmethod
     def agent_from_cr(cls, cr, HASH, _rdkit_config=rdkit_config()):

@@ -23,9 +23,12 @@ from .scaffold import scaffold_split
 def remove_none(X: List):
     X_ = []
     for x in X:
-        if x is not None:
+        if x is not None and len(x) != 0:
             X_.append(x)
-    return X_
+    if len(X_) == 0:
+        return None
+    else:
+        return X_
 
 
 def concatenate(X: List, axis: int = 0, dtype=None):
@@ -148,6 +151,7 @@ class MultiMolDatapoint:
             self.graph = nx.disjoint_union_all(
                 [g.to_networkx() for g in graphs])
             self.graph = _from_networkx(HashGraph, self.graph)
+            self.graph.normalize_concentration()
         else:
             self.graph = [
                 rv for r in zip(graphs, self.concentration) for rv in r]
@@ -259,7 +263,7 @@ class SubDataset:
                  features_add: Optional[np.ndarray] = None):  # 2d array.
         self.data = data
         # set targets
-        assert targets.ndim == 2
+        assert targets is None or targets.ndim == 2
         self.targets = targets
         # set features_add
         if features_add is not None:
@@ -268,7 +272,12 @@ class SubDataset:
         self.ignore_features_add = False
 
     def __len__(self) -> int:
-        return self.targets.shape[0]
+        if self.targets is not None:
+            return self.targets.shape[0]
+        elif self.features_add is not None:
+            return self.features_add.shape[0]
+        else:
+            return 1
 
     @property
     def mol(self) -> Chem.Mol:
@@ -327,7 +336,7 @@ class Dataset:
                  features_add_scaler: StandardScaler = None,
                  graph_kernel_type: Literal['graph', 'preCalc'] = None):
         self.data = data
-        self.unify_datatype()
+        self.unify_datatype(self.X_graph)
         self.features_mol_normalize = False
         self.features_add_normalize = False
         self.features_mol_scaler = features_mol_scaler
@@ -357,8 +366,11 @@ class Dataset:
 
     @property
     def y(self):
-        y = np.concatenate([d.targets for d in self.data], axis=0)
-        return y.ravel() if y.shape[1] == 1 else y
+        y = concatenate([d.targets for d in self.data], axis=0)
+        if y is not None and y.shape[1] == 1:
+            return y.ravel()
+        else:
+            return y
 
     @property
     def repr(self) -> np.ndarray:  # 2d array str.
@@ -369,8 +381,11 @@ class Dataset:
         return concatenate([d.X_repr for d in self.data])
 
     @property
-    def X_graph(self) -> np.ndarray:
-        return concatenate([d.X_graph for d in self.data])
+    def X_graph(self) -> Optional[np.ndarray]:
+        if self.data is None:
+            return None
+        else:
+            return concatenate([d.X_graph for d in self.data])
 
     @property
     def X_mol(self):
@@ -493,10 +508,9 @@ class Dataset:
         else:
             self.features_add_scaler = None
 
-    def unify_datatype(self):
-        if self.data is None:
+    def unify_datatype(self, X):
+        if X is None:
             return
-        X = self.X_graph
         for i in range(X.shape[1]):
             self._unify_datatype(X[:, i])
 
@@ -610,13 +624,15 @@ def tolist(list_: pd.Series) -> List[str]:
     else:
         if (',' in list_[0]) and (list_[0][0] == '[') and (list_[0][-1] == ']'):
             list_[0] = eval(list_[0])
-            return list(list_)
-        else:
-            return list(list_)
+        return list(list_)
 
 
 def to_numpy(list_: pd.Series) -> Optional[np.ndarray]:
     if list_ is None:
         return None
     else:
-        return list_.to_numpy()
+        ndarray = list_.to_numpy()
+        if ndarray.size == 0:
+            return None
+        else:
+            return ndarray
