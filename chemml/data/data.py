@@ -560,7 +560,7 @@ class Dataset:
     @staticmethod
     def get_subDataset(
             pure: List[str],
-            mixture: List[Optional[str]],
+            mixture: List[List[Union[str, float]]],
             mixture_type: Literal['single_graph', 'multi_graph'],
             reaction: List[str],
             reaction_type: Literal['reaction', 'agent', 'reaction+agent'],
@@ -603,10 +603,10 @@ class Dataset:
                 n_jobs=args.n_jobs, verbose=True,
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(cls.get_subDataset)(
-                    (lambda x: [x] if x.__class__ == str else list[x])(g[0])[0:n1],
-                    (lambda x: [x] if x.__class__ == str else list[x])(g[0])[n1:n1+n2],
+                    (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[0:n1],
+                    (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[n1:n1+n2],
                     args.mixture_type,
-                    (lambda x: [x] if x.__class__ == str else list[x])(g[0])[n1+n2:n1+n2+n3],
+                    (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[n1+n2:n1+n2+n3],
                     args.reaction_type,
                     to_numpy(g[1][args.target_columns]),
                     to_numpy(g[1][args.feature_columns]),
@@ -635,9 +635,8 @@ def tolist(list_: pd.Series) -> List[str]:
     if list_ is None:
         return []
     else:
-        if (',' in list_[0]) and (list_[0][0] == '[') and (list_[0][-1] == ']'):
-            list_[0] = eval(list_[0])
-        return list(list_)
+        # eval(x) for mixture input.
+        return list(map(lambda x: eval(x) if (',' in x) and (x[0] == '[') and (x[-1] == ']') else x, list_))
 
 
 def to_numpy(list_: pd.Series) -> Optional[np.ndarray]:

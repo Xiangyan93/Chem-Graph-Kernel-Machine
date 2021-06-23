@@ -274,8 +274,8 @@ class ConvolutionGraphKernel(MGK):
 
 
 class GraphKernelConfig(BaseKernelConfig):
-    def __init__(self, N_MGK: int, N_conv_MGK: int,
-                 graph_hyperparameters: List[Dict],
+    def __init__(self, N_MGK: int = 0, N_conv_MGK: int = 0,
+                 graph_hyperparameters: List[Dict] = [],
                  unique: bool = False,
                  N_RBF: int = 0,
                  sigma_RBF: List[float] = None,
