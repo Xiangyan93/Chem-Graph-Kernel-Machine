@@ -20,6 +20,11 @@ from ..args import CommonArgs, KernelArgs
 from .scaffold import scaffold_split
 
 
+# Cache of RDKit molecules
+CACHE_MOL = True
+SMILES_TO_MOL: Dict[str, Chem.Mol] = {}
+
+
 def remove_none(X: List):
     X_ = []
     for x in X:
@@ -47,8 +52,16 @@ class SingleMolDatapoint:
     def __init__(self, smiles: str, features_mol: np.ndarray = None):
         self.smiles = smiles
         self.features_mol = features_mol
-        self.mol = self.get_mol()
         self.graph = HashGraph.from_rdkit(self.mol, self.smiles)
+
+    @property
+    def mol(self):
+        if self.smiles in SMILES_TO_MOL:
+            return SMILES_TO_MOL[self.smiles]
+        else:
+            mol = Chem.MolFromSmiles(self.smiles)
+            SMILES_TO_MOL[self.smiles] = mol
+            return mol
 
     def __repr__(self) -> str:
         return self.smiles
@@ -393,7 +406,7 @@ class Dataset:
 
     @property
     def X_raw_features_mol(self) -> Optional[np.ndarray]:
-        assert self.graph_kernel_type == 'graph'
+        # assert self.graph_kernel_type == 'graph'
         return concatenate([d.X_features_mol for d in self.data])
 
     @property

@@ -7,7 +7,7 @@ import numpy as np
 
 
 Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
-                 'rmse', 'mae', 'mse', 'r2']
+                 'rmse', 'mae', 'mse', 'r2', 'max']
 
 
 class CommonArgs(Tap):
@@ -216,7 +216,7 @@ class TrainArgs(KernelArgs):
         if self.dataset_type == 'regression':
             assert self.model_type in ['gpr', 'gpr_nystrom']
             for metric in self.metrics:
-                assert metric in ['rmse', 'mae', 'mse', 'r2']
+                assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
         elif self.dataset_type == 'classification':
             assert self.model_type in ['gpc', 'svc']
             for metric in self.metrics:

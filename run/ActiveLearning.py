@@ -16,7 +16,7 @@ def main(args: ActiveLearningArgs) -> None:
     dataset.graph_kernel_type = args.graph_kernel_type
     kernel_config = get_kernel_config(args, dataset)
     dataset, dataset_pool = dataset.split(
-        split_type="random",
+        split_type="random", seed=args.seed,
         sizes=(args.initial_size/len(dataset),
                1 - args.initial_size/len(dataset)))
     ActiveLearner(args, dataset, dataset_pool, kernel_config).run()

@@ -486,8 +486,8 @@ def _from_rdkit(cls, mol, rdkit_config):
                     else:
                         g.edges[ij]['RingStereo'] = StereoOfRingBond
     # rdkit_config.set_node_propogation(g, mol, 'Chiral', depth=1)
-    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=5, sum=False)
-    rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=1, sum=True)
+    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=5, sum=False, usehash=False)
+    rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=1, sum=True, usehash=False)
     # rdkit_config.set_node_propogation(g, mol, 'FirstNeighbors', depth=4)
     # rdkit_config.set_node_propogation(g, mol, 'Aromatic', depth=4)
     return _from_networkx(cls, g)

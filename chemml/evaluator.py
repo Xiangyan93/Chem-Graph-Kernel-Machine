@@ -291,6 +291,8 @@ class Evaluator:
             return mean_squared_error(y, y_pred)
         elif metric == 'rmse':
             return np.sqrt(self._metric_func(y, y_pred, 'mse'))
+        elif metric == 'max':
+            return np.max(abs(y - y_pred))
         else:
             raise RuntimeError(f'Unsupported metrics {metric}')
 
@@ -304,7 +306,7 @@ class ActiveLearner(Evaluator):
         self.args = args
         self.dataset_pool = dataset_pool
         self.max_uncertainty = 1.
-        self.log_df = pd.DataFrame({'training_size': []})
+        self.log_df = pd.DataFrame({'training_size': [], 'max_uncertainty': []})
         for metric in args.metrics:
             self.log_df[metric] = []
 
@@ -355,7 +357,7 @@ class ActiveLearner(Evaluator):
     def evaluate(self):
         train_metrics, test_metrics = self.evaluate_train_test(
             self.dataset, self.dataset_pool, test_log='test_active_%d.log' % self.current_size)
-        self.log_df.loc[len(self.log_df)] = [self.current_size] + test_metrics
+        self.log_df.loc[len(self.log_df)] = [self.current_size, self.max_uncertainty] + test_metrics
         for i, metric in enumerate(self.args.metrics):
             print('%s: %.5f' % (metric, test_metrics[i]))
 
