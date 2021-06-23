@@ -48,6 +48,8 @@ class Evaluator:
                 and self.kernel.__class__ != PreCalcKernel \
                 and self.args.graph_kernel_type == 'graph':
             self.make_kernel_precalc()
+            self.set_model(self.args)
+            self.dataset.graph_kernel_type = 'preCalc'
 
         # Initialization
         train_metrics_results = dict()
@@ -122,26 +124,22 @@ class Evaluator:
         return train_metrics, test_metrics
 
     def _evaluate_loocv(self):
-        X, y, X_repr = self.dataset.X, self.dataset.y, self.dataset.X_repr.ravel()
+        X, y, repr = self.dataset.X, self.dataset.y, self.dataset.repr.ravel()
+        if self.args.detail:
+            y_similar = self.get_similar_info(X, X, repr, 5)
+        else:
+            y_similar = None
         # optimize hyperparameters.
         if self.args.optimizer is not None:
             self.model.fit(X, y, loss='loocv', verbose=True)
-        # LOOCV prediction
-        y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
+        loocv_metrics = self._eval(X, y, repr, y_similar,
+                                  file='%s/%s' % (self.args.save_dir, 'loocv.log'),
+                                  return_std=False, loocv=True,
+                                  proba=False)
         print('LOOCV:')
-        for metric in self.args.metrics:
-            print('%s: %.5f' % (metric, self._eval_metric(y, y_pred, metric)))
-        if self.args.detail:
-            y_similar = self.get_similar_info(X, X, X_repr, 5)
-        else:
-            y_similar = None
-        self._output_df(df=pd.DataFrame({
-            'target': y.tolist(),
-            'predict': y_pred.tolist(),
-            'uncertainty': y_std.tolist()}), y_similar=y_similar).to_csv(
-            '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
-            float_format='%15.10f')
-        return self._eval_metric(y, y_pred, self.args.metric)
+        for i, metric in enumerate(self.args.metrics):
+            print(metric, ': %.5f' % loocv_metrics[i])
+        return loocv_metrics[0]
 
     def _train(self):
         X = self.dataset.X
@@ -227,8 +225,10 @@ class Evaluator:
                 df.pop(key)
         return pd.DataFrame(df)
 
-    def _eval(self, X, y, repr, y_similar, file, return_std=False, proba=False):
-        if return_std:
+    def _eval(self, X, y, repr, y_similar, file, return_std=False, proba=False, loocv=False):
+        if loocv:
+            y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
+        elif return_std:
             y_pred, y_std = self.model.predict(X, return_std=True)
         elif proba:
             y_pred = self.model.predict_proba(X)
