@@ -604,7 +604,7 @@ class Dataset:
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(cls.get_subDataset)(
                     (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[0:n1],
-                    (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[n1:n1+n2],
+                    (lambda x: tolist([x]) if x.__class__ == str else tolist(x))(g[0])[n1:n1+n2],
                     args.mixture_type,
                     (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[n1+n2:n1+n2+n3],
                     args.reaction_type,
@@ -631,7 +631,7 @@ class Dataset:
         return cls(data)
 
 
-def tolist(list_: pd.Series) -> List[str]:
+def tolist(list_: Union[pd.Series, List]) -> List[str]:
     if list_ is None:
         return []
     else:
