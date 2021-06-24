@@ -385,7 +385,13 @@ class GraphKernelConfig(BaseKernelConfig):
             raise RuntimeError(f'Unknown type: {rule}')
 
     def get_preCalc_kernel_config(self, args: KernelArgs, dataset: Dataset):
+        dataset.set_ignore_features_add(True)
+        N_RBF = self.N_RBF
+        self.N_RBF = 0
+        self._update_kernel()
         kernel_dict = self.get_kernel_dict(dataset.X_mol, dataset.X_repr.ravel())
+        dataset.set_ignore_features_add(False)
+        self.N_RBF = N_RBF
         args.graph_kernel_type = 'preCalc'
         return get_kernel_config(args, dataset, kernel_dict)
 

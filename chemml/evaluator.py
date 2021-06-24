@@ -44,9 +44,7 @@ class Evaluator:
             return self._evaluate_loocv()
 
         # Transform graph kernel to preCalc kernel.
-        if self.args.num_folds != 1 \
-                and self.kernel.__class__ != PreCalcKernel \
-                and self.args.graph_kernel_type == 'graph':
+        if self.kernel.__class__ != PreCalcKernel and self.args.graph_kernel_type == 'graph':
             self.make_kernel_precalc()
             self.set_model(self.args)
             self.dataset.graph_kernel_type = 'preCalc'
