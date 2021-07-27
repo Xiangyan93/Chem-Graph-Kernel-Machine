@@ -7,6 +7,8 @@ conda activate graphdot
 conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge
 pip install tensorboardX
 
+# Notice that running this script completely in one computer may take several weeks.
+
 # regression data sets
 properties=(delaney freesolv lipo pdbbind_core pdbbind_refined pdbbind_full qm7)
 metrics=(rmse rmse rmse rmse rmse rmse mae)
