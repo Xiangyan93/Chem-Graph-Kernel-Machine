@@ -1,11 +1,12 @@
 # Preparation.
+# (GCC 7.* or 9.*)(CUDA >= 10.1) are required for graphdot.
 git clone -b comparative_study https://github.com/Xiangyan93/Chem-Graph-Kernel-Machine
 git clone -b gpr-mgk-comparison https://github.com/Xiangyan93/chemprop
 git clone -b uncertainty_quantification https://github.com/Xiangyan93/chemprop chemprop_uq
 conda env create -f Chem-Graph-Kernel-Machine/environment.yml
 conda activate graphdot
 conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge
-pip install tensorboardX
+pip install tensorboardX GPy seaborn
 
 # Notice that running this script completely in one computer may take several weeks.
 
