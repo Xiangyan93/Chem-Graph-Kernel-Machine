@@ -19,7 +19,7 @@ do
 
   ### GP-MGK hyperparameter optimization.
   cd Chem-Graph-Kernel-Machine/run
-  # python ReadData.py --save_dir $property --data_path datasets/Public/$property.csv --pure_columns smiles --n_jobs 6 --features_generator rdkit_2d_normalized
+  python ReadData.py --save_dir $property --data_path datasets/Public/$property.csv --pure_columns smiles --n_jobs 6 --features_generator rdkit_2d_normalized
   # The hyperparameters are optimized using HyperOpt.py.
   python HyperOpt.py --save_dir $property --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type loocv --metric rmse --num_folds 1 --graph_hyperparameters ../hyperparameters/additive.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02 --features_hyperparameters 1.0 --features_hyperparameters_min 0.1 --features_hyperparameters_max 20.0
   # hyperparameters_0.json, sigma_RBF.json, alpha are saved hyperparameter files, which will be generated in
