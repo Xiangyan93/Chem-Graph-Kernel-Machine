@@ -111,6 +111,13 @@ class Evaluator:
 
             if self.args.evaluate_train:
                 y_pred, y_std = self.model.predict(X_train, return_std=True)
+                self._output_df(df=pd.DataFrame({
+                    'target': y_train.tolist(),
+                    'predict': y_pred.tolist(),
+                    'uncertainty': y_std.tolist(),
+                    'repr': repr_train})). \
+                    to_csv('%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')), sep='\t',
+                           index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
                     train_metrics.append(
                         self._evaluate(y_train, y_pred, metric))
@@ -273,13 +280,16 @@ class Evaluator:
             raise RuntimeError(f'Unsupported metrics {metrics}')
 
 
-class ActiveLearner(Evaluator):
+class ActiveLearner:
     def __init__(self, args: ActiveLearningArgs,
                  dataset_train: Dataset,
                  dataset_pool: Dataset,
-                 kernel_config):
-        super().__init__(args, dataset_train, kernel_config)
+                 kernel_config, kernel_config_surrogate):
         self.args = args
+        self.evaluator = Evaluator(args, dataset_train, kernel_config)
+        self.surrogate = Evaluator(args, dataset_train, kernel_config_surrogate)
+        self.kernel = kernel_config_surrogate.kernel
+        self.dataset = dataset_train
         self.dataset_pool = dataset_pool
         self.max_uncertainty = 1.
         self.log_df = pd.DataFrame({'training_size': []})
@@ -328,10 +338,11 @@ class ActiveLearner(Evaluator):
 
     def train(self):
         X_train, y_train = self.dataset.X, self.dataset.y
-        self.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
+        self.evaluator.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
+        self.surrogate.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
 
     def evaluate(self):
-        train_metrics, test_metrics = self._evaluate_train_test(
+        train_metrics, test_metrics = self.evaluator._evaluate_train_test(
             self.dataset, self.dataset_pool, test_log='test_active_%d.log' % self.current_size)
         self.log_df.loc[len(self.log_df)] = [self.current_size] + test_metrics
         for i, metric in enumerate(self.args.metrics):
@@ -341,11 +352,11 @@ class ActiveLearner(Evaluator):
         pool_idx = self.pool_idx()
         X, y = self.dataset_pool.X[pool_idx], self.dataset_pool.y[pool_idx]
         if self.args.learning_algorithm == 'supervised':
-            y_pred = self.model.predict(X)
+            y_pred = self.surrogate.model.predict(X)
             y_abse = abs(y_pred - y)
             add_idx = self._get_add_samples_idx(y_abse, pool_idx)
         elif self.args.learning_algorithm == 'unsupervised':
-            y_pred, y_std = self.model.predict(X, return_std=True)
+            y_pred, y_std = self.surrogate.model.predict(X, return_std=True)
             self.max_uncertainty = y_std.max()
             print('Add sample with maximum uncertainty: %f' % self.max_uncertainty)
             add_idx = self._get_add_samples_idx(y_std, pool_idx)

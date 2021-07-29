@@ -15,11 +15,12 @@ def main(args: ActiveLearningArgs) -> None:
     dataset = Dataset.load(args.save_dir)
     dataset.graph_kernel_type = args.graph_kernel_type
     kernel_config = get_kernel_config(args, dataset)
+    kernel_config_surrogate = get_kernel_config(args, dataset, k_pkl='kernel_surrogate.pkl')
     dataset, dataset_pool = dataset.split(
         split_type="random",
         sizes=(args.initial_size/len(dataset),
                1 - args.initial_size/len(dataset)))
-    ActiveLearner(args, dataset, dataset_pool, kernel_config).run()
+    ActiveLearner(args, dataset, dataset_pool, kernel_config, kernel_config_surrogate).run()
 
 
 if __name__ == '__main__':
