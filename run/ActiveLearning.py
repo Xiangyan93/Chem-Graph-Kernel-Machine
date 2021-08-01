@@ -14,8 +14,12 @@ from chemml.evaluator import ActiveLearner
 def main(args: ActiveLearningArgs) -> None:
     dataset = Dataset.load(args.save_dir)
     dataset.graph_kernel_type = args.graph_kernel_type
-    kernel_config = get_kernel_config(args, dataset)
-    kernel_config_surrogate = get_kernel_config(args, dataset, k_pkl='kernel_surrogate.pkl')
+    kernel_config = get_kernel_config(args, dataset, kernel_pkl=os.path.join(args.save_dir, 'kernel.pkl'))
+    if args.surrogate_kernel is not None:
+        kernel_config_surrogate = get_kernel_config(args, dataset,
+                                                    kernel_pkl=os.path.join(args.save_dir, 'kernel_surrogate.pkl'))
+    else:
+        kernel_config_surrogate = kernel_config
     dataset, dataset_pool = dataset.split(
         split_type="random",
         sizes=(args.initial_size/len(dataset),
