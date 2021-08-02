@@ -23,7 +23,9 @@ def main(args: ActiveLearningArgs) -> None:
     dataset, dataset_pool = dataset.split(
         split_type="random",
         sizes=(args.initial_size/len(dataset),
-               1 - args.initial_size/len(dataset)))
+               1 - args.initial_size/len(dataset)),
+        seed=args.seed
+    )
     ActiveLearner(args, dataset, dataset_pool, kernel_config, kernel_config_surrogate).run()
 
 
