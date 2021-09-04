@@ -7,7 +7,7 @@ import numpy as np
 
 
 Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
-                 'rmse', 'mae', 'mse', 'r2']
+                 'rmse', 'mae', 'mse', 'r2', 'max']
 
 
 class CommonArgs(Tap):
@@ -73,7 +73,7 @@ class CommonArgs(Tap):
             used_columns = self.graph_columns
             if self.feature_columns is not None:
                 used_columns += self.feature_columns
-            for key in self.graph_columns:
+            for key in used_columns:
                 keys.remove(key)
             self.target_columns = keys
 
@@ -183,6 +183,8 @@ class TrainArgs(KernelArgs):
     """If set True, evaluate the model on training set."""
     detail: bool = False
     """If set True, 5 most similar molecules in the training set will be save in the test_*.log."""
+    save_model: bool = False
+    """Save the trained model file."""
 
     @property
     def metrics(self) -> List[str]:
@@ -214,7 +216,7 @@ class TrainArgs(KernelArgs):
         if self.dataset_type == 'regression':
             assert self.model_type in ['gpr', 'gpr_nystrom']
             for metric in self.metrics:
-                assert metric in ['rmse', 'mae', 'mse', 'r2']
+                assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
         elif self.dataset_type == 'classification':
             assert self.model_type in ['gpc', 'svc']
             for metric in self.metrics:
@@ -244,6 +246,21 @@ class TrainArgs(KernelArgs):
             self.optimizer = None
         if not hasattr(self, 'batch_size'):
             self.batch_size = None
+
+        if self.save_model:
+            assert self.num_folds == 1
+            assert self.split_sizes[0] > 0.99999
+            assert self.model_type == 'gpr'
+
+
+class PredictArgs(TrainArgs):
+    test_path: str
+    """Path to CSV file containing testing data for which predictions will be made."""
+    preds_path: str = 'test.log'
+    """Path to CSV file where predictions will be saved."""
+
+    def process_args(self) -> None:
+        super().process_args()
 
 
 class HyperoptArgs(TrainArgs):

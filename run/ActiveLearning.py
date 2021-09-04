@@ -21,7 +21,7 @@ def main(args: ActiveLearningArgs) -> None:
     else:
         kernel_config_surrogate = kernel_config
     dataset, dataset_pool = dataset.split(
-        split_type="random",
+        split_type="random", seed=args.seed,
         sizes=(args.initial_size/len(dataset),
                1 - args.initial_size/len(dataset)),
         seed=args.seed

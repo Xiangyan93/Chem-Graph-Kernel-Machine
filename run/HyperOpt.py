@@ -43,7 +43,8 @@ def Bayesian(args: HyperoptArgs, dataset: Dataset, kernel_config):
         if not args.minimize_score:
             result = - result
         results.append(result)
-        dataset.graph_kernel_type = args.graph_kernel_type
+        dataset.graph_kernel_type = 'graph'
+        args.graph_kernel_type = 'graph'
         save_best_params(results, hyperdicts, kernel_config, args)
         return result
 

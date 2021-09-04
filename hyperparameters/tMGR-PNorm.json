@@ -165,7 +165,7 @@
   "Additive_p",
   "fixed"
  ],
- "probability_Concentration": {
+ "probability_Concentration_norm": {
   "Assign_p": [
    1.0,
    "fixed"

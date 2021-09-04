@@ -36,21 +36,24 @@ class Evaluator:
         self.set_model(args)
 
     def evaluate(self):
+        # Train a model using all data.
+        if self.args.save_model:
+            return self._train()
         # Leave-One-Out cross validation
         if self.args.split_type == 'loocv':
             return self._evaluate_loocv()
 
         # Transform graph kernel to preCalc kernel.
-        if self.args.num_folds != 1 and self.kernel.__class__ != PreCalcKernel \
-                and self.args.graph_kernel_type == 'graph':
+        if self.kernel.__class__ != PreCalcKernel and self.args.graph_kernel_type == 'graph':
             self.make_kernel_precalc()
+            self.set_model(self.args)
+            self.dataset.graph_kernel_type = 'preCalc'
 
         # Initialization
-        train_results = dict()
-        test_results = dict()
+        train_metrics_results = dict()
         for metric in self.args.metrics:
-            train_results[metric] = []
-            test_results[metric] = []
+            train_metrics_results[metric] = []
+        test_metrics_results = train_metrics_results.copy()
 
         for i in range(self.args.num_folds):
             # data splits
@@ -58,27 +61,28 @@ class Evaluator:
                 self.args.split_type,
                 self.args.split_sizes,
                 seed=self.args.seed + i)
-            train_metrics, test_metrics = self._evaluate_train_test(dataset_train, dataset_test,
-                                                                    test_log='test_%d.log' % i)
+            train_metrics, test_metrics = self.evaluate_train_test(dataset_train, dataset_test,
+                                                                   train_log='train_%d.log' % i,
+                                                                   test_log='test_%d.log' % i)
             for j, metric in enumerate(self.args.metrics):
-                if self.args.evaluate_train:
-                    train_results[metric].append(train_metrics[j])
-                test_results[metric].append(test_metrics[j])
-
+                if train_metrics is not None:
+                    train_metrics_results[metric].append(train_metrics[j])
+                if test_metrics is not None:
+                    test_metrics_results[metric].append(test_metrics[j])
         if self.args.evaluate_train:
             print('\nTraining set:')
-            for metric, result in train_results.items():
-                print(metric,
-                      ': %.5f +/- %.5f' % (np.nanmean(result), np.nanstd(result)))
+            for metric, result in train_metrics_results.items():
+                print(metric, ': %.5f +/- %.5f' % (np.nanmean(result), np.nanstd(result)))
                 # print(np.asarray(result).ravel())
         print('\nTest set:')
-        for metric, result in test_results.items():
+        for metric, result in test_metrics_results.items():
             print(metric, ': %.5f +/- %.5f' % (np.nanmean(result), np.nanstd(result)))
-        return np.nanmean(test_results[self.args.metric])
+        return np.nanmean(test_metrics_results[self.args.metric])
 
-    def _evaluate_train_test(self, dataset_train: Dataset,
-                             dataset_test: Dataset,
-                             test_log: str = 'test.log') -> Tuple[List[float], List[float]]:
+    def evaluate_train_test(self, dataset_train: Dataset,
+                            dataset_test: Dataset,
+                            train_log: str = 'train.log',
+                            test_log: str = 'test.log') -> Tuple[Optional[List[float]], Optional[List[float]]]:
         X_train = dataset_train.X
         y_train = dataset_train.y
         repr_train = dataset_train.repr.ravel()
@@ -91,24 +95,14 @@ class Evaluator:
         else:
             y_similar = None
 
-        train_metrics = []
-        test_metrics = []
+        train_metrics = None
         if self.args.dataset_type == 'regression':
             self.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
-            y_pred, y_std = self.model.predict(X_test, return_std=True)
-            # save results test_0.log
-            self._output_df(df=pd.DataFrame({
-                'target': y_test.tolist(),
-                'predict': y_pred.tolist(),
-                'uncertainty': y_std.tolist(),
-                'repr': repr_test}), y_similar=y_similar). \
-                to_csv('%s/%s' % (self.args.save_dir, test_log), sep='\t',
-                       index=False, float_format='%15.10f')
-            # save results metric
-            for metric in self.args.metrics:
-                test_metrics.append(
-                    self._evaluate(y_test, y_pred, metric))
-
+            # save results test_*.log
+            test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
+                                      file='%s/%s' % (self.args.save_dir, test_log),
+                                      return_std=True,
+                                      proba=False)
             if self.args.evaluate_train:
                 y_pred, y_std = self.model.predict(X_train, return_std=True)
                 self._output_df(df=pd.DataFrame({
@@ -123,46 +117,48 @@ class Evaluator:
                         self._evaluate(y_train, y_pred, metric))
         else:
             self.model.fit(X_train, y_train)
-            if self.args.no_proba:
-                y_pred = self.model.predict(X_test)
-            else:
-                y_pred = self.model.predict_proba(X_test)
-            self._output_df(df=pd.DataFrame({
-                'target': y_test.tolist(),
-                'predict': y_pred.tolist(),
-                'repr': repr_test}), y_similar=y_similar). \
-                to_csv('%s/%s' % (self.args.save_dir, test_log), sep='\t',
-                       index=False, float_format='%15.10f')
-            for metric in self.args.metrics:
-                test_metrics.append(
-                    self._evaluate(y_test, y_pred, metric))
-
+            test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
+                                      file='%s/%s' % (self.args.save_dir, test_log),
+                                      return_std=False,
+                                      proba=not self.args.no_proba)
             if self.args.evaluate_train:
-                y_pred = self.model.predict(X_train)
-                for metric in self.args.metrics:
-                    train_metrics.append(
-                        self._evaluate(y_train, y_pred, metric))
+                train_metrics = self._eval(X_train, y_train, repr_train, y_similar=None,
+                                           file='%s/%s' % (self.args.save_dir, train_log),
+                                           return_std=False,
+                                           proba=not self.args.no_proba)
         return train_metrics, test_metrics
 
     def _evaluate_loocv(self):
-        X, y, X_repr = self.dataset.X, self.dataset.y, self.dataset.X_repr.ravel()
-        if self.args.optimizer is not None:
-            self.model.fit(X, y, loss='loocv', verbose=True)
-        y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
-        print('LOOCV:')
-        for metric in self.args.metrics:
-            print('%s: %.5f' % (metric, self._evaluate(y, y_pred, metric)))
+        X, y, repr = self.dataset.X, self.dataset.y, self.dataset.repr.ravel()
         if self.args.detail:
-            y_similar = self.get_similar_info(X, X, X_repr, 5)
+            y_similar = self.get_similar_info(X, X, repr, 5)
         else:
             y_similar = None
-        self._output_df(df=pd.DataFrame({
-            'target': y.tolist(),
-            'predict': y_pred.tolist(),
-            'uncertainty': y_std.tolist()}), y_similar=y_similar).to_csv(
-            '%s/loocv.log' % self.args.save_dir, sep='\t', index=False,
-            float_format='%15.10f')
-        return self._evaluate(y, y_pred, self.args.metric)
+        # optimize hyperparameters.
+        if self.args.optimizer is not None:
+            self.model.fit(X, y, loss='loocv', verbose=True)
+        loocv_metrics = self._eval(X, y, repr, y_similar,
+                                  file='%s/%s' % (self.args.save_dir, 'loocv.log'),
+                                  return_std=False, loocv=True,
+                                  proba=False)
+        print('LOOCV:')
+        for i, metric in enumerate(self.args.metrics):
+            print(metric, ': %.5f' % loocv_metrics[i])
+        return loocv_metrics[0]
+
+    def _train(self):
+        X = self.dataset.X
+        y = self.dataset.y
+        repr_train = self.dataset.repr.ravel()
+
+        if self.args.dataset_type == 'regression':
+            self.model.fit(X, y, loss=self.args.loss, verbose=True)
+        else:
+            self.model.fit(X, y)
+        # save the model
+        self.dataset.graph_kernel_type = 'graph'
+        self.model.X_train_ = self.dataset.X
+        self.model.save(self.args.save_dir, overwrite=True)
 
     def get_similar_info(self, X, X_train, X_repr, n_most_similar):
         K = self.kernel(X, X_train)
@@ -227,23 +223,47 @@ class Evaluator:
             raise RuntimeError(f'Unsupport model:{args.model_type}')
 
     @staticmethod
-    def _output_df(df: pd.DataFrame, y_similar: List = None):
-        if y_similar is not None:
-            df['y_similar'] = y_similar
-        return df
+    def _output_df(**kwargs):
+        df = kwargs.copy()
+        for key, value in kwargs.items():
+            if value is None:
+                df.pop(key)
+        return pd.DataFrame(df)
 
-    def _evaluate(self, y, y_pred, metrics):
+    def _eval(self, X, y, repr, y_similar, file, return_std=False, proba=False, loocv=False):
+        if loocv:
+            y_pred, y_std = self.model.predict_loocv(X, y, return_std=True)
+        elif return_std:
+            y_pred, y_std = self.model.predict(X, return_std=True)
+        elif proba:
+            y_pred = self.model.predict_proba(X)
+            y_std = None
+        else:
+            y_pred = self.model.predict(X)
+            y_std = None
+        self._output_df(target=y,
+                        predict=y_pred,
+                        uncertainty=y_std,
+                        repr=repr,
+                        y_similar=y_similar). \
+            to_csv(file, sep='\t', index=False, float_format='%15.10f')
+        if y is None:
+            return None
+        else:
+            return [self._eval_metric(y, y_pred, metric) for metric in self.args.metrics]
+
+    def _eval_metric(self, y, y_pred, metric: str) -> float:
         if y.ndim == 2 and y_pred.ndim == 2:
             num_tasks = y.shape[1]
             results = []
             for i in range(num_tasks):
                 results.append(self._metric_func(y[:, i], y_pred[:, i],
-                                                      metrics))
+                                                 metric))
             return np.nanmean(results)
         else:
-            return self._metric_func(y, y_pred, metrics)
+            return self._metric_func(y, y_pred, metric)
 
-    def _metric_func(self, y, y_pred, metrics):
+    def _metric_func(self, y, y_pred, metric: str) -> float:
         # y_pred has nan may happen when train_y are all 1 or 0.
         if y_pred.dtype != object and True in np.isnan(y_pred):
             return np.nan
@@ -256,28 +276,30 @@ class Evaluator:
             if 0 not in y or 1 not in y:
                 return np.nan
 
-        if metrics == 'roc-auc':
+        if metric == 'roc-auc':
             return roc_auc_score(y, y_pred)
-        elif metrics == 'accuracy':
+        elif metric == 'accuracy':
             return accuracy_score(y, y_pred)
-        elif metrics == 'precision':
+        elif metric == 'precision':
             return precision_score(y, y_pred, average='macro')
-        elif metrics == 'recall':
+        elif metric == 'recall':
             return recall_score(y, y_pred, average='macro')
-        elif metrics == 'f1_score':
+        elif metric == 'f1_score':
             return f1_score(y, y_pred, average='macro')
-        elif metrics == 'precision':
+        elif metric == 'precision':
             return precision_score(y, y_pred, average='macro')
-        elif metrics == 'r2':
+        elif metric == 'r2':
             return r2_score(y, y_pred)
-        elif metrics == 'mae':
+        elif metric == 'mae':
             return mean_absolute_error(y, y_pred)
-        elif metrics == 'mse':
+        elif metric == 'mse':
             return mean_squared_error(y, y_pred)
-        elif metrics == 'rmse':
+        elif metric == 'rmse':
             return np.sqrt(self._metric_func(y, y_pred, 'mse'))
+        elif metric == 'max':
+            return np.max(abs(y - y_pred))
         else:
-            raise RuntimeError(f'Unsupported metrics {metrics}')
+            raise RuntimeError(f'Unsupported metrics {metric}')
 
 
 class ActiveLearner:
@@ -349,7 +371,7 @@ class ActiveLearner:
         self.evaluator.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
         train_metrics, test_metrics = self.evaluator._evaluate_train_test(
             self.dataset, self.dataset_pool, test_log='test_active_%d.log' % self.current_size)
-        self.log_df.loc[len(self.log_df)] = [self.current_size] + test_metrics
+        self.log_df.loc[len(self.log_df)] = [self.current_size, self.max_uncertainty] + test_metrics
         for i, metric in enumerate(self.args.metrics):
             print('%s: %.5f' % (metric, test_metrics[i]))
 
