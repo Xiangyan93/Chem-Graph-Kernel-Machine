@@ -328,23 +328,29 @@ class ActiveLearningArgs(TrainArgs):
     stop_uncertainty: float = None
     """If learning_algorithm='unsupervised', stop active learning if the 
     uncertainty is smaller than stop_uncertainty."""
-    stop_size: int
+    evaluate_uncertainty: List[float] = None
+    """Evaluate the performance at the steps that the posterior uncertainty reach the setting values."""
+    stop_size: int = None
     """Stop active learning when N samples are selected."""
-    evaluate_stride: int = 100
+    evaluate_stride: int = None
     """Evaluate the model performance every N samples."""
+    surrogate_kernel: str = None
+    """Specify the kernel pickle file for surrogate model."""
     def process_args(self) -> None:
         super().process_args()
         # active learning is only valid for GPR
         assert self.dataset_type == 'regression'
         assert self.model_type == 'gpr'
         assert self.split_type == 'random'
-        if self.stop_uncertainty is not None:
+        if self.stop_uncertainty is not None or self.evaluate_uncertainty is not None:
             assert self.learning_algorithm == 'unsupervised'
         if self.cluster_size is not None:
             assert self.sample_add_algorithm == 'cluster'
         if self.sample_add_algorithm == 'nlargest':
             self.cluster_size = self.add_size
         assert self.initial_size >= 2
+        if self.surrogate_kernel is not None:
+            assert self.graph_kernel_type == 'preCalc'
 
 
 class EmbeddingArgs(KernelArgs):
