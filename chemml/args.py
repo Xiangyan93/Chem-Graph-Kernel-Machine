@@ -17,6 +17,8 @@ class CommonArgs(Tap):
     """The cpu numbers used for parallel computing."""
     data_path: str = None
     """The Path of input data CSV file."""
+    data_public: Literal['qm7', 'qm9'] = None
+    """Use public data sets."""
     pure_columns: List[str] = None
     """
     For pure compounds.

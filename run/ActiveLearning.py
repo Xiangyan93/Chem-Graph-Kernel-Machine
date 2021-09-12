@@ -9,6 +9,7 @@ from chemml.args import ActiveLearningArgs
 from chemml.data.data import Dataset
 from chemml.kernels.utils import get_kernel_config
 from chemml.evaluator import ActiveLearner
+from chemml.data import dataset_split
 
 
 def main(args: ActiveLearningArgs) -> None:
@@ -20,11 +21,11 @@ def main(args: ActiveLearningArgs) -> None:
                                                     kernel_pkl=os.path.join(args.save_dir, 'kernel_surrogate.pkl'))
     else:
         kernel_config_surrogate = kernel_config
-    dataset, dataset_pool = dataset.split(
+    dataset, dataset_pool = dataset_split(
+        dataset,
         split_type="random", seed=args.seed,
         sizes=(args.initial_size/len(dataset),
                1 - args.initial_size/len(dataset)),
-        seed=args.seed
     )
     ActiveLearner(args, dataset, dataset_pool, kernel_config, kernel_config_surrogate).run()
 

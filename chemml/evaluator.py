@@ -17,12 +17,12 @@ from sklearn.metrics import (
     f1_score
 )
 from .args import TrainArgs, ActiveLearningArgs
-from .data import Dataset
+from .data import Dataset, dataset_split
 from .models.regression.GPRgraphdot import GPR, LRAGPR
 from .models.classification import GPC
 from .models.classification import SVC
 from .models.regression import ConsensusRegressor
-from .kernels import PreCalcKernel, PreCalcKernelConfig
+from .kernels import PreCalcKernel
 
 
 class Evaluator:
@@ -57,9 +57,10 @@ class Evaluator:
 
         for i in range(self.args.num_folds):
             # data splits
-            dataset_train, dataset_test = self.dataset.split(
-                self.args.split_type,
-                self.args.split_sizes,
+            dataset_train, dataset_test = dataset_split(
+                self.dataset,
+                split_type=self.args.split_type,
+                sizes=self.args.split_sizes,
                 seed=self.args.seed + i)
             train_metrics, test_metrics = self.evaluate_train_test(dataset_train, dataset_test,
                                                                    train_log='train_%d.log' % i,
