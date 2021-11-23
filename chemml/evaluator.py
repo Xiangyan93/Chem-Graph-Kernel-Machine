@@ -314,6 +314,8 @@ class ActiveLearner:
         self.kernel = kernel_config_surrogate.kernel
         self.dataset = dataset_train
         self.dataset_pool = dataset_pool
+        self.dataset_inactive = dataset_train.copy()
+        self.dataset_inactive.data = []
         self.max_uncertainty_current = 5.
         self.max_uncertainty_last = 5.
         self.log_df = pd.DataFrame({'training_size': []})
@@ -325,40 +327,45 @@ class ActiveLearner:
         return len(self.dataset)
 
     def run(self) -> None:
-        while True:
-            print('***\tStart: active learning, current size = %i\t***\n' % self.current_size)
-            print('**\tStart train\t**\n')
-            self.train()
-            if self.args.evaluate_stride is not None and self.current_size % self.args.evaluate_stride == 0:
-                print('\n**\tstart evaluate\t**\n')
-                self.evaluate()
-                print('\n**\tend evaluate\t**\n')
-            elif self.args.evaluate_uncertainty is not None:
-                for uncertainty in self.args.evaluate_uncertainty:
-                    if self.max_uncertainty_current < uncertainty < self.max_uncertainty_last:
-                        self.evaluate()
-                        break
-            print('**\tadding samples**\n')
-            if self.stop():
-                break
-            self.add_sample()
+        for stop_uncertainty in self.args.stop_uncertainty:
+            self.stop_uncertainty = stop_uncertainty
+            while True:
+                print('\n***\tStart: active learning\t***')
+                print('***\tactive size   = %i\t***' % self.current_size)
+                print('***\tpool size     = %i\t***' % len(self.dataset_pool))
+                print('***\tinactive size = %i\t***' % len(self.dataset_inactive))
+                print('**\tStart train\t**')
+                self.train()
+                if (self.args.evaluate_stride is not None and self.current_size % self.args.evaluate_stride == 0) or \
+                        len(self.dataset_pool) == 0:
+                    print('\n**\tstart evaluate\t**\n')
+                    self.evaluate()
+                    print('\n**\tend evaluate\t**\n')
+                #elif self.args.evaluate_uncertainty is not None:
+                #    for uncertainty in self.args.evaluate_uncertainty:
+                #        if self.max_uncertainty_current < uncertainty < self.max_uncertainty_last:
+                #            self.evaluate()
+                #            break
+                if self.stop():
+                    break
+                print('**\tadding samples**')
+                self.add_sample()
+
         if self.args.save_dir is not None:
             self.log_df.to_csv('%s/active_learning.log' % self.args.save_dir,
                                sep='\t', index=False, float_format='%15.10f')
             pd.DataFrame({'smiles': self.dataset.X_repr.ravel()}).to_csv('%s/training_smiles.csv' % self.args.save_dir,
                                                                  index=False)
-        self.evaluate()
-
         print('\n***\tEnd: active learning\t***\n')
 
     def stop(self) -> bool:
         # stop active learning when reach stop size.
-        if len(self.dataset) >= self.args.stop_size:
+        if self.args.stop_size is not None and len(self.dataset) >= self.args.stop_size:
             return True
         # stop active learning when pool data set is empty.
         elif len(self.dataset_pool) == 0:
-            return True
-        elif self.args.stop_uncertainty is not None and self.max_uncertainty_current < self.args.stop_uncertainty:
+            self.dataset_pool.data = self.dataset_inactive.data
+            self.dataset_inactive.data = []
             return True
         else:
             return False
@@ -370,9 +377,11 @@ class ActiveLearner:
     def evaluate(self):
         X_train, y_train = self.dataset.X, self.dataset.y
         self.evaluator.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
-        train_metrics, test_metrics = self.evaluator._evaluate_train_test(
-            self.dataset, self.dataset_pool, test_log='test_active_%d.log' % self.current_size)
-        self.log_df.loc[len(self.log_df)] = [self.current_size, self.max_uncertainty] + test_metrics
+        dataset_test = self.dataset_pool.copy()
+        dataset_test.data = self.dataset_pool.data + self.dataset_inactive.data
+        train_metrics, test_metrics = self.evaluator.evaluate_train_test(
+            self.dataset, dataset_test, test_log='test_active_%d.log' % self.current_size)
+        self.log_df.loc[len(self.log_df)] = [self.current_size] + test_metrics
         for i, metric in enumerate(self.args.metrics):
             print('%s: %.5f' % (metric, test_metrics[i]))
 
@@ -382,22 +391,31 @@ class ActiveLearner:
         if self.args.learning_algorithm == 'supervised':
             y_pred = self.surrogate.model.predict(X)
             y_abse = abs(y_pred - y)
-            add_idx = self._get_add_samples_idx(y_abse, pool_idx)
+            add_idx = self._get_add_samples_idx(y_abse, pool_idx).tolist()
+            confident_idx = []
         elif self.args.learning_algorithm == 'unsupervised':
             y_pred, y_std = self.surrogate.model.predict(X, return_std=True)
-            self.max_uncertainty_last = self.max_uncertainty_current
-            self.max_uncertainty_current = y_std.max()
-            print('Add sample with maximum uncertainty: %f' % self.max_uncertainty_current)
-            add_idx = self._get_add_samples_idx(y_std, pool_idx)
+            print('Add sample with maximum uncertainty: %f' % y_std.max())
+            add_idx = self._get_add_samples_idx(y_std, pool_idx).tolist()
+            # move data with uncertainty < self.args.stop_uncertainty
+            confident_idx = pool_idx[np.where(y_std < self.stop_uncertainty)[0]].tolist()
+            for i in add_idx:
+                if i in confident_idx:
+                    add_idx.remove(i)
         elif self.args.learning_algorithm == 'random':
             if len(pool_idx) < self.args.add_size:
-                add_idx = pool_idx
+                add_idx = pool_idx.tolist()
             else:
-                add_idx = np.random.choice(pool_idx, self.args.add_size, replace=False)
+                add_idx = np.random.choice(pool_idx, self.args.add_size, replace=False).tolist()
+            confident_idx = []
         else:
             raise Exception
-        for i in sorted(add_idx, reverse=True):
-            self.dataset.data.append(self.dataset_pool.data.pop(i))
+
+        for i in sorted(add_idx + confident_idx, reverse=True):
+            if i in add_idx:
+                self.dataset.data.append(self.dataset_pool.data.pop(i))
+            elif i in confident_idx:
+                self.dataset_inactive.data.append(self.dataset_pool.data.pop(i))
 
     def pool_idx(self) -> List[int]:
         idx = np.arange(len(self.dataset_pool))

@@ -5,7 +5,7 @@ import copy
 import ase
 import os
 import pickle
-from random import Random
+import json
 import numpy as np
 import pandas as pd
 import rdkit.Chem.AllChem as Chem
@@ -264,6 +264,8 @@ class CompositeDatapoint:
         return ';'.join(list(map(lambda x: x.__repr__(), self.data)))
 
     def set_features_mol(self, features_generator):
+        if features_generator is None:
+            return
         assert len(self.data_3d) == 0
         assert len(self.data_m) == 0
         assert len(self.data_cr) == 0
@@ -647,7 +649,6 @@ class Dataset:
                     args.mixture_type,
                     (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[n1+n2:n1+n2+n3],
                     args.reaction_type,
-                    [],
                     to_numpy(g[1][args.target_columns]),
                     to_numpy(g[1][args.feature_columns]),
                     args.features_generator
@@ -675,8 +676,15 @@ def tolist(list_: Union[pd.Series, List]) -> List[str]:
     if list_ is None:
         return []
     else:
-        # eval(x) for mixture input.
-        return list(map(lambda x: eval(x) if (',' in x) and (x[0] == '[') and (x[-1] == ']') else x, list_))
+        result = []
+        for string_ in list_:
+            # print(1)
+            # print(string_)
+            if ',' in string_:
+                result.append(json.loads(string_))
+            else:
+                result.append(string_)
+        return result
 
 
 def to_numpy(list_: pd.Series) -> Optional[np.ndarray]:

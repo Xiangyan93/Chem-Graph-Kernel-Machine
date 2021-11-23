@@ -71,6 +71,15 @@ python3 ModelEvaluate.py --save_dir freesolv --graph_kernel_type preCalc --datas
 python3 Predict.py --save_dir freesolv --test_path datasets/predict.csv --pure_columns smiles --features_generator rdkit_2d_normalized --n_jobs 6 --graph_kernel_type graph --graph_hyperparameters datasets/Public/freesolv/hyperparameters_0.json --features_hyperparameters_file datasets/Public/freesolv/sigma_RBF.json --dataset_type regression --model_type gpr --alpha 0.01 --metric rmse --preds_path test.log
 ```
 
+## Mixtures
+Property prediction of mixtures, using CO2 adsorption of ionic liquid as an example.
+```
+python3 ReadData.py --save_dir co2 --data_path pure_f.csv --mixture_columns smiles --feature_columns T P --target_columns Solubility --n_jobs 6 --group_reading
+python3 HyperOpt.py --save_dir co2 --graph_kernel_type graph --dataset_type regression --model_type gpr --split_type random --metric rmse --num_folds 10 --graph_hyperparameters ../hyperparameters/tMGR-PNorm.json --num_iters 100 --seed 0 --alpha 0.01 --alpha_bounds 0.008 0.02 --features_hyperparameters 50.0 10.0 --features_hyperparameters_min 1 1 --features_hyperparameters_max 100 100
+python3 KernelCalc.py --save_dir co2 --graph_kernel_type graph --graph_hyperparameters co2/hyperparameters_0.json
+python3 ModelEvaluate.py --save_dir co2 --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 10 --features_hyperparameters 50.0 10.0
+```
+
 ## Classification
 We use bbbp data set as an example.
 

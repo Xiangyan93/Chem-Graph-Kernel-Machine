@@ -83,6 +83,10 @@ class CommonArgs(Tap):
         if not os.path.exists(self.save_dir):
             os.mkdir(self.save_dir)
 
+        if self.group_reading:
+            if self.feature_columns is None:
+                raise ValueError('feature_columns must be assigned when using group_reading.')
+
 
 class KernelArgs(CommonArgs):
     graph_kernel_type: Literal['graph', 'preCalc'] = None
@@ -327,11 +331,9 @@ class ActiveLearningArgs(TrainArgs):
     cluster_size: int = None
     """If sample_add_algorithm='cluster', N worst samples are selected for 
     clustering."""
-    stop_uncertainty: float = None
+    stop_uncertainty: List[float] = None
     """If learning_algorithm='unsupervised', stop active learning if the 
     uncertainty is smaller than stop_uncertainty."""
-    evaluate_uncertainty: List[float] = None
-    """Evaluate the performance at the steps that the posterior uncertainty reach the setting values."""
     stop_size: int = None
     """Stop active learning when N samples are selected."""
     evaluate_stride: int = None
@@ -344,7 +346,7 @@ class ActiveLearningArgs(TrainArgs):
         assert self.dataset_type == 'regression'
         assert self.model_type == 'gpr'
         assert self.split_type == 'random'
-        if self.stop_uncertainty is not None or self.evaluate_uncertainty is not None:
+        if self.stop_uncertainty is not None:
             assert self.learning_algorithm == 'unsupervised'
         if self.cluster_size is not None:
             assert self.sample_add_algorithm == 'cluster'
@@ -353,6 +355,11 @@ class ActiveLearningArgs(TrainArgs):
         assert self.initial_size >= 2
         if self.surrogate_kernel is not None:
             assert self.graph_kernel_type == 'preCalc'
+
+        if self.stop_uncertainty is None:
+            self.stop_uncertainty = [-1.0]
+        else:
+            self.stop_uncertainty.sort(reverse=True)
 
 
 class EmbeddingArgs(KernelArgs):
