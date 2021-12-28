@@ -153,7 +153,7 @@ class TrainArgs(KernelArgs):
     """
     Type of dataset. This determines the loss function used during training.
     """
-    model_type: Literal['gpr', 'svc', 'gpc', 'gpr_nystrom']
+    model_type: Literal['gpr', 'svc', 'svr', 'gpc', 'gpr_nystrom']
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
@@ -220,7 +220,7 @@ class TrainArgs(KernelArgs):
     def process_args(self) -> None:
         super().process_args()
         if self.dataset_type == 'regression':
-            assert self.model_type in ['gpr', 'gpr_nystrom']
+            assert self.model_type in ['gpr', 'gpr_nystrom', 'svr']
             for metric in self.metrics:
                 assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
         elif self.dataset_type == 'classification':

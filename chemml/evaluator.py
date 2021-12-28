@@ -21,6 +21,7 @@ from .data import Dataset, dataset_split
 from .models.regression.GPRgraphdot import GPR, LRAGPR
 from .models.classification import GPC
 from .models.classification import SVC
+from .models.regression import SVR
 from .models.regression import ConsensusRegressor
 from .kernels import PreCalcKernel
 
@@ -97,7 +98,7 @@ class Evaluator:
             y_similar = None
 
         train_metrics = None
-        if self.args.dataset_type == 'regression':
+        if self.args.dataset_type == 'regression' and self.args.model_type == 'gpr':
             self.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
             # save results test_*.log
             test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
@@ -114,8 +115,24 @@ class Evaluator:
                     to_csv('%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')), sep='\t',
                            index=False, float_format='%15.10f')
                 for metric in self.args.metrics:
-                    train_metrics.append(
-                        self._evaluate(y_train, y_pred, metric))
+                    train_metrics.append(self._eval_metric(y_train, y_pred, metric))
+        elif self.args.dataset_type == 'regression' and self.args.model_type == 'svr':
+            self.model.fit(X_train, y_train)
+            # save results test_*.log
+            test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
+                                      file='%s/%s' % (self.args.save_dir, test_log),
+                                      return_std=False,
+                                      proba=False)
+            if self.args.evaluate_train:
+                y_pred = self.model.predict(X_train)
+                self._output_df(df=pd.DataFrame({
+                    'target': y_train.tolist(),
+                    'predict': y_pred.tolist(),
+                    'repr': repr_train})). \
+                    to_csv('%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')), sep='\t',
+                           index=False, float_format='%15.10f')
+                for metric in self.args.metrics:
+                    train_metrics.append(self._eval_metric(y_train, y_pred, metric))
         else:
             self.model.fit(X_train, y_train)
             test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
@@ -219,6 +236,11 @@ class Evaluator:
                 kernel=self.kernel,
                 C=args.C_,
                 probability=True
+            )
+        elif args.model_type == 'svr':
+            self.model = SVR(
+                kernel=self.kernel,
+                C=args.C_,
             )
         else:
             raise RuntimeError(f'Unsupport model:{args.model_type}')
