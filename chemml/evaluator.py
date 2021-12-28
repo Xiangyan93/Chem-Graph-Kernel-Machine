@@ -52,9 +52,10 @@ class Evaluator:
 
         # Initialization
         train_metrics_results = dict()
+        test_metrics_results = dict()
         for metric in self.args.metrics:
             train_metrics_results[metric] = []
-        test_metrics_results = train_metrics_results.copy()
+            test_metrics_results[metric] = []
 
         for i in range(self.args.num_folds):
             # data splits
@@ -106,16 +107,10 @@ class Evaluator:
                                       return_std=True,
                                       proba=False)
             if self.args.evaluate_train:
-                y_pred, y_std = self.model.predict(X_train, return_std=True)
-                self._output_df(df=pd.DataFrame({
-                    'target': y_train.tolist(),
-                    'predict': y_pred.tolist(),
-                    'uncertainty': y_std.tolist(),
-                    'repr': repr_train})). \
-                    to_csv('%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')), sep='\t',
-                           index=False, float_format='%15.10f')
-                for metric in self.args.metrics:
-                    train_metrics.append(self._eval_metric(y_train, y_pred, metric))
+                train_metrics = self._eval(X_train, y_train, repr_train, repr_train,
+                                           file='%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')),
+                                           return_std=True,
+                                           proba=False)
         elif self.args.dataset_type == 'regression' and self.args.model_type == 'svr':
             self.model.fit(X_train, y_train)
             # save results test_*.log
@@ -124,15 +119,11 @@ class Evaluator:
                                       return_std=False,
                                       proba=False)
             if self.args.evaluate_train:
-                y_pred = self.model.predict(X_train)
-                self._output_df(df=pd.DataFrame({
-                    'target': y_train.tolist(),
-                    'predict': y_pred.tolist(),
-                    'repr': repr_train})). \
-                    to_csv('%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')), sep='\t',
-                           index=False, float_format='%15.10f')
-                for metric in self.args.metrics:
-                    train_metrics.append(self._eval_metric(y_train, y_pred, metric))
+                if self.args.evaluate_train:
+                    train_metrics = self._eval(X_train, y_train, repr_train, repr_train,
+                                               file='%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')),
+                                               return_std=False,
+                                               proba=False)
         else:
             self.model.fit(X_train, y_train)
             test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
