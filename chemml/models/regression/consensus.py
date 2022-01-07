@@ -7,10 +7,11 @@ from joblib import Parallel, delayed
 from sklearn.utils.fixes import _joblib_parallel_args
 from ...models.regression.GPRgraphdot import GPR as GPRgraphdot
 from ...models.regression.GPRsklearn.gpr import GPR as GPRsklearn
-from .GPRgraphdot.gpr import _predict
+from .GPRgraphdot.gpr import predict_
+from sklearn.ensemble._forest import RandomForestRegressor
 
 
-def _parallel_build_models(model, models, X, y, id, model_idx, n_models,
+def _parallel_build_models(model, models, X, y, model_idx, n_models,
                            verbose=0):
     """
     Private function used to fit a consensus model in parallel."""
@@ -27,7 +28,6 @@ def _parallel_build_models(model, models, X, y, id, model_idx, n_models,
         raise RuntimeError(
             'X must be 1 or 2 dimensional'
         )
-    model.X_id_ = id[idx]
     return model
 
 
@@ -45,13 +45,8 @@ def _accumulate_prediction(predict, X, out, out_u, lock, return_std=False):
             out_u.append(uncertainty)
     else:
         prediction = predict(X, return_std=False)
-
         with lock:
-            if len(out) == 1:
-                out[0].append(prediction)
-            else:
-                for i in range(len(out)):
-                    out[i].append(prediction)
+            out.append(prediction)
 
 
 class ConsensusRegressor:
@@ -66,19 +61,19 @@ class ConsensusRegressor:
         self.consensus_rule = consensus_rule
         assert (n_estimators > 0)
 
-    def fit(self, X, y, id):
-        models = [copy.copy(self.model) for i in range(self.n_estimators)]
+    def fit(self, X, y):
+        models = [copy.deepcopy(self.model) for i in range(self.n_estimators)]
         models = Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
                           **_joblib_parallel_args(prefer='processes'))(
             delayed(_parallel_build_models)(
-                m, self, X, y, id, i, len(models), verbose=self.verbose)
+                m, self, X, y, i, len(models), verbose=self.verbose)
             for i, m in enumerate(models))
         self.models.extend(models)
 
     def predict(self, X, return_std=False, return_cov=False):
         assert (not return_cov)
-        if self.model.__class__ in [GPRgraphdot, GPRsklearn]:
-            return _predict(self.predict_gpr, X, return_std=return_std,
+        if self.model.__class__ in [GPRgraphdot]:
+            return predict_(self.predict_gpr, X, return_std=return_std,
                             return_cov=return_cov)
         else:
             raise RuntimeError(
@@ -92,7 +87,7 @@ class ConsensusRegressor:
         # Parallel loop
         lock = threading.Lock()
         Parallel(n_jobs=self.n_jobs, verbose=self.verbose,
-                 **_joblib_parallel_args(prefer='processes'))(
+                 **_joblib_parallel_args(require='sharedmem'))(
             delayed(_accumulate_prediction)(m.predict, X, y_hat, u_hat, lock,
                                             return_std=return_std)
             for m in self.models)

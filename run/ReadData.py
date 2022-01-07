@@ -10,7 +10,11 @@ from chemml.data import Dataset
 
 def main(args: CommonArgs) -> None:
     print('Preprocessing Dataset.')
-    dataset = Dataset.from_csv(args)
+    if args.data_path is not None:
+        dataset = Dataset.from_csv(args)
+    else:
+        assert args.data_public is not None
+        dataset = Dataset.from_public(args)
     dataset.save(args.save_dir, overwrite=True)
     print('Preprocessing Dataset Finished.')
 

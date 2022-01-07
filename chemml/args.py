@@ -7,7 +7,7 @@ import numpy as np
 
 
 Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
-                 'rmse', 'mae', 'mse', 'r2']
+                 'rmse', 'mae', 'mse', 'r2', 'max']
 
 
 class CommonArgs(Tap):
@@ -17,6 +17,8 @@ class CommonArgs(Tap):
     """The cpu numbers used for parallel computing."""
     data_path: str = None
     """The Path of input data CSV file."""
+    data_public: Literal['qm7', 'qm9'] = None
+    """Use public data sets."""
     pure_columns: List[str] = None
     """
     For pure compounds.
@@ -73,13 +75,17 @@ class CommonArgs(Tap):
             used_columns = self.graph_columns
             if self.feature_columns is not None:
                 used_columns += self.feature_columns
-            for key in self.graph_columns:
+            for key in used_columns:
                 keys.remove(key)
             self.target_columns = keys
 
     def process_args(self) -> None:
         if not os.path.exists(self.save_dir):
             os.mkdir(self.save_dir)
+
+        if self.group_reading:
+            if self.feature_columns is None:
+                raise ValueError('feature_columns must be assigned when using group_reading.')
 
 
 class KernelArgs(CommonArgs):
@@ -147,7 +153,7 @@ class TrainArgs(KernelArgs):
     """
     Type of dataset. This determines the loss function used during training.
     """
-    model_type: Literal['gpr', 'svc', 'gpc', 'gpr_nystrom']
+    model_type: Literal['gpr', 'svc', 'svr', 'gpc', 'gpr_nystrom', 'gpr_nle']
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
@@ -173,6 +179,10 @@ class TrainArgs(KernelArgs):
     ensemble_rule: Literal['smallest_uncertainty', 'weight_uncertainty',
                            'mean'] = 'weight_uncertainty'
     """The rule to combining prediction from estimators."""
+    n_local: int = 500
+    """The number of samples used in Naive Local Experts."""
+    n_core: int = 500
+    """The number of samples used in Nystrom core set."""
     metric: Metric = None
     """metric"""
     extra_metrics: List[Metric] = []
@@ -183,6 +193,8 @@ class TrainArgs(KernelArgs):
     """If set True, evaluate the model on training set."""
     detail: bool = False
     """If set True, 5 most similar molecules in the training set will be save in the test_*.log."""
+    save_model: bool = False
+    """Save the trained model file."""
 
     @property
     def metrics(self) -> List[str]:
@@ -212,9 +224,9 @@ class TrainArgs(KernelArgs):
     def process_args(self) -> None:
         super().process_args()
         if self.dataset_type == 'regression':
-            assert self.model_type in ['gpr', 'gpr_nystrom']
+            assert self.model_type in ['gpr', 'gpr_nystrom', 'gpr_nle', 'svr']
             for metric in self.metrics:
-                assert metric in ['rmse', 'mae', 'mse', 'r2']
+                assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
         elif self.dataset_type == 'classification':
             assert self.model_type in ['gpc', 'svc']
             for metric in self.metrics:
@@ -244,6 +256,21 @@ class TrainArgs(KernelArgs):
             self.optimizer = None
         if not hasattr(self, 'batch_size'):
             self.batch_size = None
+
+        if self.save_model:
+            assert self.num_folds == 1
+            assert self.split_sizes[0] > 0.99999
+            assert self.model_type == 'gpr'
+
+
+class PredictArgs(TrainArgs):
+    test_path: str
+    """Path to CSV file containing testing data for which predictions will be made."""
+    preds_path: str = 'test.log'
+    """Path to CSV file where predictions will be saved."""
+
+    def process_args(self) -> None:
+        super().process_args()
 
 
 class HyperoptArgs(TrainArgs):
@@ -308,13 +335,15 @@ class ActiveLearningArgs(TrainArgs):
     cluster_size: int = None
     """If sample_add_algorithm='cluster', N worst samples are selected for 
     clustering."""
-    stop_uncertainty: float = None
+    stop_uncertainty: List[float] = None
     """If learning_algorithm='unsupervised', stop active learning if the 
     uncertainty is smaller than stop_uncertainty."""
-    stop_size: int
+    stop_size: int = None
     """Stop active learning when N samples are selected."""
-    evaluate_stride: int = 100
+    evaluate_stride: int = None
     """Evaluate the model performance every N samples."""
+    surrogate_kernel: str = None
+    """Specify the kernel pickle file for surrogate model."""
     def process_args(self) -> None:
         super().process_args()
         # active learning is only valid for GPR
@@ -328,6 +357,13 @@ class ActiveLearningArgs(TrainArgs):
         if self.sample_add_algorithm == 'nlargest':
             self.cluster_size = self.add_size
         assert self.initial_size >= 2
+        if self.surrogate_kernel is not None:
+            assert self.graph_kernel_type == 'preCalc'
+
+        if self.stop_uncertainty is None:
+            self.stop_uncertainty = [-1.0]
+        else:
+            self.stop_uncertainty.sort(reverse=True)
 
 
 class EmbeddingArgs(KernelArgs):

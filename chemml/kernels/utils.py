@@ -32,7 +32,7 @@ def get_features_hyperparameters(args: KernelArgs, N_RBF: int) -> \
 
 
 def get_kernel_config(args: KernelArgs, dataset: Dataset,
-                      kernel_dict: Dict = None):
+                      kernel_dict: Dict = None, kernel_pkl: str = 'kernel.pkl'):
     if args.graph_kernel_type is None:
         N_RBF = dataset.N_features_mol + dataset.N_features_add
         assert N_RBF != 0
@@ -76,7 +76,6 @@ def get_kernel_config(args: KernelArgs, dataset: Dataset,
         )
 
         if kernel_dict is None:
-            kernel_pkl = os.path.join(args.save_dir, 'kernel.pkl')
             kernel_dict = pickle.load(open(kernel_pkl, 'rb'))
         params = {
             'kernel_dict': kernel_dict,

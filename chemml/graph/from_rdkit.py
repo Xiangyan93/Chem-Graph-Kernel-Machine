@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+
 CWD = os.path.dirname(os.path.abspath(__file__))
 from typing import Dict, List, Tuple, Optional
 import networkx as nx
@@ -29,7 +30,7 @@ def get_bond_orientation_dict(mol: Chem.Mol) -> Dict[Tuple[int, int], int]:
 def get_atom_ring_stereo(
         mol: Chem.Mol,
         atom: Chem.Atom,
-        ring_idx : Tuple[int],
+        ring_idx: Tuple[int],
         depth: int = 5,
         bond_orientation_dict: Optional[Dict[Tuple[int, int], int]] = None):
     """Return an atom is upward or downward refer to a ring plane.
@@ -296,7 +297,7 @@ class rdkit_config:
             node['Concentration'] = self.concentration / 2
             node['SingleAtom'] = True
         else:
-            node['Concentration'] = self.concentration / mol.GetNumAtoms()
+            node['Concentration'] = self.concentration  # / mol.GetNumAtoms()
             node['SingleAtom'] = False
         if self.set_elemental_mode:
             emode = self.emode
@@ -364,7 +365,7 @@ class rdkit_config:
                              usehash=True, sum=True):
         if mol.GetNumBonds() == 0:
             for i, atom in enumerate(mol.GetAtoms()):
-                for depth_ in range(1, depth+1):
+                for depth_ in range(1, depth + 1):
                     graph.nodes[i][attribute + '_list_%i' % depth_] = \
                         np.asarray([0])
                     if count:
@@ -378,7 +379,7 @@ class rdkit_config:
                 assert (attribute in graph.nodes[i])
                 AE = AtomEnvironment(mol, atom, depth=depth,
                                      IsSanitized=self.IsSanitized)
-                for depth_ in range(1, depth+1):
+                for depth_ in range(1, depth + 1):
                     neighbors = AE.get_nth_neighbors(depth_)
                     if neighbors:
                         graph.nodes[i][attribute + '_list_%i' % depth_] = \
@@ -484,9 +485,9 @@ def _from_rdkit(cls, mol, rdkit_config):
                                         StereoOfRingBond)
                     else:
                         g.edges[ij]['RingStereo'] = StereoOfRingBond
-    #rdkit_config.set_node_propogation(g, mol, 'Chiral', depth=1)
-    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=5, sum=False)
-    rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=1, sum=True)
-    #rdkit_config.set_node_propogation(g, mol, 'FirstNeighbors', depth=4)
-    #rdkit_config.set_node_propogation(g, mol, 'Aromatic', depth=4)
+    # rdkit_config.set_node_propogation(g, mol, 'Chiral', depth=1)
+    rdkit_config.set_node_propogation(g, mol, 'AtomicNumber', depth=5, sum=False, usehash=False)
+    rdkit_config.set_node_propogation(g, mol, 'Hcount', depth=1, sum=True, usehash=False)
+    # rdkit_config.set_node_propogation(g, mol, 'FirstNeighbors', depth=4)
+    # rdkit_config.set_node_propogation(g, mol, 'Aromatic', depth=4)
     return _from_networkx(cls, g)

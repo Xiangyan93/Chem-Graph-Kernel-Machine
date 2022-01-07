@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from .gpr import GPR
+from .qm7 import QM7
+from .qm9 import QM9
 
 
 __all__ = [
-    'GPR'
+    'QM7', 'QM9'
 ]

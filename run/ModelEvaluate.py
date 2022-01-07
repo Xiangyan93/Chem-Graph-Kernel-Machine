@@ -12,7 +12,7 @@ from chemml.evaluator import Evaluator
 
 def main(args: TrainArgs) -> None:
     dataset = Dataset.load(args.save_dir, args=args)
-    kernel_config = get_kernel_config(args, dataset)
+    kernel_config = get_kernel_config(args, dataset, kernel_pkl=os.path.join(args.save_dir, 'kernel.pkl'))
     Evaluator(args, dataset, kernel_config).evaluate()
 
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import copy
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
+import copy
+import ase
 import os
 import pickle
-from random import Random
+import json
 import numpy as np
 import pandas as pd
 import rdkit.Chem.AllChem as Chem
@@ -17,15 +18,23 @@ from graphdot.graph._from_networkx import _from_networkx
 from ..features_mol import get_features_generator, FeaturesGenerator
 from ..graph.hashgraph import HashGraph
 from ..args import CommonArgs, KernelArgs
-from .scaffold import scaffold_split
+from .public import QM7, QM9
+
+
+# Cache of RDKit molecules
+CACHE_MOL = True
+SMILES_TO_MOL: Dict[str, Chem.Mol] = {}
 
 
 def remove_none(X: List):
     X_ = []
     for x in X:
-        if x is not None:
+        if x is not None and len(x) != 0:
             X_.append(x)
-    return X_
+    if len(X_) == 0:
+        return None
+    else:
+        return X_
 
 
 def concatenate(X: List, axis: int = 0, dtype=None):
@@ -36,7 +45,7 @@ def concatenate(X: List, axis: int = 0, dtype=None):
         return None
 
 
-class SingleMolDatapoint:
+class MolecularGraph2D:
     """
     SingleMolDatapoint: Object of single molecule.
     """
@@ -44,8 +53,16 @@ class SingleMolDatapoint:
     def __init__(self, smiles: str, features_mol: np.ndarray = None):
         self.smiles = smiles
         self.features_mol = features_mol
-        self.mol = self.get_mol()
         self.graph = HashGraph.from_rdkit(self.mol, self.smiles)
+
+    @property
+    def mol(self):
+        if self.smiles in SMILES_TO_MOL:
+            return SMILES_TO_MOL[self.smiles]
+        else:
+            mol = Chem.MolFromSmiles(self.smiles)
+            SMILES_TO_MOL[self.smiles] = mol
+            return mol
 
     def __repr__(self) -> str:
         return self.smiles
@@ -88,7 +105,7 @@ class SingleMolDatapoint:
             return Chem.MolFromSmiles(self.smiles)
 
 
-class SingleReactionDatapoint:
+class ReactionGraph2D:
     """
     SingleReactionDatapoint： Object of single chemical reaction.
     """
@@ -126,8 +143,8 @@ class SingleReactionDatapoint:
         return None
 
 
-class MultiMolDatapoint:
-    def __init__(self, data: List[SingleMolDatapoint],
+class MultiMolecularGraph2D:
+    def __init__(self, data: List[MolecularGraph2D],
                  concentration: List[float] = None,
                  graph_type: Literal['single_graph', 'multi_graph'] = 'single_graph'):
         # read data point
@@ -148,6 +165,7 @@ class MultiMolDatapoint:
             self.graph = nx.disjoint_union_all(
                 [g.to_networkx() for g in graphs])
             self.graph = _from_networkx(HashGraph, self.graph)
+            self.graph.normalize_concentration()
         else:
             self.graph = [
                 rv for r in zip(graphs, self.concentration) for rv in r]
@@ -203,29 +221,54 @@ class MultiMolDatapoint:
 
     @classmethod
     def from_smiles(cls, smiles: str):
-        return cls([SingleMolDatapoint(smiles)])
+        return cls([MolecularGraph2D(smiles)])
 
     @classmethod
     def from_smiles_list(cls, smiles: List[str], concentration: List[float] = None,
                          graph_type: Literal['single_graph', 'multi_graph'] = 'single_graph'):
-        return cls([SingleMolDatapoint(s) for s in smiles], concentration,
+        return cls([MolecularGraph2D(s) for s in smiles], concentration,
                    graph_type)
 
 
+class Graph3D:
+    def __init__(self, ASE: ase.atoms.Atoms):
+        self.ASE = ASE
+        self.graph = HashGraph.from_ase(ASE)
+
+    @property
+    def X_single_graph(self) -> Optional[np.ndarray]:  # 2d array.
+        return np.asarray([[self.graph]])
+
+    @property
+    def X_multi_graph(self) -> Optional[np.ndarray]:  # 2d array.
+        return None
+
+    @property
+    def features_mol(self) -> Optional[np.ndarray]:
+        return None
+
+
 class CompositeDatapoint:
-    def __init__(self, data_p: List[MultiMolDatapoint],
-                 data_m: List[MultiMolDatapoint],
-                 data_cr: List[SingleReactionDatapoint]):
+    def __init__(self, data_p: List[MultiMolecularGraph2D],
+                 data_m: List[MultiMolecularGraph2D],
+                 data_cr: List[ReactionGraph2D],
+                 data_3d: List[Graph3D]):
         # pure, mixture and chemical reactions.
         self.data_p = data_p
         self.data_m = data_m
         self.data_cr = data_cr
-        self.data = data_p + data_m + data_cr
+        self.data_3d = data_3d
+        self.data = data_p + data_m + data_cr + data_3d
 
     def __repr__(self) -> str:
         return ';'.join(list(map(lambda x: x.__repr__(), self.data)))
 
     def set_features_mol(self, features_generator):
+        if features_generator is None:
+            return
+        assert len(self.data_3d) == 0
+        assert len(self.data_m) == 0
+        assert len(self.data_cr) == 0
         for d in self.data_p:
             d.set_features_mol(features_generator)
 
@@ -234,7 +277,21 @@ class CompositeDatapoint:
         assert len(self.data_p) == 1
         assert len(self.data_m) == 0
         assert len(self.data_cr) == 0
+        assert len(self.data_3d) == 0
         return self.data_p[0].mol
+
+    @property
+    def n_heavy(self) -> int:
+        if len(self.data_p) == 1:
+            assert len(self.data_m) == 0
+            assert len(self.data_cr) == 0
+            assert len(self.data_3d) == 0
+            return self.data_p[0].data[0].mol.GetNumAtoms()
+        elif len(self.data_3d) == 1:
+            assert len(self.data_p) == 0
+            assert len(self.data_m) == 0
+            assert len(self.data_cr) == 0
+            return len([n for n in self.data_3d[0].ASE.arrays['numbers'] if n != 1])
 
     @property
     def X(self) -> np.ndarray:  # 2d array.
@@ -259,7 +316,7 @@ class SubDataset:
                  features_add: Optional[np.ndarray] = None):  # 2d array.
         self.data = data
         # set targets
-        assert targets.ndim == 2
+        assert targets is None or targets.ndim == 2
         self.targets = targets
         # set features_add
         if features_add is not None:
@@ -268,7 +325,12 @@ class SubDataset:
         self.ignore_features_add = False
 
     def __len__(self) -> int:
-        return self.targets.shape[0]
+        if self.targets is not None:
+            return self.targets.shape[0]
+        elif self.features_add is not None:
+            return self.features_add.shape[0]
+        else:
+            return 1
 
     @property
     def mol(self) -> Chem.Mol:
@@ -327,7 +389,7 @@ class Dataset:
                  features_add_scaler: StandardScaler = None,
                  graph_kernel_type: Literal['graph', 'preCalc'] = None):
         self.data = data
-        self.unify_datatype()
+        self.unify_datatype(self.X_graph)
         self.features_mol_normalize = False
         self.features_add_normalize = False
         self.features_mol_scaler = features_mol_scaler
@@ -357,8 +419,11 @@ class Dataset:
 
     @property
     def y(self):
-        y = np.concatenate([d.targets for d in self.data], axis=0)
-        return y.ravel() if y.shape[1] == 1 else y
+        y = concatenate([d.targets for d in self.data], axis=0)
+        if y is not None and y.shape[1] == 1:
+            return y.ravel()
+        else:
+            return y
 
     @property
     def repr(self) -> np.ndarray:  # 2d array str.
@@ -369,8 +434,11 @@ class Dataset:
         return concatenate([d.X_repr for d in self.data])
 
     @property
-    def X_graph(self) -> np.ndarray:
-        return concatenate([d.X_graph for d in self.data])
+    def X_graph(self) -> Optional[np.ndarray]:
+        if self.data is None:
+            return None
+        else:
+            return concatenate([d.X_graph for d in self.data])
 
     @property
     def X_mol(self):
@@ -378,7 +446,7 @@ class Dataset:
 
     @property
     def X_raw_features_mol(self) -> Optional[np.ndarray]:
-        assert self.graph_kernel_type == 'graph'
+        # assert self.graph_kernel_type == 'graph'
         return concatenate([d.X_features_mol for d in self.data])
 
     @property
@@ -441,31 +509,6 @@ class Dataset:
     def copy(self):
         return copy.copy(self)
 
-    def split(self, split_type: str = 'random',
-              sizes: Tuple[float, float] = (0.8, 0.2),
-              seed: int = 0) -> List:
-        random = Random(seed)
-        data = []
-        if split_type == 'random':
-            indices = list(range(len(self.data)))
-            random.shuffle(indices)
-            end = 0
-            for size in sizes:
-                start = end
-                end = start + int(size * len(self.data))
-                dataset = self.copy()
-                dataset.data = [self.data[i] for i in indices[start:end]]
-                data.append(dataset)
-            return data
-        elif split_type == 'scaffold_balanced':
-            train, test = scaffold_split(self, sizes=sizes, balanced=True, seed=seed)
-            dataset_train, dataset_test = self.copy(), self.copy()
-            dataset_train.data = train
-            dataset_test.data = test
-            return [dataset_train, dataset_test]
-        else:
-            raise RuntimeError(f'Unsupported split_type {split_type}')
-
     def update_args(self, args: KernelArgs):
         if args.ignore_features_add:
             self.set_ignore_features_add(True)
@@ -493,10 +536,9 @@ class Dataset:
         else:
             self.features_add_scaler = None
 
-    def unify_datatype(self):
-        if self.data is None:
+    def unify_datatype(self, X):
+        if X is None:
             return
-        X = self.X_graph
         for i in range(X.shape[1]):
             self._unify_datatype(X[:, i])
 
@@ -533,7 +575,7 @@ class Dataset:
     @staticmethod
     def get_subDataset(
             pure: List[str],
-            mixture: List[Optional[str]],
+            mixture: List[List[Union[str, float]]],
             mixture_type: Literal['single_graph', 'multi_graph'],
             reaction: List[str],
             reaction_type: Literal['reaction', 'agent', 'reaction+agent'],
@@ -544,17 +586,43 @@ class Dataset:
         data_p = []
         data_m = []
         data_r = []
+        data_3d = []
         pure = [] if pure is None else list(pure)
         for smiles in pure:
-            data_p.append(MultiMolDatapoint.from_smiles(smiles))
+            data_p.append(MultiMolecularGraph2D.from_smiles(smiles))
         for m in mixture:
-            data_m.append(MultiMolDatapoint.from_smiles_list(
+            data_m.append(MultiMolecularGraph2D.from_smiles_list(
                 m[0::2], concentration=m[1::2], graph_type=mixture_type))
         for rg in reaction:
-            data_r.append(SingleReactionDatapoint(rg, reaction_type))
-        data = SubDataset(CompositeDatapoint(data_p, data_m, data_r), targets, features)
+            data_r.append(ReactionGraph2D(rg, reaction_type))
+        data = SubDataset(CompositeDatapoint(data_p, data_m, data_r, data_3d), targets, features)
         data.set_features(features_generator)
         return data
+
+    @classmethod
+    def from_public(cls, args: CommonArgs):
+        if args.data_public == 'qm7':
+            qm_data = QM7(ase=True)
+        elif args.data_public == 'qm9':
+            qm_data = QM9(ase=True)
+        else:
+            raise RuntimeError(f'Unknown public data set {args.data_public}')
+        data = Parallel(
+            n_jobs=args.n_jobs, verbose=True,
+            **_joblib_parallel_args(prefer='processes'))(
+            delayed(cls.get_subDataset)(
+                [],
+                [],
+                args.mixture_type,
+                [],
+                args.reaction_type,
+                tolist(qm_data.iloc[i].get('atoms')),
+                to_numpy(qm_data.iloc[i:i+1][args.target_columns]),
+                to_numpy(qm_data.iloc[i:i+1].get(args.feature_columns)),
+                args.features_generator,
+            )
+            for i in qm_data.index)
+        return cls(data)
 
     @classmethod
     def from_csv(cls, args: CommonArgs):
@@ -576,10 +644,10 @@ class Dataset:
                 n_jobs=args.n_jobs, verbose=True,
                 **_joblib_parallel_args(prefer='processes'))(
                 delayed(cls.get_subDataset)(
-                    (lambda x: [x] if x.__class__ == str else list[x])(g[0])[0:n1],
-                    (lambda x: [x] if x.__class__ == str else list[x])(g[0])[n1:n1+n2],
+                    (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[0:n1],
+                    (lambda x: tolist([x]) if x.__class__ == str else tolist(x))(g[0])[n1:n1+n2],
                     args.mixture_type,
-                    (lambda x: [x] if x.__class__ == str else list[x])(g[0])[n1+n2:n1+n2+n3],
+                    (lambda x: [x] if x.__class__ == str else tolist(x))(g[0])[n1+n2:n1+n2+n3],
                     args.reaction_type,
                     to_numpy(g[1][args.target_columns]),
                     to_numpy(g[1][args.feature_columns]),
@@ -604,19 +672,27 @@ class Dataset:
         return cls(data)
 
 
-def tolist(list_: pd.Series) -> List[str]:
+def tolist(list_: Union[pd.Series, List]) -> List[str]:
     if list_ is None:
         return []
     else:
-        if (',' in list_[0]) and (list_[0][0] == '[') and (list_[0][-1] == ']'):
-            list_[0] = eval(list_[0])
-            return list(list_)
-        else:
-            return list(list_)
+        result = []
+        for string_ in list_:
+            # print(1)
+            # print(string_)
+            if ',' in string_:
+                result.append(json.loads(string_))
+            else:
+                result.append(string_)
+        return result
 
 
 def to_numpy(list_: pd.Series) -> Optional[np.ndarray]:
     if list_ is None:
         return None
     else:
-        return list_.to_numpy()
+        ndarray = list_.to_numpy()
+        if ndarray.size == 0:
+            return None
+        else:
+            return ndarray
