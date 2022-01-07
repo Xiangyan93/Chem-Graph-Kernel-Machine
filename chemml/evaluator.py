@@ -18,7 +18,8 @@ from sklearn.metrics import (
 )
 from .args import TrainArgs, ActiveLearningArgs
 from .data import Dataset, dataset_split
-from .models.regression.GPRgraphdot import GPR, LRAGPR
+from .models.regression.GPRgraphdot import GPR
+from .models.regression.ScalableGPR import LRAGPR, NLEGPR
 from .models.classification import GPC
 from .models.classification import SVC
 from .models.regression import SVR
@@ -99,42 +100,29 @@ class Evaluator:
             y_similar = None
 
         train_metrics = None
-        if self.args.dataset_type == 'regression' and self.args.model_type == 'gpr':
+        if self.args.model_type == 'gpr_nystrom':
+            idx = np.random.choice(np.arange(len(X_train)), self.args.n_core, replace=False)
+            C_train = X_train[idx]
+            self.model.fit(C_train, X_train, y_train)
+        elif self.args.dataset_type == 'regression' and self.args.model_type == 'gpr' and not self.args.ensemble:
             self.model.fit(X_train, y_train, loss=self.args.loss, verbose=True)
-            # save results test_*.log
-            test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
-                                      file='%s/%s' % (self.args.save_dir, test_log),
-                                      return_std=True,
-                                      proba=False)
-            if self.args.evaluate_train:
-                train_metrics = self._eval(X_train, y_train, repr_train, repr_train,
-                                           file='%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')),
-                                           return_std=True,
-                                           proba=False)
-        elif self.args.dataset_type == 'regression' and self.args.model_type == 'svr':
-            self.model.fit(X_train, y_train)
-            # save results test_*.log
-            test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
-                                      file='%s/%s' % (self.args.save_dir, test_log),
-                                      return_std=False,
-                                      proba=False)
-            if self.args.evaluate_train:
-                if self.args.evaluate_train:
-                    train_metrics = self._eval(X_train, y_train, repr_train, repr_train,
-                                               file='%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')),
-                                               return_std=False,
-                                               proba=False)
         else:
             self.model.fit(X_train, y_train)
-            test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
-                                      file='%s/%s' % (self.args.save_dir, test_log),
-                                      return_std=False,
-                                      proba=not self.args.no_proba)
-            if self.args.evaluate_train:
-                train_metrics = self._eval(X_train, y_train, repr_train, y_similar=None,
-                                           file='%s/%s' % (self.args.save_dir, train_log),
-                                           return_std=False,
-                                           proba=not self.args.no_proba)
+
+        return_std = True if self.args.model_type == 'gpr' else False
+        proba = not self.args.no_proba if self.args.dataset_type == 'classification' else False
+
+        # save results test_*.log
+        test_metrics = self._eval(X_test, y_test, repr_test, y_similar,
+                                  file='%s/%s' % (self.args.save_dir, test_log),
+                                  return_std=return_std,
+                                  proba=proba)
+        if self.args.evaluate_train:
+            train_metrics = self._eval(X_train, y_train, repr_train, repr_train,
+                                       file='%s/%s' % (self.args.save_dir, test_log.replace('test', 'train')),
+                                       return_std=return_std,
+                                       proba=proba)
+
         return train_metrics, test_metrics
 
     def _evaluate_loocv(self):
@@ -214,7 +202,14 @@ class Evaluator:
                 kernel=self.kernel,
                 optimizer=args.optimizer,
                 alpha=args.alpha_,
-                normalize_y=True
+                normalize_y=True,
+                batch_size=args.batch_size
+            )
+        elif args.model_type == 'gpr_nle':
+            self.model = NLEGPR(
+                kernel=self.kernel,
+                alpha=args.alpha_,
+                n_local=args.n_local,
             )
         elif args.model_type == 'gpc':
             self.model = GPC(

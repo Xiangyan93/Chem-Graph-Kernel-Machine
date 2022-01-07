@@ -181,3 +181,26 @@ and then concatenate them. A example is given for freesolv data sets.
     ```
     python3 ConcatBlockKernels.py --block_id 2 2
     ```
+
+## Scalable GPs
+Read data set and calculate kernel matrix.
+```
+python3 ReadData.py --save_dir st --data_path datasets/ThermoSIM/slab-sim.txt --pure_columns smiles --target_columns st --feature_columns T --group_reading --n_jobs 6
+python3 KernelCalc.py --save_dir st --graph_kernel_type graph --graph_hyperparameters ../hyperparameters/tMGR.json
+```
+1. subset of data (SoD).
+   ```
+   python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 1 --features_hyperparameters 100.0 --ensemble --n_estimator 1 --n_sample_per_model 5000 --ensemble_rule mean
+   ```
+2. ensemble SoD.
+   ```
+   python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 1 --features_hyperparameters 100.0 --ensemble --n_estimator 10 --n_sample_per_model 5000 --ensemble_rule weight_uncertainty --n_jobs 10
+   ```
+3. Naive Local Experts, transductive NLE.
+   ```
+   python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr_nle --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 1 --features_hyperparameters 100.0 --n_local 500
+   ```
+4. Nystrom approximation.
+   ```
+   python3 ModelEvaluate.py --save_dir st --graph_kernel_type preCalc --dataset_type regression --model_type gpr_nystrom --split_type random --split_sizes 0.8 0.2 --alpha 0.01 --metric rmse --extra_metrics r2 --num_folds 1 --features_hyperparameters 100.0 --n_core 500
+   ```

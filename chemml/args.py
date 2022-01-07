@@ -153,7 +153,7 @@ class TrainArgs(KernelArgs):
     """
     Type of dataset. This determines the loss function used during training.
     """
-    model_type: Literal['gpr', 'svc', 'svr', 'gpc', 'gpr_nystrom']
+    model_type: Literal['gpr', 'svc', 'svr', 'gpc', 'gpr_nystrom', 'gpr_nle']
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
@@ -179,6 +179,10 @@ class TrainArgs(KernelArgs):
     ensemble_rule: Literal['smallest_uncertainty', 'weight_uncertainty',
                            'mean'] = 'weight_uncertainty'
     """The rule to combining prediction from estimators."""
+    n_local: int = 500
+    """The number of samples used in Naive Local Experts."""
+    n_core: int = 500
+    """The number of samples used in Nystrom core set."""
     metric: Metric = None
     """metric"""
     extra_metrics: List[Metric] = []
@@ -220,7 +224,7 @@ class TrainArgs(KernelArgs):
     def process_args(self) -> None:
         super().process_args()
         if self.dataset_type == 'regression':
-            assert self.model_type in ['gpr', 'gpr_nystrom', 'svr']
+            assert self.model_type in ['gpr', 'gpr_nystrom', 'gpr_nle', 'svr']
             for metric in self.metrics:
                 assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
         elif self.dataset_type == 'classification':
