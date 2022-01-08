@@ -109,7 +109,7 @@ class Evaluator:
         else:
             self.model.fit(X_train, y_train)
 
-        return_std = True if self.args.model_type == 'gpr' else False
+        return_std = True if self.args.model_type in ['gpr', 'gpr_nystrom', 'gpr_nle'] else False
         proba = not self.args.no_proba if self.args.dataset_type == 'classification' else False
 
         # save results test_*.log
