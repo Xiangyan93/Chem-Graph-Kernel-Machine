@@ -94,7 +94,7 @@ class NaiveLocalExpertGP:
             Ky_local = Kinv_local @ y_local
             y_mean.append((Ks_local @ Ky_local) * self.y_std + self.y_mean)
             if return_std is True:
-                Kss = self._gramian(Z, diag=True)
+                Kss = self._gramian(Z_, diag=True)
                 std = np.sqrt(
                     np.maximum(0, Kss - (Ks_local @ (Kinv_local @ Ks_local.T)).diagonal())
                 )
