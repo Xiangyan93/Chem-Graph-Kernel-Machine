@@ -206,10 +206,12 @@ class Evaluator:
                 batch_size=args.batch_size
             )
         elif args.model_type == 'gpr_nle':
+            n_jobs = 1 if self.args.graph_kernel_type == 'graph' else self.args.n_jobs
             self.model = NLEGPR(
                 kernel=self.kernel,
                 alpha=args.alpha_,
                 n_local=args.n_local,
+                n_jobs=n_jobs
             )
         elif args.model_type == 'gpc':
             self.model = GPC(
