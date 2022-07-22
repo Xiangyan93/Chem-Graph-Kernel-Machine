@@ -11,6 +11,7 @@ dependencies:
   - rdkit>=2020.03.1.0
   - scikit-learn>=0.24.1
   - hyperopt>=0.2.5
+  - mgktools>=0.0.0
   - pip:
     - typed-argument-parser>=1.6.1
     - git+https://github.com/bp-kelley/descriptastorus

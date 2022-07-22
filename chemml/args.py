@@ -89,7 +89,7 @@ class CommonArgs(Tap):
 
 
 class KernelArgs(CommonArgs):
-    graph_kernel_type: Literal['graph', 'preCalc'] = None
+    graph_kernel_type: Literal['graph', 'pre-computed'] = None
     """The type of kernel to use."""
     graph_hyperparameters: List[str] = None
     """hyperparameters file for graph kernel."""
@@ -149,9 +149,9 @@ class KernelBlockArgs(KernelArgs):
 
 
 class TrainArgs(KernelArgs):
-    dataset_type: Literal['regression', 'classification', 'multiclass'] = None
+    task_type: Literal['regression', 'binary', 'multi-class'] = None
     """
-    Type of dataset. This determines the loss function used during training.
+    Type of task. This determines the loss function used during training.
     """
     model_type: Literal['gpr', 'svc', 'svr', 'gpc', 'gpr_nystrom', 'gpr_nle']
     """Type of model to use"""
@@ -181,7 +181,7 @@ class TrainArgs(KernelArgs):
     """The rule to combining prediction from estimators."""
     n_local: int = 500
     """The number of samples used in Naive Local Experts."""
-    n_core: int = 500
+    n_core: int = None
     """The number of samples used in Nystrom core set."""
     metric: Metric = None
     """metric"""
@@ -197,21 +197,25 @@ class TrainArgs(KernelArgs):
     """Save the trained model file."""
 
     @property
-    def metrics(self) -> List[str]:
+    def metrics(self) -> List[Metric]:
         return [self.metric] + self.extra_metrics
 
     @property
     def alpha_(self) -> float:
-        if isinstance(self.alpha, float):
+        if self.alpha is None:
+            return None
+        elif isinstance(self.alpha, float):
             return self.alpha
-        if os.path.exists(self.alpha):
+        elif os.path.exists(self.alpha):
             return float(open(self.alpha, 'r').read())
         else:
             return float(self.alpha)
 
     @property
     def C_(self) -> float:
-        if isinstance(self.C, float):
+        if self.C is None:
+            return None
+        elif isinstance(self.C, float):
             return self.C
         elif os.path.exists(self.C):
             return float(open(self.C, 'r').read())
@@ -223,12 +227,12 @@ class TrainArgs(KernelArgs):
 
     def process_args(self) -> None:
         super().process_args()
-        if self.dataset_type == 'regression':
+        if self.task_type == 'regression':
             assert self.model_type in ['gpr', 'gpr_nystrom', 'gpr_nle', 'svr']
             for metric in self.metrics:
                 assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
-        elif self.dataset_type == 'classification':
-            assert self.model_type in ['gpc', 'svc']
+        elif self.task_type == 'binary':
+            assert self.model_type in ['gpc', 'svc', 'gpr']
             for metric in self.metrics:
                 assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score']
         else:
@@ -250,7 +254,7 @@ class TrainArgs(KernelArgs):
             assert self.C is not None
 
         if self.split_type == 'loocv':
-            assert self.dataset_type == 'regression'
+            assert self.task_type == 'regression'
 
         if not hasattr(self, 'optimizer'):
             self.optimizer = None
@@ -312,7 +316,7 @@ class HyperoptArgs(TrainArgs):
 
     def process_args(self) -> None:
         super().process_args()
-        assert self.graph_kernel_type != 'preCalc'
+        assert self.graph_kernel_type == 'graph'
         if self.optimizer in ['L-BFGS-B']:
             assert self.model_type == 'gpr'
 
