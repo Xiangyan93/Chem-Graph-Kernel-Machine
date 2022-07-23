@@ -284,7 +284,7 @@ class HyperoptArgs(TrainArgs):
     """Bounds of alpha used in GPR."""
     alpha_uniform: float = None
     """"""
-    C_bounds: Tuple[float, float] = (1e-3, 1e3)
+    C_bounds: Tuple[float, float] = None #  (1e-3, 1e3)
     """Bounds of C used in SVC."""
     C_uniform: float = None
     """"""
