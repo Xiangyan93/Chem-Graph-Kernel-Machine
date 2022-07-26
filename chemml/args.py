@@ -47,6 +47,8 @@ class CommonArgs(Tap):
     """
     features_generator: List[str] = None
     """Method(s) of generating additional features_mol."""
+    features_combination: Literal['concat', 'mean'] = None
+    """How to combine features vector for mixtures."""
     target_columns: List[str] = None
     """
     Name of the columns containing target values.
@@ -157,7 +159,6 @@ class TrainArgs(KernelArgs):
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
-
     split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
     """Method of splitting the data into train/val/test."""
     split_sizes: Tuple[float, float] = (0.8, 0.2)

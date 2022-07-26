@@ -20,6 +20,7 @@ def main(args: CommonArgs) -> None:
                                   feature_columns=args.feature_columns,
                                   target_columns=args.target_columns,
                                   features_generator=args.features_generator,
+                                  features_combination=args.features_combination,
                                   mixture_type=args.mixture_type,
                                   reaction_type=args.reaction_type,
                                   group_reading=args.group_reading,

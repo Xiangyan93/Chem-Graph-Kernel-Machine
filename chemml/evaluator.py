@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from .args import TrainArgs
-from mgktools.models import GPR, GPC, LRAGPR, NLEGPR, SVC, SVR, ConsensusRegressor
+from mgktools.models import GPC, LRAGPR, NLEGPR, SVC, SVR, ConsensusRegressor
+from graphdot.model.gaussian_process import GaussianProcessRegressor as GPR
 
 
 def set_model(args: TrainArgs,
@@ -12,7 +13,7 @@ def set_model(args: TrainArgs,
             optimizer=args.optimizer,
             alpha=args.alpha_,
             normalize_y=True,
-            batch_size=args.batch_size
+            # batch_size=args.batch_size
         )
         if args.ensemble:
             model = ConsensusRegressor(
