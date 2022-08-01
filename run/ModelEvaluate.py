@@ -15,7 +15,7 @@ from chemml.evaluator import set_model
 
 def main(args: TrainArgs) -> None:
     dataset = Dataset.load(path=args.save_dir)
-    dataset.graph_kernel_type = 'pre-computed'
+    dataset.graph_kernel_type = args.graph_kernel_type
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,
                                       features_hyperparameters=args.features_hyperparameters,
@@ -37,6 +37,7 @@ def main(args: TrainArgs) -> None:
                                        reaction_type=args.reaction_type,
                                        group_reading=args.group_reading,
                                        n_jobs=args.n_jobs)
+        dataset_test.graph_kernel_type = args.graph_kernel_type
     else:
         dataset_test = None
     Evaluator(save_dir=args.save_dir,
