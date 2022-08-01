@@ -150,6 +150,21 @@ class KernelBlockArgs(KernelArgs):
         assert self.block_id[1] >= self.block_id[0]
 
 
+class DataSplitArgs(Tap):
+    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
+    """Method of splitting the data into train/val/test."""
+    split_sizes: Tuple[float, float] = (0.8, 0.2)
+    """Split proportions for train/validation/test sets."""
+    num_folds: int = 1
+    """Number of folds when performing cross validation."""
+    save_dir: str
+    """The output directory."""
+    n_jobs: int = 1
+    """The cpu numbers used for parallel computing."""
+    data_path: str = None
+    """The Path of input data CSV file."""
+
+
 class TrainArgs(KernelArgs):
     task_type: Literal['regression', 'binary', 'multi-class'] = None
     """
@@ -159,7 +174,7 @@ class TrainArgs(KernelArgs):
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
-    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
+    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = None
     """Method of splitting the data into train/val/test."""
     split_sizes: Tuple[float, float] = (0.8, 0.2)
     """Split proportions for train/validation/test sets."""
@@ -196,6 +211,8 @@ class TrainArgs(KernelArgs):
     """If set True, 5 most similar molecules in the training set will be save in the test_*.log."""
     save_model: bool = False
     """Save the trained model file."""
+    separate_test_path: str = None
+    """Path to separate test set, optional."""
 
     @property
     def metrics(self) -> List[Metric]:
@@ -247,6 +264,8 @@ class TrainArgs(KernelArgs):
         if self.split_type == 'loocv':
             assert self.num_folds == 1
             assert self.model_type == 'gpr'
+        elif self.split_type is None:
+            assert self.separate_test_path is not None
 
         if self.model_type in ['gpr', 'gpr_nystrom']:
             assert self.alpha is not None

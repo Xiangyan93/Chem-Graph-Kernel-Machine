@@ -9,7 +9,6 @@ from mgktools.data import Dataset
 from mgktools.kernels.utils import get_kernel_config
 from mgktools.evaluators.cross_validation import Evaluator
 
-
 Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
                  'rmse', 'mae', 'mse', 'r2', 'max']
 
@@ -52,7 +51,7 @@ class RandomForestArgs(Tap):
     """
     Type of task. This determines the loss function used during training.
     """
-    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
+    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = None
     """Method of splitting the data into train/val/test."""
     split_sizes: Tuple[float, float] = (0.8, 0.2)
     """Split proportions for train/validation/test sets."""
@@ -64,6 +63,8 @@ class RandomForestArgs(Tap):
     """Metrics"""
     seed: int = 0
     """Random seed."""
+    separate_test_path: str = None
+    """Path to separate test set, optional."""
 
     @property
     def metrics(self) -> List[Metric]:
@@ -79,6 +80,7 @@ def main(args: RandomForestArgs) -> None:
     if os.path.exists('%s/dataset.pkl' % args.save_dir):
         dataset = Dataset.load(path=args.save_dir)
     else:
+        os.mkdir(args.save_dir)
         dataset = Dataset.from_df(df=pd.read_csv(args.data_path),
                                   pure_columns=args.pure_columns,
                                   mixture_columns=args.mixture_columns,
@@ -89,6 +91,18 @@ def main(args: RandomForestArgs) -> None:
                                   group_reading=args.group_reading,
                                   n_jobs=args.n_jobs)
         dataset.save(args.save_dir)
+    if args.separate_test_path is not None:
+        dataset_test = Dataset.from_df(df=pd.read_csv(args.separate_test_path),
+                                       pure_columns=args.pure_columns,
+                                       mixture_columns=args.mixture_columns,
+                                       feature_columns=args.feature_columns,
+                                       target_columns=args.target_columns,
+                                       features_generator=args.features_generator,
+                                       features_combination=args.features_combination,
+                                       group_reading=args.group_reading,
+                                       n_jobs=args.n_jobs)
+    else:
+        dataset_test = None
     if args.task_type == 'regression':
         model = RandomForestRegressor()
     else:
@@ -106,7 +120,7 @@ def main(args: RandomForestArgs) -> None:
               n_similar=None,
               kernel=None,
               seed=args.seed,
-              verbose=True).evaluate()
+              verbose=True).evaluate(external_test_dataset=dataset_test)
 
 
 if __name__ == '__main__':
