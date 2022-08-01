@@ -38,6 +38,7 @@ def main(args: TrainArgs) -> None:
                                        group_reading=args.group_reading,
                                        n_jobs=args.n_jobs)
         dataset_test.graph_kernel_type = args.graph_kernel_type
+        dataset.unify_datatype(dataset_test.X_graph)
     else:
         dataset_test = None
     Evaluator(save_dir=args.save_dir,
