@@ -10,7 +10,7 @@ from mgktools.data import Dataset
 from mgktools.kernels.utils import get_kernel_config
 from mgktools.evaluators.cross_validation import Evaluator
 from chemml.args import TrainArgs
-from chemml.evaluator import set_model
+from chemml.model import set_model
 
 
 def main(args: TrainArgs) -> None:
@@ -18,6 +18,7 @@ def main(args: TrainArgs) -> None:
     dataset.graph_kernel_type = args.graph_kernel_type
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,
+                                      features_kernel_type=args.features_kernel_type,
                                       features_hyperparameters=args.features_hyperparameters,
                                       features_hyperparameters_bounds=args.features_hyperparameters_bounds,
                                       features_hyperparameters_file=args.features_hyperparameters_file,

@@ -6,11 +6,7 @@ from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from mgktools.data import Dataset
-from mgktools.kernels.utils import get_kernel_config
-from mgktools.evaluators.cross_validation import Evaluator
-
-Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
-                 'rmse', 'mae', 'mse', 'r2', 'max']
+from mgktools.evaluators.cross_validation import Evaluator, Metric
 
 
 class RandomForestArgs(Tap):

@@ -29,6 +29,10 @@ def main(args: CommonArgs) -> None:
         assert args.data_public is not None
         # TODO
         raise ValueError('Public datasets are not available.')
+    if args.features_mol_normalize:
+        dataset.normalize_features_mol()
+    if args.features_add_normalize:
+        dataset.normalize_features_add()
     dataset.save(args.save_dir, overwrite=True)
     print('Preprocessing Dataset Finished.')
 

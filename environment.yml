@@ -15,5 +15,5 @@ dependencies:
     - typed-argument-parser>=1.6.1
     - git+https://github.com/bp-kelley/descriptastorus
     - git+https://gitlab.com/Xiangyan93/graphdot.git@feature/xy
-    - git+https://github.com/Xiangyan93/mgktools.git@dev
     - rxntools>=0.0.2
+    - mgktools>=0.0.1

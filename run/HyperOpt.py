@@ -5,14 +5,10 @@ import sys
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
-from typing import Dict, Union, List
-from hyperopt import fmin, hp, tpe
-import numpy as np
 from mgktools.data import Dataset
 from mgktools.kernels.utils import get_kernel_config
 from mgktools.hyperparameters.hyperopt import bayesian_optimization
-from mgktools.evaluators.cross_validation import Evaluator
-from chemml.evaluator import set_model
+from chemml.model import set_model
 from chemml.args import HyperoptArgs
 
 
@@ -20,11 +16,13 @@ def main(args: HyperoptArgs) -> None:
     # read data
     dataset = Dataset.load(args.save_dir)
     dataset.graph_kernel_type = args.graph_kernel_type
+    print(dataset.X[:, 1])
     # set kernel_config
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,
-                                      rbf_length_scale=args.features_hyperparameters,
-                                      rbf_length_scale_bounds=args.features_hyperparameters_bounds,
+                                      features_kernel_type=args.features_kernel_type,
+                                      features_hyperparameters=args.features_hyperparameters,
+                                      features_hyperparameters_bounds=args.features_hyperparameters_bounds,
                                       features_hyperparameters_file=args.features_hyperparameters_file,
                                       mgk_hyperparameters_files=args.graph_hyperparameters)
     if args.optimizer is None:

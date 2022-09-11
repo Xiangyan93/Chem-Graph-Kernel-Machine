@@ -8,7 +8,7 @@ sys.path.append(os.path.join(CWD, '..'))
 from chemml.args import ActiveLearningArgs
 from chemml.data.data import Dataset
 from chemml.kernels.utils import get_kernel_config
-from chemml.evaluator import ActiveLearner
+from chemml.model import ActiveLearner
 from chemml.data import dataset_split
 
 

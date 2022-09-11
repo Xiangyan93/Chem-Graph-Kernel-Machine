@@ -4,10 +4,7 @@ import os
 from tap import Tap
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import numpy as np
-
-
-Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
-                 'rmse', 'mae', 'mse', 'r2', 'max']
+from mgktools.evaluators.metric import Metric
 
 
 class CommonArgs(Tap):
@@ -53,6 +50,10 @@ class CommonArgs(Tap):
     """
     Name of the columns containing target values.
     """
+    features_mol_normalize: bool = False
+    """Nomralize the molecular features_mol."""
+    features_add_normalize: bool = False
+    """Nomralize the additonal features_mol."""
     group_reading: bool = False
     """Find unique input strings first, then read the data."""
     def __init__(self, *args, **kwargs):
@@ -95,6 +96,8 @@ class KernelArgs(CommonArgs):
     """The type of kernel to use."""
     graph_hyperparameters: List[str] = None
     """hyperparameters file for graph kernel."""
+    features_kernel_type: Literal['dot_product', 'rbf'] = None
+    """choose dot product kernel or rbf kernel for features."""
     features_hyperparameters: List[float] = None
     """hyperparameters for molecular features."""
     features_hyperparameters_min: List[float] = None
@@ -103,17 +106,16 @@ class KernelArgs(CommonArgs):
     """hyperparameters for molecular features."""
     features_hyperparameters_file: str = None
     """JSON file contains features hyperparameters"""
-    features_mol_normalize: bool = False
-    """Nomralize the molecular features_mol."""
-    features_add_normalize: bool = False
-    """Nomralize the additonal features_mol."""
     single_features_hyperparameter: bool = True
     """Use the same hyperparameter for all features."""
 
     @property
     def features_hyperparameters_bounds(self):
         if self.features_hyperparameters_min is None or self.features_hyperparameters_max is None:
-            return 'fixed'
+            if self.features_hyperparameters is None:
+                return None
+            else:
+                return 'fixed'
         else:
             return [(self.features_hyperparameters_min[i], self.features_hyperparameters_max[i])
                     for i in range(len(self.features_hyperparameters))]
@@ -252,14 +254,11 @@ class TrainArgs(KernelArgs):
         elif self.task_type == 'binary':
             assert self.model_type in ['gpc', 'svc', 'gpr']
             for metric in self.metrics:
-                assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score']
+                assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score', 'mcc']
         else:
             assert self.model_type in ['gpc', 'svc']
             for metric in self.metrics:
                 assert metric in ['accuracy', 'precision', 'recall', 'f1_score']
-
-        if 'accuracy' in self.metrics:
-            assert self.no_proba
 
         if self.split_type == 'loocv':
             assert self.num_folds == 1

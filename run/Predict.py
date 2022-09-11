@@ -9,7 +9,7 @@ import pandas as pd
 from chemml.args import PredictArgs
 from chemml.data.data import Dataset
 from chemml.kernels.utils import get_kernel_config
-from chemml.evaluator import Evaluator
+from chemml.model import Evaluator
 
 
 def main(args: PredictArgs) -> None:
