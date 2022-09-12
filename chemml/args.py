@@ -255,7 +255,7 @@ class TrainArgs(KernelArgs):
             assert self.model_type in ['gpc', 'svc', 'gpr']
             for metric in self.metrics:
                 assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score', 'mcc']
-        else:
+        elif self.task_type == 'multi-class':
             assert self.model_type in ['gpc', 'svc']
             for metric in self.metrics:
                 assert metric in ['accuracy', 'precision', 'recall', 'f1_score']
@@ -263,8 +263,6 @@ class TrainArgs(KernelArgs):
         if self.split_type == 'loocv':
             assert self.num_folds == 1
             assert self.model_type == 'gpr'
-        elif self.split_type is None:
-            assert self.separate_test_path is not None
 
         if self.model_type in ['gpr', 'gpr_nystrom']:
             assert self.alpha is not None

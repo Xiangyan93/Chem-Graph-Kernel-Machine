@@ -10,16 +10,15 @@ from run.ReadData import main
 
 
 @pytest.mark.parametrize('dataset', [
-    ('freesolv', ['smiles'], ['freesolv'], None, False),
-    ('bace', ['smiles'], ['bace'], None, False),
-    ('clintox', ['smiles'], ['FDA_APPROVED', 'CT_TOX'], None, False),
-    ('np', ['smiles1', 'smiles2'], ['np'], None, False),
-    ('st', ['smiles'], ['st'], ['T'], True),
-    ('st', ['smiles'], ['st'], ['T'], False),
+    ('freesolv', ['smiles'], ['freesolv']),
+    ('bace', ['smiles'], ['bace']),
+    ('clintox', ['smiles'], ['FDA_APPROVED', 'CT_TOX']),
+    ('np', ['smiles1', 'smiles2'], ['np']),
 ])
-def test_read_data_pure_graph(dataset):
-    dataset, pure_columns, target_columns, features_columns, group_reading = dataset
-    save_dir = '%s/data/_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns), group_reading)
+def test_ReadData_PureGraph(dataset):
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
+    assert not os.path.exists(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -27,34 +26,57 @@ def test_read_data_pure_graph(dataset):
         '--target_columns'] + target_columns + [
         '--n_jobs', '6',
     ]
-    if features_columns is not None:
-        arguments += [
-            '--feature_columns'
-        ] + features_columns
+    args = CommonArgs().parse_args(arguments)
+    main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
+
+
+@pytest.mark.parametrize('dataset', [
+    ('st', ['smiles'], ['st'], ['T']),
+])
+@pytest.mark.parametrize('group_reading', [True, False])
+@pytest.mark.parametrize('features_scaling', [True, False])
+def test_ReadData_PureGraph_FeaturesAdd(dataset, group_reading, features_scaling):
+    dataset, pure_columns, target_columns, features_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                            group_reading, features_scaling)
+    assert not os.path.exists(save_dir)
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
+        '--pure_columns'] + pure_columns + [
+        '--target_columns'] + target_columns + [
+        '--n_jobs', '6',
+        '--feature_columns'
+    ] + features_columns
     if group_reading:
         arguments += [
             '--group_reading'
         ]
+    if features_scaling:
+        arguments += [
+            '--features_add_normalize'
+        ]
     args = CommonArgs().parse_args(arguments)
     main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
 
 
 @pytest.mark.parametrize('dataset', [
-    ('freesolv', ['smiles'], ['freesolv'], None, False),
-    ('bace', ['smiles'], ['bace'], None, False),
-    ('clintox', ['smiles'], ['FDA_APPROVED', 'CT_TOX'], None, False),
-    ('np', ['smiles1', 'smiles2'], ['np'], None, False),
-    ('st', ['smiles'], ['st'], ['T'], True),
-    ('st', ['smiles'], ['st'], ['T'], False),
+    ('freesolv', ['smiles'], ['freesolv']),
+    ('bace', ['smiles'], ['bace']),
+    ('clintox', ['smiles'], ['FDA_APPROVED', 'CT_TOX']),
+    ('np', ['smiles1', 'smiles2'], ['np']),
 ])
 @pytest.mark.parametrize('features_generator', [['rdkit_2d_normalized'],
                                                 ['morgan'],
                                                 ['rdkit_2d', 'morgan_count']])
 @pytest.mark.parametrize('features_scaling', [True, False])
-def test_read_data_pure_graph_features(dataset, features_generator, features_scaling):
-    dataset, pure_columns, target_columns, features_columns, group_reading = dataset
-    save_dir = '%s/data/_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
-                                               ','.join(features_generator), features_scaling, group_reading)
+def test_ReadData_PureGraph_FeaturesMol(dataset, features_generator, features_scaling):
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                            ','.join(features_generator), features_scaling)
+    assert not os.path.exists(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -67,30 +89,55 @@ def test_read_data_pure_graph_features(dataset, features_generator, features_sca
         arguments += [
             '--features_mol_normalize'
         ]
-        if features_columns is not None:
-            arguments += [
-                '--features_add_normalize'
-            ]
-    if features_columns is not None:
+    args = CommonArgs().parse_args(arguments)
+    main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
+
+
+@pytest.mark.parametrize('dataset', [
+    ('st', ['smiles'], ['st'], ['T']),
+])
+@pytest.mark.parametrize('group_reading', [True, False])
+@pytest.mark.parametrize('features_generator', [['rdkit_2d_normalized'],
+                                                ['morgan'],
+                                                ['rdkit_2d', 'morgan_count']])
+@pytest.mark.parametrize('features_scaling', [True, False])
+def test_ReadData_PureGraph_FeaturesAddMol(dataset, group_reading, features_generator, features_scaling):
+    dataset, pure_columns, target_columns, features_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                               group_reading, ','.join(features_generator), features_scaling)
+    assert not os.path.exists(save_dir)
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
+        '--pure_columns'] + pure_columns + [
+        '--target_columns'] + target_columns + [
+        '--n_jobs', '6',
+        '--features_generator',
+    ] + features_generator + [
+        '--feature_columns'
+    ] + features_columns
+    if features_scaling:
         arguments += [
-            '--feature_columns'
-        ] + features_columns
+            '--features_mol_normalize',
+            '--features_add_normalize'
+        ]
     if group_reading:
         arguments += [
             '--group_reading'
         ]
     args = CommonArgs().parse_args(arguments)
     main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
 
 
 @pytest.mark.parametrize('dataset', [
-    ('np', ['mixture'], ['np'], None, False),
-    ('solubility', ['mixture'], ['Solubility'], ['T', 'P'], True),
-    ('solubility', ['mixture'], ['Solubility'], ['T', 'P'], False),
+    ('np', ['mixture'], ['np']),
 ])
-def test_read_data_mixture_graph(dataset):
-    dataset, pure_columns, target_columns, features_columns, group_reading = dataset
-    save_dir = '%s/data/_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns), group_reading)
+def test_ReadData_MixtureGraph(dataset):
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
+    assert not os.path.exists(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -98,33 +145,57 @@ def test_read_data_mixture_graph(dataset):
         '--target_columns'] + target_columns + [
         '--n_jobs', '6',
     ]
-    if features_columns is not None:
-        arguments += [
-            '--feature_columns'
-        ] + features_columns
+    args = CommonArgs().parse_args(arguments)
+    main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
+
+
+@pytest.mark.parametrize('dataset', [
+    ('solubility', ['mixture'], ['Solubility'], ['T', 'P']),
+])
+@pytest.mark.parametrize('group_reading', [True, False])
+@pytest.mark.parametrize('features_scaling', [True, False])
+def test_ReadData_MixtureGraph_FeaturesAdd(dataset, group_reading, features_scaling):
+    dataset, pure_columns, target_columns, features_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                            group_reading, features_scaling)
+    assert not os.path.exists(save_dir)
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
+        '--mixture_columns'] + pure_columns + [
+        '--target_columns'] + target_columns + [
+        '--n_jobs', '6',
+        '--feature_columns',
+    ] + features_columns + [
+        '--feature_columns'
+    ] + features_columns
     if group_reading:
         arguments += [
             '--group_reading'
         ]
+    if features_scaling:
+        arguments += [
+            '--features_add_normalize'
+        ]
     args = CommonArgs().parse_args(arguments)
     main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
 
 
 @pytest.mark.parametrize('dataset', [
-    ('np', ['mixture'], ['np'], None, False),
-    ('solubility', ['mixture'], ['Solubility'], ['T', 'P'], True),
-    ('solubility', ['mixture'], ['Solubility'], ['T', 'P'], False),
+    ('np', ['mixture'], ['np']),
 ])
 @pytest.mark.parametrize('features_generator', [['rdkit_2d_normalized'],
                                                 ['morgan'],
                                                 ['rdkit_2d', 'morgan_count']])
 @pytest.mark.parametrize('features_combination', ['mean', 'concat'])
 @pytest.mark.parametrize('features_scaling', [True, False])
-def test_read_data_mixture_graph_features(dataset, features_generator, features_combination, features_scaling):
-    dataset, pure_columns, target_columns, features_columns, group_reading = dataset
-    save_dir = '%s/data/_%s_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
-                                                  ','.join(features_generator), features_combination, features_scaling,
-                                                  group_reading)
+def test_ReadData_MixtureGraph_FeaturesMol(dataset, features_generator, features_combination, features_scaling):
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                               ','.join(features_generator), features_combination, features_scaling)
+    assert not os.path.exists(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -138,24 +209,53 @@ def test_read_data_mixture_graph_features(dataset, features_generator, features_
         arguments += [
             '--features_mol_normalize'
         ]
-        if features_columns is not None:
-            arguments += [
-                '--features_add_normalize'
-            ]
-    if features_columns is not None:
-        arguments += [
-            '--group_reading',
-            '--feature_columns'
-        ] + features_columns
+    args = CommonArgs().parse_args(arguments)
+    main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
+
+
+@pytest.mark.parametrize('dataset', [
+    ('solubility', ['mixture'], ['Solubility'], ['T', 'P']),
+])
+@pytest.mark.parametrize('group_reading', [True, False])
+@pytest.mark.parametrize('features_generator', [['rdkit_2d_normalized'],
+                                                ['morgan'],
+                                                ['rdkit_2d', 'morgan_count']])
+@pytest.mark.parametrize('features_combination', ['mean', 'concat'])
+@pytest.mark.parametrize('features_scaling', [True, False])
+def test_ReadData_MixtureGraph_FeaturesMolAdd(dataset, group_reading, features_generator, features_combination,
+                                              features_scaling):
+    dataset, pure_columns, target_columns, features_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                                  group_reading, ','.join(features_generator), features_combination,
+                                                  features_scaling)
+    assert not os.path.exists(save_dir)
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
+        '--mixture_columns'] + pure_columns + [
+        '--target_columns'] + target_columns + [
+        '--n_jobs', '6',
+        '--features_combination', features_combination,
+        '--features_generator',
+    ] + features_generator + [
+        '--feature_columns'
+    ] + features_columns
     if group_reading:
         arguments += [
             '--group_reading'
         ]
+    if features_scaling:
+        arguments += [
+            '--features_mol_normalize',
+            '--features_add_normalize'
+        ]
     args = CommonArgs().parse_args(arguments)
     main(args)
+    assert os.path.exists('%s/dataset.pkl' % save_dir)
 
 
-def test_read_data_reaction():
+def test_ReadData_reaction():
     # TODO
     return
     """

@@ -16,7 +16,6 @@ def main(args: HyperoptArgs) -> None:
     # read data
     dataset = Dataset.load(args.save_dir)
     dataset.graph_kernel_type = args.graph_kernel_type
-    print(dataset.X[:, 1])
     # set kernel_config
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,
