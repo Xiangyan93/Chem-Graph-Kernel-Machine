@@ -5,124 +5,104 @@ import os
 CWD = os.path.dirname(os.path.abspath(__file__))
 import sys
 sys.path.append('%s/..' % CWD)
+from mgktools.hyperparameters import (
+    additive, additive_pnorm, additive_msnorm, additive_norm,
+    product, product_pnorm, product_msnorm, product_norm
+)
 from chemml.args import KernelArgs, TrainArgs
 
 
-@pytest.mark.parametrize('dataset', ['freesolv', 'bace', 'st'])
-def test_kernel_data_pure_graph(dataset):
-    save_dir = '%s/data/_%s' % (CWD, dataset)
+@pytest.mark.parametrize('dataset', [
+    ('freesolv', ['smiles'], ['freesolv']),
+])
+@pytest.mark.parametrize('testset', [
+    ('loocv', '1'),
+    ('random', '10'),
+    ('scaffold_balanced', '10'),
+])
+@pytest.mark.parametrize('graph_hyperparameters', [
+    additive, additive_pnorm, additive_msnorm, additive_norm,
+    product, product_pnorm, product_msnorm, product_norm
+])
+def test_cv_PreComputed_PureGraph_Regression(dataset, testset, graph_hyperparameters):
+    task = 'regression'
+    model = 'gpr'
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
+    split, num_folds = testset
+    # kernel computation
     assert not os.path.exists('%s/kernel.pkl' % save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--graph_kernel_type', 'graph',
-        '--graph_hyperparameters', '%s/../hyperparameters/tMGR.json' % CWD
+        '--graph_hyperparameters', '%s' % graph_hyperparameters,
     ]
     args = KernelArgs().parse_args(arguments)
     from run.KernelCalc import main
     main(args)
     assert os.path.exists('%s/kernel.pkl' % save_dir)
-
-
-@pytest.mark.parametrize('dataset', ['freesolv', 'bace', 'st'])
-@pytest.mark.parametrize('features_generator', [['rdkit_2d_normalized'],
-                                                ['morgan'],
-                                                ['rdkit_2d'],
-                                                ['morgan_count'],
-                                                ['rdkit_2d_normalized', 'morgan']])
-@pytest.mark.parametrize('features_scaling', [True, False])
-def test_kernel_pure_graph_features(dataset, features_generator, features_scaling):
-    save_dir = '%s_%s_%s' % (dataset, ','.join(features_generator), features_scaling)
+    # cross validation
     arguments = [
-        '--save_dir', '%s/data/_%s' % (CWD, save_dir),
-        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
-        '--pure_columns', 'smiles',
-        '--target_columns', dataset,
-        '--n_jobs', '6',
-        '--features_generator',
-    ] + features_generator
-    if features_scaling:
-        arguments += [
-            '--features_mol_normalize'
-        ]
-        if dataset == 'st':
-            arguments += [
-                '--features_add_normalize'
-            ]
-    if dataset == 'st':
-        arguments += [
-            '--feature_columns', 'T'
-        ]
+        '--save_dir', '%s' % save_dir,
+        '--graph_kernel_type', 'pre-computed',
+        '--task_type', task,
+        '--model_type', model,
+        '--split_type', split,
+        '--split_sizes', '0.8', '0.2',
+        '--alpha', '0.01',
+        '--metric', 'rmse',
+        '--extra_metrics', 'r2', 'mae',
+        '--num_folds', num_folds
+    ]
+    args = TrainArgs().parse_args(arguments)
+    from run.ModelEvaluate import main
+    main(args)
+    os.remove('%s/kernel.pkl' % save_dir)
+
+
+@pytest.mark.parametrize('dataset', [
+    ('bace', ['smiles'], ['bace']),
+    ('np', ['smiles1', 'smiles2'], ['np']),
+])
+@pytest.mark.parametrize('model', ['gpr', 'gpc', 'svc'])
+@pytest.mark.parametrize('testset', [
+    ('random', '10'),
+])
+@pytest.mark.parametrize('metric', ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score', 'mcc'])
+@pytest.mark.parametrize('graph_hyperparameters', [
+    additive_msnorm
+])
+def test_cv_PreComputed_PureGraph_Binary(dataset, model, testset, metric, graph_hyperparameters):
+    task = 'binary'
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
+    split, num_folds = testset
+    # kernel computation
+    assert not os.path.exists('%s/kernel.pkl' % save_dir)
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--graph_kernel_type', 'graph',
+        '--graph_hyperparameters'] + ['%s' % graph_hyperparameters] * len(pure_columns)
     args = KernelArgs().parse_args(arguments)
-    from run.ReadData import main
+    from run.KernelCalc import main
     main(args)
-
-
-@pytest.mark.parametrize('dataset', ['np', 'solubility'])
-def test_read_data_mixture_graph(dataset):
-    save_dir = dataset
+    assert os.path.exists('%s/kernel.pkl' % save_dir)
+    # cross validation
     arguments = [
-        '--save_dir', '%s/data/_%s' % (CWD, save_dir),
-        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
-        '--mixture_columns', 'mixture',
-        '--target_columns', dataset,
-        '--n_jobs', '6',
+        '--save_dir', '%s' % save_dir,
+        '--graph_kernel_type', 'pre-computed',
+        '--task_type', task,
+        '--model_type', model,
+        '--split_type', split,
+        '--split_sizes', '0.8', '0.2',
+        '--metric', metric,
+        '--num_folds', num_folds
     ]
-    if dataset == 'solubility':
-        arguments += [
-            '--feature_columns', 'T', 'P'
-        ]
-    args = CommonArgs().parse_args(arguments)
-    from run.ReadData import main
+    if model == 'gpr':
+        arguments += ['--alpha', '0.01']
+    elif model == 'svc':
+        arguments += ['--C', '1.0']
+    args = TrainArgs().parse_args(arguments)
+    from run.ModelEvaluate import main
     main(args)
-
-
-@pytest.mark.parametrize('dataset', ['np', 'solubility'])
-@pytest.mark.parametrize('features_generator', [['rdkit_2d_normalized'],
-                                                ['morgan'],
-                                                ['rdkit_2d'],
-                                                ['morgan_count'],
-                                                ['rdkit_2d_normalized', 'morgan']])
-@pytest.mark.parametrize('features_combination', ['mean', 'concat'])
-@pytest.mark.parametrize('features_scaling', [True, False])
-def test_read_data_mixture_graph_features(dataset, features_generator, features_combination, features_scaling):
-    save_dir = '%s_%s_%s_%s' % (dataset, ','.join(features_generator), features_combination, features_scaling)
-    arguments = [
-        '--save_dir', '%s/data/_%s' % (CWD, save_dir),
-        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
-        '--mixture_columns', 'mixture',
-        '--target_columns', dataset,
-        '--n_jobs', '6',
-        '--features_combination', features_combination,
-        '--features_generator',
-    ] + features_generator
-    if features_scaling:
-        arguments += [
-            '--features_mol_normalize'
-        ]
-        if dataset == 'solubility':
-            arguments += [
-                '--features_add_normalize'
-            ]
-    if dataset == 'solubility':
-        arguments += [
-            '--feature_columns', 'T', 'P'
-        ]
-    args = CommonArgs().parse_args(arguments)
-    from run.ReadData import main
-    main(args)
-
-
-"""
-@pytest.mark.parametrize('dataset', ['react'])
-def test_read_data_reaction(dataset):
-    arguments = [
-        '--save_dir', '%s/data/_%s' % (CWD, dataset),
-        '--data_path', '%s/data/%s.csv' % (CWD, dataset),
-        '--reaction_columns', 'good_smarts',
-        '--target_columns', 'reaction_type',
-        '--n_jobs', '6',
-    ]
-    args = CommonArgs().parse_args(arguments)
-    from run.ReadData import main
-    main(args)
-"""
+    os.remove('%s/kernel.pkl' % save_dir)

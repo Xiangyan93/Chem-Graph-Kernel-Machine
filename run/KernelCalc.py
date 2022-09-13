@@ -27,7 +27,6 @@ def main(args: KernelArgs) -> None:
                                       features_hyperparameters_file=args.features_hyperparameters_file,
                                       mgk_hyperparameters_files=args.graph_hyperparameters)
     print('**\tCalculating kernel matrix\t**')
-    print(dataset.X.shape)
     kernel_dict = kernel_config.get_kernel_dict(dataset.X, dataset.X_repr.ravel())
     print('**\tEnd Calculating kernel matrix\t**')
     kernel_pkl = os.path.join(args.save_dir, 'kernel.pkl')

@@ -62,11 +62,12 @@ def test_hyperopt_PureGraph_regression(dataset, testset, metric, graph_hyperpara
 
 
 @pytest.mark.parametrize('dataset', [
-    # ('bace', ['smiles'], ['bace']),
-    # ('clintox', ['smiles'], ['FDA_APPROVED', 'CT_TOX']), multi-class TODO
+    ('bace', ['smiles'], ['bace']),
     ('np', ['smiles1', 'smiles2'], ['np']),
 ])
 @pytest.mark.parametrize('modelset', [
+    ('gpr', True),
+    ('gpr', False),
     ('gpc', False),
     ('svc', True),
     ('svc', False),
@@ -86,6 +87,7 @@ def test_hyperopt_PureGraph_binary(dataset, modelset, testset, metric, graph_hyp
     split, num_folds = testset
     for i in range(len(pure_columns)):
         assert not os.path.exists('%s/hyperparameters_%d.json' % (save_dir, i))
+    assert not os.path.exists('%s/alpha' % save_dir)
     assert not os.path.exists('%s/C' % save_dir)
     arguments = [
         '--save_dir', save_dir,
@@ -99,17 +101,35 @@ def test_hyperopt_PureGraph_binary(dataset, modelset, testset, metric, graph_hyp
         '--num_iters', '10',
         '--C', '1',
     ]
-    if optimize_C:
+    if model == 'gpr':
         arguments += [
-            '--C_bounds', '0.01', '10.0'
+            '--alpha', '0.01'
         ]
+        if optimize_C:
+            arguments += [
+                '--alpha_bounds', '0.001', '0.02'
+            ]
+    elif model == 'svc':
+        arguments += [
+            '--C', '1',
+        ]
+        if optimize_C:
+            arguments += [
+                '--C_bounds', '0.01', '10.0'
+            ]
     args = HyperoptArgs().parse_args(arguments)
     main(args)
-    if optimize_C:
+    if optimize_C and model == 'svc':
         assert 0.01 < float(open('%s/C' % save_dir).readline()) < 10.0
         os.remove('%s/C' % save_dir)
     else:
         assert not os.path.exists('%s/C' % save_dir)
+
+    if optimize_C and model == 'gpr':
+        assert 0.001 < float(open('%s/alpha' % save_dir).readline()) < 0.02
+        os.remove('%s/alpha' % save_dir)
+    else:
+        assert not os.path.exists('%s/alpha' % save_dir)
     for i in range(len(pure_columns)):
         os.remove('%s/hyperparameters_%d.json' % (save_dir, i))
 
