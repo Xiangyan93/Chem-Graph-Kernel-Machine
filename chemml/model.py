@@ -29,7 +29,6 @@ def set_model(args: TrainArgs,
             optimizer=args.optimizer,
             alpha=args.alpha_,
             normalize_y=True,
-            batch_size=args.batch_size
         )
     elif args.model_type == 'gpr_nle':
         n_jobs = 1 if args.graph_kernel_type == 'graph' else args.n_jobs

@@ -5,7 +5,6 @@ import os
 CWD = os.path.dirname(os.path.abspath(__file__))
 import sys
 sys.path.append('%s/..' % CWD)
-import json
 from mgktools.hyperparameters import (
     additive, additive_pnorm, additive_msnorm, additive_norm,
     product, product_pnorm, product_msnorm, product_norm

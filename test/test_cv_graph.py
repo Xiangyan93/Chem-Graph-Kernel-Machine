@@ -7,41 +7,39 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 import sys
 import pandas as pd
 sys.path.append('%s/..' % CWD)
+from mgktools.hyperparameters import (
+    additive, additive_pnorm, additive_msnorm, additive_norm,
+    product, product_pnorm, product_msnorm, product_norm
+)
 from chemml.args import TrainArgs
 from run.ModelEvaluate import main
 
 
-@pytest.mark.parametrize('testset', [
-    ('freesolv', 'regression', 'gpr', 'loocv', 'rmse', ['mae', 'r2'], '1'),
-    ('freesolv', 'regression', 'gpr', 'random', 'rmse', ['mae', 'r2'], '10'),
-    ('st', 'regression', 'gpr', 'loocv', 'rmse', ['mae', 'r2'], '1'),
-    ('st', 'regression', 'gpr', 'random', 'rmse', ['mae', 'r2'], '10'),
-    ('bace', 'binary', 'gpc', 'random', 'roc-auc', ['accuracy', 'precision', 'recall', 'f1_score', 'mcc'], '10'),
-    ('bace', 'binary', 'svc', 'random', 'roc-auc', ['accuracy', 'precision', 'recall', 'f1_score', 'mcc'], '10')
+@pytest.mark.parametrize('dataset', [
+    ('freesolv', ['smiles'], ['freesolv']),
 ])
-def test_cv_pure_graph(testset):
-    dataset, task, model, split, metric, extra_metric, num_folds = testset
-    save_dir = '%s/data/_%s' % (CWD, dataset)
+@pytest.mark.parametrize('model', ['gpr'])
+@pytest.mark.parametrize('testset', [
+    ('loocv', '1'),
+    ('random', '10'),
+])
+def test_cv_PureGraph_regression(dataset, model, testset):
+    task = 'regression'
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
+    split, num_folds = testset
+    metric = 'rmse'
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--graph_kernel_type', 'graph',
-        '--graph_hyperparameters', '%s/../hyperparameters/tMGR.json' % CWD,
+        '--graph_hyperparameters', additive_msnorm,
         '--task_type', task,
         '--model_type', model,
         '--split_type', split,
         '--metric', metric,
         '--num_folds', num_folds,
-        '--extra_metrics'
-    ] + extra_metric
-    if model == 'gpr':
-        arguments += ['--alpha', '0.01']
-    elif model == 'svc':
-        arguments += ['--C', '1.0']
-    if dataset == 'st':
-        arguments += [
-            '--feature_columns', 'T',
-            '--features_hyperparameters', '100.0'
-        ]
+        '--alpha', '0.01'
+    ]
     args = TrainArgs().parse_args(arguments)
     main(args)
     if split == 'loocv':
@@ -54,7 +52,7 @@ def test_cv_pure_graph(testset):
             assert len(df) > 0
             os.remove('%s/test_%d.log' % (save_dir, i))
 
-
+"""
 @pytest.mark.parametrize('testset', [
     ('freesolv', 'regression', 'gpr', 'loocv', 'rmse', ['mae', 'r2'], '1'),
     ('freesolv', 'regression', 'gpr', 'random', 'rmse', ['mae', 'r2'], '10'),
@@ -102,3 +100,4 @@ def test_cv_pure_graph_features(testset, features_generator, features_kernel_typ
             df = pd.read_csv('%s/test_%d.log' % (save_dir, i))
             assert len(df) > 0
             os.remove('%s/test_%d.log' % (save_dir, i))
+"""
