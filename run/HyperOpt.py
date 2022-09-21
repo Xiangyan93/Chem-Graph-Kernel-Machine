@@ -6,6 +6,7 @@ import sys
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
 from mgktools.data import Dataset
+from mgktools.data.split import dataset_split
 from mgktools.kernels.utils import get_kernel_config
 from mgktools.hyperparameters.hyperopt import bayesian_optimization
 from chemml.model import set_model
@@ -16,6 +17,10 @@ def main(args: HyperoptArgs) -> None:
     # read data
     dataset = Dataset.load(args.save_dir)
     dataset.graph_kernel_type = args.graph_kernel_type
+    if args.num_splits == 1:
+        datasets = [dataset]
+    else:
+        datasets = dataset_split(dataset=dataset, split_type='random', sizes=tuple([1 / args.num_splits] * args.num_splits))
     # set kernel_config
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,
@@ -26,7 +31,7 @@ def main(args: HyperoptArgs) -> None:
                                       mgk_hyperparameters_files=args.graph_hyperparameters)
     if args.optimizer is None:
         bayesian_optimization(save_dir=args.save_dir,
-                              dataset=dataset,
+                              datasets=datasets,
                               kernel_config=kernel_config,
                               task_type=args.task_type,
                               model_type=args.model_type,

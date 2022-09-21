@@ -21,13 +21,14 @@ from run.HyperOpt import main
     ('loocv', '1'),
     ('random', '10'),
 ])
+@pytest.mark.parametrize('num_splits', ['1', '2'])
 @pytest.mark.parametrize('metric', ['r2', 'mae', 'rmse'])
 @pytest.mark.parametrize('graph_hyperparameters', [
     additive, additive_pnorm, additive_msnorm, additive_norm,
     product, product_pnorm, product_msnorm, product_norm
 ])
 @pytest.mark.parametrize('optimize_alpha', [True, False])
-def test_hyperopt_PureGraph_regression(dataset, testset, metric, graph_hyperparameters, optimize_alpha):
+def test_hyperopt_PureGraph_regression(dataset, testset, num_splits, metric, graph_hyperparameters, optimize_alpha):
     task = 'regression'
     model = 'gpr'
     dataset, pure_columns, target_columns = dataset
@@ -46,6 +47,7 @@ def test_hyperopt_PureGraph_regression(dataset, testset, metric, graph_hyperpara
         '--graph_hyperparameters', '%s' % graph_hyperparameters,
         '--num_iters', '10',
         '--alpha', '0.01',
+        '--num_splits', num_splits
     ]
     if optimize_alpha:
         arguments += [

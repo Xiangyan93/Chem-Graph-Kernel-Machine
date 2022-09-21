@@ -309,6 +309,8 @@ class HyperoptArgs(TrainArgs):
     """Optimizer"""
     batch_size: int = None
     """batch_size"""
+    num_splits: int = 1
+    """split the dataset randomly into no. subsets."""
 
     @property
     def minimize_score(self) -> bool:
