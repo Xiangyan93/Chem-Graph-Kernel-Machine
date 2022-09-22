@@ -311,6 +311,8 @@ class HyperoptArgs(TrainArgs):
     """batch_size"""
     num_splits: int = 1
     """split the dataset randomly into no. subsets."""
+    save_all: bool = False
+    """save all hyperparameters during bayesian optimization."""
 
     @property
     def minimize_score(self) -> bool:
