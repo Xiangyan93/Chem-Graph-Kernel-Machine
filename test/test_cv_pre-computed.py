@@ -18,7 +18,7 @@ from chemml.args import KernelArgs, TrainArgs
 @pytest.mark.parametrize('testset', [
     ('loocv', '1'),
     ('random', '10'),
-    ('scaffold_balanced', '10'),
+    ('scaffold_order', '10'),
 ])
 @pytest.mark.parametrize('graph_hyperparameters', [
     additive, additive_pnorm, additive_msnorm, additive_norm,
@@ -64,7 +64,7 @@ def test_cv_PreComputed_PureGraph_Regression(dataset, testset, graph_hyperparame
     ('bace', ['smiles'], ['bace']),
     ('np', ['smiles1', 'smiles2'], ['np']),
 ])
-@pytest.mark.parametrize('model', ['gpr', 'gpc', 'svc'])
+@pytest.mark.parametrize('model', ['gpr' , 'gpc', 'svc'])
 @pytest.mark.parametrize('testset', [
     ('random', '10'),
 ])

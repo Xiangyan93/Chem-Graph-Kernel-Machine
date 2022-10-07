@@ -19,15 +19,15 @@ from run.ModelEvaluate import main
     ('freesolv', ['smiles'], ['freesolv']),
 ])
 @pytest.mark.parametrize('model', ['gpr'])
-@pytest.mark.parametrize('testset', [
+@pytest.mark.parametrize('input_set', [
     ('loocv', '1'),
     ('random', '10'),
 ])
-def test_cv_PureGraph_regression(dataset, model, testset):
+def test_cv_PureGraph_regression(dataset, model, input_set):
     task = 'regression'
     dataset, pure_columns, target_columns = dataset
     save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
-    split, num_folds = testset
+    split, num_folds = input_set
     metric = 'rmse'
     arguments = [
         '--save_dir', '%s' % save_dir,
@@ -40,6 +40,43 @@ def test_cv_PureGraph_regression(dataset, model, testset):
         '--num_folds', num_folds,
         '--alpha', '0.01'
     ]
+    args = TrainArgs().parse_args(arguments)
+    main(args)
+    if split == 'loocv':
+        df = pd.read_csv('%s/loocv.log' % save_dir)
+        assert len(df) > 0
+        os.remove('%s/loocv.log' % save_dir)
+    elif split == 'random':
+        for i in range(int(num_folds)):
+            df = pd.read_csv('%s/test_%d.log' % (save_dir, i))
+            assert len(df) > 0
+            os.remove('%s/test_%d.log' % (save_dir, i))
+
+
+@pytest.mark.parametrize('dataset', [
+    ('freesolv', ['smiles'], ['freesolv']),
+])
+@pytest.mark.parametrize('model', ['gpr'])
+def test_cv_PureGraph_regression_ExtTest(dataset, model):
+    task = 'regression'
+    dataset, pure_columns, target_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
+    split, num_folds = 'random', '1'
+    metric = 'rmse'
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--graph_kernel_type', 'graph',
+        '--graph_hyperparameters', additive_msnorm,
+        '--task_type', task,
+        '--model_type', model,
+        '--split_type', split,
+        '--metric', metric,
+        '--num_folds', num_folds,
+        '--alpha', '0.01',
+        '--separate_test_path', '%s/data/%s_test.csv' % (CWD, dataset),
+        '--pure_columns'] + pure_columns + [
+        '--target_columns'] + target_columns
+    print(arguments)
     args = TrainArgs().parse_args(arguments)
     main(args)
     if split == 'loocv':

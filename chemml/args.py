@@ -176,9 +176,9 @@ class TrainArgs(KernelArgs):
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
-    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = None
+    split_type: Literal['random', 'scaffold_order', 'scaffold_random', 'stratified', 'n_heavy', 'loocv'] = None
     """Method of splitting the data into train/val/test."""
-    split_sizes: Tuple[float, float] = (0.8, 0.2)
+    split_sizes: List[float] = [0.8, 0.2]
     """Split proportions for train/validation/test sets."""
     num_folds: int = 1
     """Number of folds when performing cross validation."""

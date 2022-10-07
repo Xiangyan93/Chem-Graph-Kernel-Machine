@@ -21,7 +21,7 @@ def main(args: HyperoptArgs) -> None:
         datasets = [dataset]
     else:
         datasets = dataset_split(dataset=dataset, split_type='random',
-                                 sizes=tuple([1 / args.num_splits] * args.num_splits))
+                                 sizes=[1 / args.num_splits] * args.num_splits)
     # set kernel_config
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,
