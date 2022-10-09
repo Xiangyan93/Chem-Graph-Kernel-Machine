@@ -337,7 +337,6 @@ class HyperoptArgs(TrainArgs):
 
     def process_args(self) -> None:
         super().process_args()
-        assert self.graph_kernel_type == 'graph'
         if self.optimizer in ['L-BFGS-B']:
             assert self.model_type == 'gpr'
 
