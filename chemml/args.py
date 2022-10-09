@@ -270,9 +270,6 @@ class TrainArgs(KernelArgs):
         if self.model_type == 'svc':
             assert self.C is not None
 
-        if self.split_type == 'loocv':
-            assert self.task_type == 'regression'
-
         if not hasattr(self, 'optimizer'):
             self.optimizer = None
         if not hasattr(self, 'batch_size'):
