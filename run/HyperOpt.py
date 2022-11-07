@@ -2,97 +2,58 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+
 CWD = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(CWD, '..'))
-from typing import Dict, Union, List
-from hyperopt import fmin, hp, tpe
-import numpy as np
-from chemml.evaluator import Evaluator
+from mgktools.data import Dataset
+from mgktools.data.split import dataset_split
+from mgktools.kernels.utils import get_kernel_config
+from mgktools.hyperparameters.hyperopt import bayesian_optimization
+from chemml.model import set_model
 from chemml.args import HyperoptArgs
-from chemml.data.data import Dataset
-from chemml.kernels.utils import get_kernel_config
-
-
-def save_best_params(results: List[float],
-                     hyperdicts: List[Dict],
-                     kernel_config,
-                     args):
-    best_idx = np.where(results == np.min(results))[0][0]
-    best = hyperdicts[best_idx].copy()
-    #
-    if args.opt_alpha:
-        open('%s/alpha' % args.save_dir, 'w').write('%s' % best.pop('alpha'))
-    elif args.opt_C:
-        open('%s/C' % args.save_dir, 'w').write('%s' % best.pop('C'))
-    kernel_config.update_from_space(best)
-    kernel_config.save_hyperparameters(args.save_dir)
-
-
-def Bayesian(args: HyperoptArgs, dataset: Dataset, kernel_config):
-    hyperdicts = []
-    results = []
-
-    def objective(hyperdict: Dict[str, float]) -> float:
-        print('\nHyperopt Step')
-        hyperdicts.append(hyperdict.copy())
-        args.alpha = hyperdict.pop('alpha', None)
-        args.C = hyperdict.pop('C', None)
-        kernel_config.update_from_space(hyperdict)
-        evaluator = Evaluator(args, dataset, kernel_config)
-        result = evaluator.evaluate()
-        if not args.minimize_score:
-            result = - result
-        results.append(result)
-        dataset.graph_kernel_type = 'graph'
-        args.graph_kernel_type = 'graph'
-        save_best_params(results, hyperdicts, kernel_config, args)
-        return result
-
-    SPACE = kernel_config.get_space()
-
-    # add adjust hyperparameters of model
-    if args.model_type == 'gpr':
-        if args.alpha_bounds is None:
-            pass
-        elif args.alpha_uniform is None:
-            SPACE['alpha'] = hp.loguniform('alpha',
-                                           low=np.log(args.alpha_bounds[0]),
-                                           high=np.log(args.alpha_bounds[1]))
-        else:
-            SPACE['alpha'] = hp.quniform('alpha',
-                                         low=args.alpha_bounds[0],
-                                         high=args.alpha_bounds[1],
-                                         q=args.alpha_uniform)
-
-    elif args.model_type == 'svc':
-        if args.C_bounds is None:
-            pass
-        elif args.C_uniform is None:
-            SPACE['C'] = hp.loguniform('C',
-                                       low=np.log(args.C_bounds[0]),
-                                       high=np.log(args.C_bounds[1]))
-        else:
-            SPACE['C'] = hp.loguniform('C',
-                                       low=args.C_bounds[0],
-                                       high=args.C_bounds[1],
-                                       q=args.C_uniform)
-
-    fmin(objective, SPACE, algo=tpe.suggest, max_evals=args.num_iters,
-         rstate=np.random.RandomState(args.seed))
-    # get best hyperparameters.
-    save_best_params(results, hyperdicts, kernel_config, args)
 
 
 def main(args: HyperoptArgs) -> None:
     # read data
     dataset = Dataset.load(args.save_dir)
     dataset.graph_kernel_type = args.graph_kernel_type
-    # get kernel config
-    kernel_config = get_kernel_config(args, dataset)
-    if args.optimizer is None:
-        Bayesian(args, dataset, kernel_config)
+    if args.num_splits == 1:
+        datasets = [dataset]
     else:
-        Evaluator(args, dataset, kernel_config).evaluate()
+        datasets = dataset_split(dataset=dataset, split_type='random',
+                                 sizes=[1 / args.num_splits] * args.num_splits)
+    # set kernel_config
+    kernel_config = get_kernel_config(dataset=dataset,
+                                      graph_kernel_type=args.graph_kernel_type,
+                                      features_kernel_type=args.features_kernel_type,
+                                      features_hyperparameters=args.features_hyperparameters,
+                                      features_hyperparameters_bounds=args.features_hyperparameters_bounds,
+                                      features_hyperparameters_file=args.features_hyperparameters_file,
+                                      mgk_hyperparameters_files=args.graph_hyperparameters)
+    if args.optimizer is None:
+        best_hyperdict, results, hyperdicts = bayesian_optimization(save_dir=args.save_dir,
+                                                                    datasets=datasets,
+                                                                    kernel_config=kernel_config,
+                                                                    task_type=args.task_type,
+                                                                    model_type=args.model_type,
+                                                                    metric=args.metric,
+                                                                    split_type=args.split_type,
+                                                                    num_iters=args.num_iters,
+                                                                    alpha=args.alpha_,
+                                                                    alpha_bounds=args.alpha_bounds,
+                                                                    C=args.C_,
+                                                                    C_bounds=args.C_bounds,
+                                                                    seed=args.seed)
+        if args.save_all:
+            for i, hyperdict in enumerate(hyperdicts):
+                if not os.path.exists('%s/%d' % (args.save_dir, i)):
+                    os.mkdir('%s/%d' % (args.save_dir, i))
+                kernel_config.update_from_space(hyperdict)
+                kernel_config.save_hyperparameters('%s/%d' % (args.save_dir, i))
+                open('%s/%d/loss' % (args.save_dir, i), 'w').write(str(results[i]))
+    else:
+        model = set_model(args, kernel=kernel_config.kernel)
+        model.fit(dataset.X, dataset.y, loss=args.loss, verbose=True)
         kernel_config.update_from_theta()
         kernel_config.save_hyperparameters(args.save_dir)
 

@@ -4,10 +4,7 @@ import os
 from tap import Tap
 from typing import Dict, Iterator, List, Optional, Union, Literal, Tuple
 import numpy as np
-
-
-Metric = Literal['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score',
-                 'rmse', 'mae', 'mse', 'r2', 'max']
+from mgktools.evaluators.metric import Metric
 
 
 class CommonArgs(Tap):
@@ -47,10 +44,16 @@ class CommonArgs(Tap):
     """
     features_generator: List[str] = None
     """Method(s) of generating additional features_mol."""
+    features_combination: Literal['concat', 'mean'] = None
+    """How to combine features vector for mixtures."""
     target_columns: List[str] = None
     """
     Name of the columns containing target values.
     """
+    features_mol_normalize: bool = False
+    """Nomralize the molecular features_mol."""
+    features_add_normalize: bool = False
+    """Nomralize the additonal features_mol."""
     group_reading: bool = False
     """Find unique input strings first, then read the data."""
     def __init__(self, *args, **kwargs):
@@ -89,10 +92,12 @@ class CommonArgs(Tap):
 
 
 class KernelArgs(CommonArgs):
-    graph_kernel_type: Literal['graph', 'preCalc'] = None
+    graph_kernel_type: Literal['graph', 'pre-computed'] = None
     """The type of kernel to use."""
     graph_hyperparameters: List[str] = None
     """hyperparameters file for graph kernel."""
+    features_kernel_type: Literal['dot_product', 'rbf'] = None
+    """choose dot product kernel or rbf kernel for features."""
     features_hyperparameters: List[float] = None
     """hyperparameters for molecular features."""
     features_hyperparameters_min: List[float] = None
@@ -101,17 +106,16 @@ class KernelArgs(CommonArgs):
     """hyperparameters for molecular features."""
     features_hyperparameters_file: str = None
     """JSON file contains features hyperparameters"""
-    features_mol_normalize: bool = False
-    """Nomralize the molecular features_mol."""
-    features_add_normalize: bool = False
-    """Nomralize the additonal features_mol."""
     single_features_hyperparameter: bool = True
     """Use the same hyperparameter for all features."""
 
     @property
     def features_hyperparameters_bounds(self):
         if self.features_hyperparameters_min is None or self.features_hyperparameters_max is None:
-            return 'fixed'
+            if self.features_hyperparameters is None:
+                return None
+            else:
+                return 'fixed'
         else:
             return [(self.features_hyperparameters_min[i], self.features_hyperparameters_max[i])
                     for i in range(len(self.features_hyperparameters))]
@@ -148,19 +152,33 @@ class KernelBlockArgs(KernelArgs):
         assert self.block_id[1] >= self.block_id[0]
 
 
+class DataSplitArgs(Tap):
+    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
+    """Method of splitting the data into train/val/test."""
+    split_sizes: Tuple[float, float] = (0.8, 0.2)
+    """Split proportions for train/validation/test sets."""
+    num_folds: int = 1
+    """Number of folds when performing cross validation."""
+    save_dir: str
+    """The output directory."""
+    n_jobs: int = 1
+    """The cpu numbers used for parallel computing."""
+    data_path: str = None
+    """The Path of input data CSV file."""
+
+
 class TrainArgs(KernelArgs):
-    dataset_type: Literal['regression', 'classification', 'multiclass'] = None
+    task_type: Literal['regression', 'binary', 'multi-class'] = None
     """
-    Type of dataset. This determines the loss function used during training.
+    Type of task. This determines the loss function used during training.
     """
     model_type: Literal['gpr', 'svc', 'svr', 'gpc', 'gpr_nystrom', 'gpr_nle']
     """Type of model to use"""
     loss: Literal['loocv', 'likelihood'] = 'loocv'
     """The target loss function to minimize or maximize."""
-
-    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = 'random'
+    split_type: Literal['random', 'scaffold_order', 'scaffold_random', 'stratified', 'n_heavy', 'loocv'] = None
     """Method of splitting the data into train/val/test."""
-    split_sizes: Tuple[float, float] = (0.8, 0.2)
+    split_sizes: List[float] = [0.8, 0.2]
     """Split proportions for train/validation/test sets."""
     num_folds: int = 1
     """Number of folds when performing cross validation."""
@@ -181,7 +199,7 @@ class TrainArgs(KernelArgs):
     """The rule to combining prediction from estimators."""
     n_local: int = 500
     """The number of samples used in Naive Local Experts."""
-    n_core: int = 500
+    n_core: int = None
     """The number of samples used in Nystrom core set."""
     metric: Metric = None
     """metric"""
@@ -195,23 +213,29 @@ class TrainArgs(KernelArgs):
     """If set True, 5 most similar molecules in the training set will be save in the test_*.log."""
     save_model: bool = False
     """Save the trained model file."""
+    separate_test_path: str = None
+    """Path to separate test set, optional."""
 
     @property
-    def metrics(self) -> List[str]:
+    def metrics(self) -> List[Metric]:
         return [self.metric] + self.extra_metrics
 
     @property
     def alpha_(self) -> float:
-        if isinstance(self.alpha, float):
+        if self.alpha is None:
+            return None
+        elif isinstance(self.alpha, float):
             return self.alpha
-        if os.path.exists(self.alpha):
+        elif os.path.exists(self.alpha):
             return float(open(self.alpha, 'r').read())
         else:
             return float(self.alpha)
 
     @property
     def C_(self) -> float:
-        if isinstance(self.C, float):
+        if self.C is None:
+            return None
+        elif isinstance(self.C, float):
             return self.C
         elif os.path.exists(self.C):
             return float(open(self.C, 'r').read())
@@ -223,21 +247,18 @@ class TrainArgs(KernelArgs):
 
     def process_args(self) -> None:
         super().process_args()
-        if self.dataset_type == 'regression':
+        if self.task_type == 'regression':
             assert self.model_type in ['gpr', 'gpr_nystrom', 'gpr_nle', 'svr']
             for metric in self.metrics:
                 assert metric in ['rmse', 'mae', 'mse', 'r2', 'max']
-        elif self.dataset_type == 'classification':
-            assert self.model_type in ['gpc', 'svc']
+        elif self.task_type == 'binary':
+            assert self.model_type in ['gpc', 'svc', 'gpr']
             for metric in self.metrics:
-                assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score']
-        else:
+                assert metric in ['roc-auc', 'accuracy', 'precision', 'recall', 'f1_score', 'mcc']
+        elif self.task_type == 'multi-class':
             assert self.model_type in ['gpc', 'svc']
             for metric in self.metrics:
                 assert metric in ['accuracy', 'precision', 'recall', 'f1_score']
-
-        if 'accuracy' in self.metrics:
-            assert self.no_proba
 
         if self.split_type == 'loocv':
             assert self.num_folds == 1
@@ -249,9 +270,6 @@ class TrainArgs(KernelArgs):
         if self.model_type == 'svc':
             assert self.C is not None
 
-        if self.split_type == 'loocv':
-            assert self.dataset_type == 'regression'
-
         if not hasattr(self, 'optimizer'):
             self.optimizer = None
         if not hasattr(self, 'batch_size'):
@@ -261,6 +279,9 @@ class TrainArgs(KernelArgs):
             assert self.num_folds == 1
             assert self.split_sizes[0] > 0.99999
             assert self.model_type == 'gpr'
+
+        if self.ensemble:
+            assert self.n_sample_per_model is not None
 
 
 class PredictArgs(TrainArgs):
@@ -280,7 +301,7 @@ class HyperoptArgs(TrainArgs):
     """Bounds of alpha used in GPR."""
     alpha_uniform: float = None
     """"""
-    C_bounds: Tuple[float, float] = (1e-3, 1e3)
+    C_bounds: Tuple[float, float] = None #  (1e-3, 1e3)
     """Bounds of C used in SVC."""
     C_uniform: float = None
     """"""
@@ -288,6 +309,10 @@ class HyperoptArgs(TrainArgs):
     """Optimizer"""
     batch_size: int = None
     """batch_size"""
+    num_splits: int = 1
+    """split the dataset randomly into no. subsets."""
+    save_all: bool = False
+    """save all hyperparameters during bayesian optimization."""
 
     @property
     def minimize_score(self) -> bool:
@@ -312,7 +337,6 @@ class HyperoptArgs(TrainArgs):
 
     def process_args(self) -> None:
         super().process_args()
-        assert self.graph_kernel_type != 'preCalc'
         if self.optimizer in ['L-BFGS-B']:
             assert self.model_type == 'gpr'
 
