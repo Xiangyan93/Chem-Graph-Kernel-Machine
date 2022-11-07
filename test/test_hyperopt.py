@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 import pytest
 import os
+
 CWD = os.path.dirname(os.path.abspath(__file__))
 import sys
+
 sys.path.append('%s/..' % CWD)
 from mgktools.hyperparameters import (
     additive, additive_pnorm, additive_msnorm, additive_norm,
@@ -91,17 +93,17 @@ def test_hyperopt_PureGraph_binary(dataset, modelset, testset, metric, graph_hyp
     assert not os.path.exists('%s/alpha' % save_dir)
     assert not os.path.exists('%s/C' % save_dir)
     arguments = [
-        '--save_dir', save_dir,
-        '--graph_kernel_type', 'graph',
-        '--task_type', task,
-        '--model_type', model,
-        '--split_type', split,
-        '--metric', metric,
-        '--num_folds', num_folds,
-        '--graph_hyperparameters'] + ['%s' % graph_hyperparameters] * len(pure_columns) + [
-        '--num_iters', '10',
-        '--C', '1',
-    ]
+                    '--save_dir', save_dir,
+                    '--graph_kernel_type', 'graph',
+                    '--task_type', task,
+                    '--model_type', model,
+                    '--split_type', split,
+                    '--metric', metric,
+                    '--num_folds', num_folds,
+                    '--graph_hyperparameters'] + ['%s' % graph_hyperparameters] * len(pure_columns) + [
+                    '--num_iters', '10',
+                    '--C', '1',
+                ]
     if model == 'gpr':
         arguments += [
             '--alpha', '0.01'
@@ -150,7 +152,7 @@ def test_hyperopt_PureGraph_binary(dataset, modelset, testset, metric, graph_hyp
 @pytest.mark.parametrize('graph_hyperparameters', [
     additive_msnorm
 ])
-def test_hyperopt_PureGraph_multiclass(dataset, modelset, testset, metric, graph_hyperparameters):
+def test_hyperopt_PureGraph_binary_multitask(dataset, modelset, testset, metric, graph_hyperparameters):
     task = 'binary'
     dataset, pure_columns, target_columns = dataset
     save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
@@ -173,8 +175,9 @@ def test_hyperopt_PureGraph_multiclass(dataset, modelset, testset, metric, graph
 ])
 @pytest.mark.parametrize('features_kernel_type', ['rbf', 'dot_product'])
 @pytest.mark.parametrize('features_hyperparameter_fix', [True, False])
-def test_hyperopt_PureGraph_FeaturesAdd_regression(dataset, group_reading, features_scaling, testset, metric,
-                                         graph_hyperparameters, features_kernel_type, features_hyperparameter_fix):
+def test_hyperopt_PureGraph_FeaturesAdd_regression(
+        dataset, group_reading, features_scaling, testset, metric,
+        graph_hyperparameters, features_kernel_type, features_hyperparameter_fix):
     optimize_alpha = features_hyperparameter_fix
     task = 'regression'
     model = 'gpr'

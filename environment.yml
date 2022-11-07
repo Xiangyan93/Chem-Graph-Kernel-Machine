@@ -16,4 +16,4 @@ dependencies:
     - git+https://github.com/bp-kelley/descriptastorus
     - git+https://gitlab.com/Xiangyan93/graphdot.git@feature/xy
     - rxntools>=0.0.2
-    - mgktools>=0.0.1
+    - mgktools>=0.0.3

@@ -48,7 +48,7 @@ class DataSplitArgs(Tap):
             assert self.split_type == 'n_heavy'
             assert self.num_folds == 1
         if self.smiles_column is not None:
-            assert self.split_type in ['scaffold_random', 'scaffold_random', 'n_heavy']
+            assert self.split_type in ['scaffold_order', 'scaffold_random', 'n_heavy']
         if self.target_column is not None:
             assert self.split_type == 'stratified'
         if self.split_type == 'stratified':

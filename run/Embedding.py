@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from chemml.args import EmbeddingArgs
-from chemml.data.data import Dataset
-from chemml.kernels.utils import get_kernel_config
+from mgktools.data import Dataset
+from mgktools.kernels.utils import get_kernel_config
 from sklearn.manifold import TSNE
 from sklearn.decomposition import KernelPCA
 
@@ -25,8 +25,16 @@ def plotmap(ax, X, Y, c, cmap='viridis', size=1, min=None, max=None):
 
 
 def main(args: EmbeddingArgs) -> None:
-    dataset = Dataset.load(args.save_dir, args=args).copy()
-    kernel_config = get_kernel_config(args, dataset)
+    dataset = Dataset.load(args.save_dir).copy()
+    dataset.graph_kernel_type = args.graph_kernel_type
+    kernel_config = get_kernel_config(dataset=dataset,
+                                      graph_kernel_type=args.graph_kernel_type,
+                                      features_kernel_type=args.features_kernel_type,
+                                      features_hyperparameters=args.features_hyperparameters,
+                                      features_hyperparameters_bounds=args.features_hyperparameters_bounds,
+                                      features_hyperparameters_file=args.features_hyperparameters_file,
+                                      mgk_hyperparameters_files=args.graph_hyperparameters,
+                                      kernel_pkl=os.path.join(args.save_dir, 'kernel.pkl'))
     if args.embedding_algorithm == 'tSNE':
         # compute data embedding.
         R = kernel_config.kernel(dataset.X)

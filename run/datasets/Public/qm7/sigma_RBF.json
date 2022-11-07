@@ -1,8 +1,9 @@
 {
- "sigma_RBF": [
+ "features_kernel_type": "rbf",
+ "features_hyperparameters": [
   15.318892222668023
  ],
- "sigma_RBF_bounds": [
+ "features_hyperparameters_bounds": [
   [
    1.0,
    20.0

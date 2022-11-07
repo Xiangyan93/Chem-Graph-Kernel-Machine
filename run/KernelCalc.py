@@ -18,6 +18,7 @@ def main(args: KernelArgs) -> None:
     # load data set.
     dataset = Dataset.load(path=args.save_dir)
     dataset.graph_kernel_type = 'graph'
+    dataset.set_ignore_features_add(True)
     # set kernel_config
     kernel_config = get_kernel_config(dataset=dataset,
                                       graph_kernel_type=args.graph_kernel_type,

@@ -61,10 +61,62 @@ def test_cv_PreComputed_PureGraph_Regression(dataset, testset, graph_hyperparame
 
 
 @pytest.mark.parametrize('dataset', [
+    ('st', ['smiles'], ['st'], ['T']),
+])
+@pytest.mark.parametrize('group_reading', [True, False])
+@pytest.mark.parametrize('features_scaling', [True, False])
+@pytest.mark.parametrize('model', ['gpr'])
+@pytest.mark.parametrize('graph_hyperparameters', [
+    additive, # additive_pnorm, additive_msnorm, additive_norm,
+    # product, product_pnorm, product_msnorm, product_norm
+])
+def test_cv_PreComputed_PureGraph_Regression_FeaturesAdd(dataset, group_reading, features_scaling, model,
+                                                         graph_hyperparameters):
+    dataset, pure_columns, target_columns, features_columns = dataset
+    save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
+                                            group_reading, features_scaling)
+    task = 'regression'
+    split, num_folds = 'random', '10'
+    metric = 'rmse'
+    # kernel computation
+    assert not os.path.exists('%s/kernel.pkl' % save_dir)
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--graph_kernel_type', 'graph',
+        '--graph_hyperparameters', '%s' % graph_hyperparameters,
+    ]
+    args = KernelArgs().parse_args(arguments)
+    from run.KernelCalc import main
+    main(args)
+    assert os.path.exists('%s/kernel.pkl' % save_dir)
+    # cross validation
+    arguments = [
+        '--save_dir', '%s' % save_dir,
+        '--graph_kernel_type', 'pre-computed',
+        '--task_type', task,
+        '--model_type', model,
+        '--split_type', split,
+        '--metric', metric,
+        '--num_folds', num_folds,
+        '--alpha', '0.01',
+        '--features_kernel_type', 'rbf',
+        '--features_hyperparameters', '100.0'
+    ]
+    args = TrainArgs().parse_args(arguments)
+    from run.ModelEvaluate import main
+    main(args)
+    os.remove('%s/kernel.pkl' % save_dir)
+
+
+def test_cv_PreComputed_PureGraph_Regression_FeaturesMol():
+    return
+
+
+@pytest.mark.parametrize('dataset', [
     ('bace', ['smiles'], ['bace']),
     ('np', ['smiles1', 'smiles2'], ['np']),
 ])
-@pytest.mark.parametrize('model', ['gpr' , 'gpc', 'svc'])
+@pytest.mark.parametrize('model', ['gpr', 'gpc', 'svc'])
 @pytest.mark.parametrize('testset', [
     ('random', '10'),
 ])

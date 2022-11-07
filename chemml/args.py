@@ -280,6 +280,9 @@ class TrainArgs(KernelArgs):
             assert self.split_sizes[0] > 0.99999
             assert self.model_type == 'gpr'
 
+        if self.ensemble:
+            assert self.n_sample_per_model is not None
+
 
 class PredictArgs(TrainArgs):
     test_path: str
