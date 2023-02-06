@@ -2,17 +2,26 @@
 # -*- coding: utf-8 -*-
 from .args import TrainArgs
 from mgktools.models import GPR, GPC, LRAGPR, NLEGPR, SVC, SVR, ConsensusRegressor
+from mgktools.interpret.gpr import InterpretableGaussianProcessRegressor as IGPR
 
 
 def set_model(args: TrainArgs,
               kernel):
     if args.model_type == 'gpr':
-        model = GPR(
-            kernel=kernel,
-            optimizer=args.optimizer,
-            alpha=args.alpha_,
-            normalize_y=True,
-        )
+        if args.atomic_attribution:
+            model = IGPR(
+                kernel=kernel,
+                optimizer=args.optimizer,
+                alpha=args.alpha_,
+                normalize_y=False,
+            )
+        else:
+            model = GPR(
+                kernel=kernel,
+                optimizer=args.optimizer,
+                alpha=args.alpha_,
+                normalize_y=True,
+            )
         if args.ensemble:
             model = ConsensusRegressor(
                 model,
