@@ -67,7 +67,8 @@ def main(args: TrainArgs) -> None:
         evaluator.fit(X=dataset.X, y=dataset.y)
         evaluator.predict(X=dataset_test.X, y=None, repr=dataset_test.repr.ravel()).to_csv(
             '%s/pred_ext.csv' % args.save_dir, sep='\t', index=False, float_format='%15.10f')
-        evaluator.interpret(dataset_test=dataset_test, output_tag='ext')
+        if args.atomic_attribution:
+            evaluator.interpret(dataset_test=dataset_test, output_tag='ext')
     else:
         evaluator.evaluate(external_test_dataset=dataset_test)
 
