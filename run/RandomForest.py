@@ -49,7 +49,7 @@ class RandomForestArgs(Tap):
     """
     split_type: Literal['random', 'scaffold_balanced', 'loocv'] = None
     """Method of splitting the data into train/val/test."""
-    split_sizes: Tuple[float, float] = (0.8, 0.2)
+    split_sizes: List[float] = [0.8, 0.2]
     """Split proportions for train/validation/test sets."""
     num_folds: int = 1
     """Number of folds when performing cross validation."""
