@@ -100,9 +100,9 @@ def main(args: RandomForestArgs) -> None:
     else:
         dataset_test = None
     if args.task_type == 'regression':
-        model = RandomForestRegressor()
+        model = RandomForestRegressor(random_state=args.seed)
     else:
-        model = RFClassifier()
+        model = RFClassifier(random_state=args.seed)
     Evaluator(save_dir=args.save_dir,
               dataset=dataset,
               model=model,
