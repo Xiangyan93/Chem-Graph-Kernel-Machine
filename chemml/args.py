@@ -215,6 +215,8 @@ class TrainArgs(KernelArgs):
     """Save the trained model file."""
     separate_test_path: str = None
     """Path to separate test set, optional."""
+    atomic_attribution: bool = False
+    """Output interpretability."""
 
     @property
     def metrics(self) -> List[Metric]:
@@ -282,6 +284,11 @@ class TrainArgs(KernelArgs):
 
         if self.ensemble:
             assert self.n_sample_per_model is not None
+
+        if self.atomic_attribution:
+            assert self.graph_kernel_type == 'graph', 'Set graph_kernel_type to graph for interpretability'
+            assert self.model_type == 'gpr', 'Set model_type to gpr for interpretability'
+            assert self.ensemble is False
 
 
 class PredictArgs(TrainArgs):
@@ -382,7 +389,7 @@ class ActiveLearningArgs(TrainArgs):
             self.cluster_size = self.add_size
         assert self.initial_size >= 2
         if self.surrogate_kernel is not None:
-            assert self.graph_kernel_type == 'preCalc'
+            assert self.graph_kernel_type == 'pre-computed'
 
         if self.stop_uncertainty is None:
             self.stop_uncertainty = [-1.0]
