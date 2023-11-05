@@ -17,7 +17,8 @@ temperature, pressure, etc.
 </div> 
 
 ## Installation
-GCC (7.*), NVIDIA Driver and CUDA toolkit(>=10.1).  
+GCC (7.*), NVIDIA Driver and CUDA toolkit(>=10.1). 
+Python 3.10 is suggested.
 ```
 pip install numpy==1.22.3 git+https://gitlab.com/Xiangyan93/graphdot.git@feature/xy git+https://github.com/bp-kelley/descriptastorus typed-argument-parser mgktools
 ```
