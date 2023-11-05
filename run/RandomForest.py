@@ -47,7 +47,7 @@ class RandomForestArgs(Tap):
     """
     Type of task. This determines the loss function used during training.
     """
-    split_type: Literal['random', 'scaffold_balanced', 'loocv'] = None
+    split_type: Literal['random', 'scaffold_order', 'scaffold_random', 'loocv'] = None
     """Method of splitting the data into train/val/test."""
     split_sizes: List[float] = [0.8, 0.2]
     """Split proportions for train/validation/test sets."""

@@ -4,6 +4,7 @@ import pytest
 import os
 CWD = os.path.dirname(os.path.abspath(__file__))
 import sys
+import shutil
 sys.path.append('%s/..' % CWD)
 from chemml.args import CommonArgs
 from run.ReadData import main
@@ -18,7 +19,8 @@ from run.ReadData import main
 def test_ReadData_PureGraph(dataset):
     dataset, pure_columns, target_columns = dataset
     save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -40,7 +42,8 @@ def test_ReadData_PureGraph_FeaturesAdd(dataset, group_reading, features_scaling
     dataset, pure_columns, target_columns, features_columns = dataset
     save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
                                             group_reading, features_scaling)
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -76,7 +79,8 @@ def test_ReadData_PureGraph_FeaturesMol(dataset, features_generator, features_sc
     dataset, pure_columns, target_columns = dataset
     save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
                                             ','.join(features_generator), features_scaling)
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -106,7 +110,8 @@ def test_ReadData_PureGraph_FeaturesAddMol(dataset, group_reading, features_gene
     dataset, pure_columns, target_columns, features_columns = dataset
     save_dir = '%s/data/_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
                                                group_reading, ','.join(features_generator), features_scaling)
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -137,7 +142,8 @@ def test_ReadData_PureGraph_FeaturesAddMol(dataset, group_reading, features_gene
 def test_ReadData_MixtureGraph(dataset):
     dataset, pure_columns, target_columns = dataset
     save_dir = '%s/data/_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns))
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -159,7 +165,8 @@ def test_ReadData_MixtureGraph_FeaturesAdd(dataset, group_reading, features_scal
     dataset, pure_columns, target_columns, features_columns = dataset
     save_dir = '%s/data/_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
                                             group_reading, features_scaling)
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -195,7 +202,8 @@ def test_ReadData_MixtureGraph_FeaturesMol(dataset, features_generator, features
     dataset, pure_columns, target_columns = dataset
     save_dir = '%s/data/_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
                                                ','.join(features_generator), features_combination, features_scaling)
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),
@@ -229,7 +237,8 @@ def test_ReadData_MixtureGraph_FeaturesMolAdd(dataset, group_reading, features_g
     save_dir = '%s/data/_%s_%s_%s_%s_%s_%s_%s' % (CWD, dataset, ','.join(pure_columns), ','.join(target_columns),
                                                   group_reading, ','.join(features_generator), features_combination,
                                                   features_scaling)
-    assert not os.path.exists(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
     arguments = [
         '--save_dir', '%s' % save_dir,
         '--data_path', '%s/data/%s.csv' % (CWD, dataset),

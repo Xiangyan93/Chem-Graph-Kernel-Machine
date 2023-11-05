@@ -389,7 +389,7 @@ class ActiveLearningArgs(TrainArgs):
             self.cluster_size = self.add_size
         assert self.initial_size >= 2
         if self.surrogate_kernel is not None:
-            assert self.graph_kernel_type == 'preCalc'
+            assert self.graph_kernel_type == 'pre-computed'
 
         if self.stop_uncertainty is None:
             self.stop_uncertainty = [-1.0]

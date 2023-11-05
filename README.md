@@ -19,8 +19,7 @@ temperature, pressure, etc.
 ## Installation
 GCC (7.*), NVIDIA Driver and CUDA toolkit(>=10.1).  
 ```
-conda env create -f environment.yml
-conda activate graphdot
+pip install numpy==1.22.3 git+https://gitlab.com/Xiangyan93/graphdot.git@feature/xy git+https://github.com/bp-kelley/descriptastorus typed-argument-parser mgktools
 ```
 For some combinations of GCC and CUDA, only old version of pycuda works```pip install pycuda==2020.1```
 
