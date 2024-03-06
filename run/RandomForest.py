@@ -76,7 +76,8 @@ def main(args: RandomForestArgs) -> None:
     if os.path.exists('%s/dataset.pkl' % args.save_dir):
         dataset = Dataset.load(path=args.save_dir)
     else:
-        os.mkdir(args.save_dir)
+        if not os.path.exists(args.save_dir):
+            os.mkdir(args.save_dir)
         dataset = Dataset.from_df(df=pd.read_csv(args.data_path),
                                   pure_columns=args.pure_columns,
                                   mixture_columns=args.mixture_columns,
